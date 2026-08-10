@@ -390,7 +390,7 @@ export default function ReleaseScreen(){
                             {t('comments.writePlaceholder')}
                         </button>
                         {isCommentsLoading && <p className={styles['empty-comments']}>{t('misc.loading')}</p>}
-                        {commentsLoadError && <p className={styles['comment-error']}>{t('release.loadError')}</p>}
+                        {Boolean(commentsLoadError) && <p className={styles['comment-error']}>{t('release.loadError')}</p>}
                         {!isCommentsLoading && !commentsLoadError && releaseComments.length === 0 && <p className={styles['empty-comments']}>{t('release.noComments')}</p>}
                         {!isCommentsLoading && <div className={styles['comments-page-list']}>
                             {releaseComments.map((comment: CommentType) => (
@@ -416,7 +416,7 @@ export default function ReleaseScreen(){
                         contentStyle={{ width: 'min(1180px, calc(100vw - 32px))', maxHeight: '80vh' }}
                     >
                         {isCommentsLoading && <p className={styles['empty-comments']}>{t('misc.loading')}</p>}
-                        {commentsLoadError && <p className={styles['comment-error']}>{t('release.loadError')}</p>}
+                        {Boolean(commentsLoadError) && <p className={styles['comment-error']}>{t('release.loadError')}</p>}
                         {!isCommentsLoading && !commentsLoadError && releaseComments.length === 0 && <p className={styles['empty-comments']}>{t('release.noComments')}</p>}
                         {!isCommentsLoading && releaseComments.map((comment: CommentType) => (
                             <Comment

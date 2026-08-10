@@ -46,6 +46,8 @@ export interface Anime {
   is_favorite: boolean;
   my_vote: number;
   comment_per_day_count: number;
+  comment_count?: number;
+  comments_count?: number;
 }
 
 export interface Comment {

@@ -81,7 +81,7 @@ export default function FilterSearchScreen() {
 
         {!hasSearched && <div className={styles.placeholder}>Настройте фильтры, чтобы начать поиск.</div>}
         {isLoading && <div className={styles.loading} role="status"><span />Ищем релизы…</div>}
-        {error && <p className={styles.error}>Не удалось загрузить релизы: {error instanceof Error ? error.message : 'неизвестная ошибка'}</p>}
+        {Boolean(error) && <p className={styles.error}>Не удалось загрузить релизы: {error instanceof Error ? error.message : 'неизвестная ошибка'}</p>}
         {hasSearched && !isLoading && !error && results.length === 0 && <p className={styles.empty}>По выбранным фильтрам ничего не найдено.</p>}
         {!isLoading && results.length > 0 && <div className={`${styles.grid} ${settings.appearance.defaultCardType === 'horizontal' ? styles.horizontal : ''}`}>
             {results.map(anime => settings.appearance.defaultCardType === 'horizontal'

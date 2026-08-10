@@ -16,6 +16,7 @@ import RemoteImage from '../components/RemoteImage';
 import { plural } from '../shared/plural';
 
 type ProfilePage = 'collections' | 'favorites' | 'history' | 'watching' | 'planned' | 'completed' | 'onHold' | 'dropped';
+type ReleasePage = Exclude<ProfilePage, 'collections'>;
 
 const PAGE_ITEMS: { page: ProfilePage; buttonText: 'nav.favorites' | 'home.history' | 'status.watching' | 'status.planned' | 'status.watched' | 'status.hold_on' | 'status.dropped'; label?: string }[] = [
     { page: 'collections', buttonText: 'nav.favorites', label: 'Коллекции' }, { page: 'favorites', buttonText: 'nav.favorites' }, { page: 'history', buttonText: 'home.history' }, { page: 'watching', buttonText: 'status.watching' }, { page: 'planned', buttonText: 'status.planned' }, { page: 'completed', buttonText: 'status.watched' }, { page: 'onHold', buttonText: 'status.hold_on' }, { page: 'dropped', buttonText: 'status.dropped' },
@@ -126,7 +127,7 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
             },
         }));
 
-        getReleasesForTab(activePage, requestedPage, sort, api, isProfileFavorites ? selectedProfileId : undefined)
+        getReleasesForTab(activePage as ReleasePage, requestedPage, sort, api, isProfileFavorites ? selectedProfileId : undefined)
             .then(newReleases => {
                 if (sortVersion !== sortVersionRef.current) return;
 
@@ -295,7 +296,7 @@ function CollectionCard({ collection }: { collection: Collection }) {
     </article>;
 }
 
-async function getReleasesForTab(page: ProfilePage, currentPage: number, sort: ReleaseSort, api: ReturnType<typeof useApi>, profileId?: number): Promise<Anime[]> {
+async function getReleasesForTab(page: ReleasePage, currentPage: number, sort: ReleaseSort, api: ReturnType<typeof useApi>, profileId?: number): Promise<Anime[]> {
     const query = `extended_mode=true&sort=${API_SORT_VALUES[sort]}`;
     const path = profileId
         ? `/profile/list/all/${profileId}/0/${currentPage}?${query}`
