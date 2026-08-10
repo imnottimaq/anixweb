@@ -36,7 +36,7 @@
     min-width: 0;
     overflow: hidden;
     border-radius: 15px;
-    color: #fff;
+    color: var(--quick-action-color);
     background: var(--lighter-background-color);
     text-decoration: none;
     isolation: isolate;
@@ -93,6 +93,49 @@
     max-height: none;
 }
 
+.quickActions {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 22px;
+}
+
+.quickAction {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 42px;
+    padding: 9px 12px;
+    border: 0px solid color-mix(in srgb, var(--quick-action-color) 46%, transparent);
+    border-radius: 11px;
+    box-sizing: border-box;
+    color: #fff;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    background: color-mix(in srgb, var(--quick-action-color) 28%, var(--background-color));
+    color: var(--quick-action-color);
+}
+
+.quickAction:focus-visible {
+    outline: 2px solid var(--quick-action-color);
+    outline-offset: 2px;
+}
+
+.quickActionIcon { width: 18px; height: 18px; flex: 0 0 18px; background: currentColor; -webkit-mask: var(--quick-action-icon) center / contain no-repeat; mask: var(--quick-action-icon) center / contain no-repeat; }
+.quickActionPopular { --quick-action-color: #ff7a18; }
+.quickActionSchedule { --quick-action-color: #198cff; }
+.quickActionFilter { --quick-action-color: #00b8a5; }
+.quickActionRandom { --quick-action-color: #78c94a; }
+.quickActionPopular { --quick-action-icon: url('../assets/icons/fire.svg'); }
+.quickActionSchedule { --quick-action-icon: url('../assets/icons/calendar-lines.svg'); }
+.quickActionFilter { --quick-action-icon: url('../assets/icons/filter.svg'); }
+.quickActionRandom { --quick-action-icon: url('../assets/icons/dice.svg'); }
+
 .comments { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .comment { position: relative; display: flex; gap: 11px; min-width: 0; padding: 14px 52px 14px 14px; border: 1px solid color-mix(in srgb, var(--text-color) 10%, transparent); border-radius: 13px; color: var(--text-color); text-decoration: none; }
 .comment:hover { border-color: color-mix(in srgb, var(--accent-color) 48%, transparent); }
@@ -124,6 +167,7 @@
     .featuredItem { height: auto; aspect-ratio: 2 / 1; }
     .topDiscussing .releaseList { height: auto; max-height: 470px; }
     .posterRail > a { flex-basis: 155px; }
+    .quickActions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (prefers-reduced-motion: reduce) {

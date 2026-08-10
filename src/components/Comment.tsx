@@ -15,14 +15,16 @@ import { useNavigate } from 'react-router-dom'
 
 export interface CommentProps {
     comment: Comment,
-    releaseId: number,  
-    onReply: (comment: Comment) => void,
-    onEdit: (comment: Comment) => void,
+    releaseId?: number,
+    onReply?: (comment: Comment) => void,
+    onEdit?: (comment: Comment) => void,
+    variant?: 'release' | 'collection',
     newReply?: { parentCommentId: number; comment: Comment } | null,
-    editedComment?: { commentId: number; message: string; spoiler: boolean } | null
+    editedComment?: { commentId: number; message: string; spoiler: boolean } | null,
+    onDelete?: () => void,
 }
 
-export default function CommentComponent({ comment, releaseId, onReply, onEdit, newReply, editedComment }: CommentProps) {
+export default function CommentComponent({ comment, releaseId, onReply, onEdit, variant = 'release', newReply, editedComment, onDelete }: CommentProps) {
     const { t } = useTranslation();
     const api = useApi();
     const navigate = useNavigate();
@@ -47,6 +49,8 @@ export default function CommentComponent({ comment, releaseId, onReply, onEdit, 
     const isSpoiler = editedComment?.commentId === comment.id
         ? editedComment.spoiler
         : comment.is_spoiler;
+    const isCollectionComment = variant === 'collection';
+    const endpointPrefix = isCollectionComment ? '/collection/comment' : '/release/comment';
 
     const handleVote = async (selectedVote: 1 | 2) => {
         if (isVoting) return;
@@ -55,7 +59,7 @@ export default function CommentComponent({ comment, releaseId, onReply, onEdit, 
         setIsVoting(true);
 
         try {
-            await api.getViaAgent<{ code: number }>(`/release/comment/vote/${comment.id}/${selectedVote}`);
+            await api.getViaAgent<{ code: number }>(`${endpointPrefix}/vote/${comment.id}/${selectedVote}`);
             setVoteCount((count) => count + getVoteScore(nextVote) - getVoteScore(currentVote));
             setCurrentVote(nextVote);
         } 
@@ -68,8 +72,9 @@ export default function CommentComponent({ comment, releaseId, onReply, onEdit, 
 
         setIsCommentActionLoading(true);
         try {
-            await api.getViaAgent<{ code: number }>(`/release/comment/delete/${comment.id}`);
+            await api.getViaAgent<{ code: number }>(`${endpointPrefix}/delete/${comment.id}`);
             setIsCommentDeleted(true);
+            onDelete?.();
         } catch (err) {
             console.error('Ошибка удаления комментария:', err);
         } finally {
@@ -86,7 +91,7 @@ export default function CommentComponent({ comment, releaseId, onReply, onEdit, 
             setIsLoading(true);
             try {
                 const existingReplies = await api.get<PagedResponse<Comment>>
-                (`release/comment/replies/${comment.id}/0?sort=2`)
+                (`${endpointPrefix}/replies/${comment.id}/0?sort=2`)
                 if (isCancelled) return;
 
                 setReplies([
@@ -103,7 +108,7 @@ export default function CommentComponent({ comment, releaseId, onReply, onEdit, 
         void appendReply();
 
         return () => {isCancelled = true}
-    }, [comment.id, newReply, userToken.userToken, api]);
+    }, [api, comment.id, endpointPrefix, newReply, userToken.userToken]);
 
     const toggleReplies = async () => {
         if (isRepliesShown) {
@@ -115,7 +120,7 @@ export default function CommentComponent({ comment, releaseId, onReply, onEdit, 
             setIsLoading(true);
             try {
                 const fetchedReplies = await api.get<PagedResponse<Comment>>
-                (`release/comment/replies/${comment.id}/0?sort=2`)
+                (`${endpointPrefix}/replies/${comment.id}/0?sort=2`)
                 setReplies(fetchedReplies.content);
                 setIsRepliesShown(true);
             } 
@@ -137,7 +142,7 @@ export default function CommentComponent({ comment, releaseId, onReply, onEdit, 
                         {comment.profile.is_verified && <img src={verifiedBadge} className={styles['verified-badge']} alt="" />}
                         <time>{formatCustomDate(comment.timestamp)}</time>
                     </div>
-                    <button type="button" className={styles['reply-button']} onClick={() => onReply(comment)}>
+                    <button type="button" className={styles['reply-button']} onClick={() => onReply?.(comment)}>
                         <img src={replyIcon} className={styles['arrow']} alt="" />
                         {t('comments.reply')}
                     </button>
@@ -153,7 +158,7 @@ export default function CommentComponent({ comment, releaseId, onReply, onEdit, 
                     {isCommentMenuOpen && <div className={styles['comment-menu-options']}>
                         <button type="button" disabled={isCommentActionLoading} onClick={() => {
                             setIsCommentMenuOpen(false);
-                            onEdit(comment);
+                            onEdit?.(comment);
                         }}>{t('comments.edit')}</button>
                         <button type="button" disabled={isCommentActionLoading} className={styles['delete-comment-option']} onClick={() => {
                             setIsCommentMenuOpen(false);
@@ -181,7 +186,7 @@ export default function CommentComponent({ comment, releaseId, onReply, onEdit, 
                 <button type="button" aria-label={t('comments.voteUp')} onClick={() => void handleVote(2)}>
                     <img src={upArrowIcon} className={`${styles['arrow']} ${currentVote === 2 ? styles['positive'] : ''}`} alt="" />
                 </button>
-                <span>{voteCount}</span>
+                <span className={voteCount > 0 ? styles['vote-positive'] : voteCount < 0 ? styles['vote-negative'] : styles['vote-neutral']}>{voteCount}</span>
                 <button type="button" aria-label={t('comments.voteDown')} onClick={() => void handleVote(1)}>
                     <img src={downArrowIcon} className={`${styles['arrow']} ${currentVote === 1 ? styles['negative'] : ''}`} alt="" />
                 </button>
@@ -212,8 +217,10 @@ export default function CommentComponent({ comment, releaseId, onReply, onEdit, 
                             releaseId={releaseId}
                             onReply={onReply}
                             onEdit={onEdit}
+                            variant={variant}
                             newReply={newReply}
                             editedComment={editedComment}
+                            onDelete={onDelete}
                         />
                     ))}
                 </div>

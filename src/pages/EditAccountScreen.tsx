@@ -149,13 +149,7 @@ export default function EditAccountScreen() {
     const [emailError, setEmailError] = useState<string | null>(null);
     const [isEmailSaving, setIsEmailSaving] = useState(false);
 
-    const getWithFallback = useCallback((async <T,>(path: string) => {
-        try {
-            return await api.get<T>(path);
-        } catch {
-            return api.getViaAgent<T>(path);
-        }
-    }), [api])
+    const getRequest = useCallback(<T,>(path: string) => api.get<T>(path), [api]);
 
     useEffect(() => {
         if (!userToken) navigate('/account/login', { replace: true });
@@ -169,10 +163,10 @@ export default function EditAccountScreen() {
         const loadProfile = async () => {
             try {
                 const [response, social, preferences, loginInfo] = await Promise.all([
-                    getWithFallback<ProfileResponse>(`/profile/${userId}`),
-                    getWithFallback<SocialResponse>('/profile/preference/social'),
-                    getWithFallback<ProfilePreferences>('/profile/preference/my'),
-                    getWithFallback<LoginInfoResponse>('/profile/preference/login/info'),
+                    getRequest<ProfileResponse>(`/profile/${userId}`),
+                    getRequest<SocialResponse>('/profile/preference/social'),
+                    getRequest<ProfilePreferences>('/profile/preference/my'),
+                    getRequest<LoginInfoResponse>('/profile/preference/login/info'),
                 ]);
                 if (isCancelled) return;
 
@@ -203,20 +197,14 @@ export default function EditAccountScreen() {
 
         void loadProfile();
         return () => { isCancelled = true; };
-    }, [api, userId, userToken, getWithFallback]);
+    }, [userId, userToken, getRequest]);
 
     const updateDraft = <Key extends keyof ProfileDraft>(key: Key, value: ProfileDraft[Key]) => {
         setSaveMessage(null);
         setDraft(current => ({ ...current, [key]: value }));
     };
 
-    const requestWithFallback = async <T,>(path: string, body: unknown) => {
-        try {
-            return await api.post<T>(path, body);
-        } catch {
-            return api.postViaAgent<T>(path, body);
-        }
-    };
+    const postRequest = <T,>(path: string, body: unknown) => api.post<T>(path, body);
 
     const saveProfile = async () => {
         if (isSaving) return;
@@ -225,8 +213,8 @@ export default function EditAccountScreen() {
 
         try {
             await Promise.all([
-                requestWithFallback('/profile/preference/status/edit', { status: draft.status }),
-                requestWithFallback('/profile/preference/social/edit', {
+                postRequest('/profile/preference/status/edit', { status: draft.status }),
+                postRequest('/profile/preference/social/edit', {
                     vkPage: draft.vk_page,
                     tgPage: draft.tg_page,
                     instPage: draft.inst_page,
@@ -250,7 +238,7 @@ export default function EditAccountScreen() {
         setIsLoginSaving(true);
         setSaveMessage(null);
         try {
-            await getWithFallback<{ code: number }>(`/profile/preference/login/change?login=${encodeURIComponent(newLogin)}`);
+            await getRequest<{ code: number }>(`/profile/preference/login/change?login=${encodeURIComponent(newLogin)}`);
             setProfile(current => current ? { ...current, login: newLogin } : current);
             setIsLoginChangeAvailable(false);
             setSaveMessage('Никнейм изменён. Следующая смена будет доступна позже.');
@@ -272,7 +260,7 @@ export default function EditAccountScreen() {
 
         setIsPrivacySaving(key);
         try {
-            await requestWithFallback(endpoints[key], { permission });
+            await postRequest(endpoints[key], { permission });
             setPrivacy(current => ({ ...current, [key]: permission }));
         } catch {
             setSaveMessage('Не удалось изменить настройку приватности.');
@@ -331,7 +319,7 @@ export default function EditAccountScreen() {
         setIsEmailSaving(true);
         setEmailError(null);
         try {
-            await requestWithFallback('/profile/preference/email/edit', {
+            await postRequest('/profile/preference/email/edit', {
                 password: emailPassword,
                 email: currentEmail.trim(),
                 newEmail: newEmail.trim(),
@@ -407,7 +395,7 @@ export default function EditAccountScreen() {
     return (
         <main className={styles.body}>
             <header className={styles.header}>
-                <button type="button" className={styles.backButton} aria-label="Вернуться к профилю" onClick={() => navigate('/account')}>←</button>
+                <button type="button" className={styles.backButton} aria-label="Вернуться к профилю" onClick={() => navigate('/account')}><span className={styles.backIcon} aria-hidden="true" /></button>
                 <div>
                     <h1>Редактирование профиля</h1>
                     <p>Настройте информацию, которая отображается в вашем профиле.</p>

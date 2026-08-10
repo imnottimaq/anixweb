@@ -30,7 +30,6 @@ export default function NotificationsScreen() {
         setError(null);
 
         const markAsRead = api.get<{ code: number }>('/notification/read')
-            .catch(() => api.getViaAgent<{ code: number }>('/notification/read'))
             .then(() => {
                 wasMarkedAsRead = true;
                 if (!cancelled) {

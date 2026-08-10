@@ -60,11 +60,12 @@ export function Modal({ isOpen, onClose, title, text, actions, children, size, s
             aria-label={title ? 'modal-title' : undefined}
             onMouseDown={(event) => event.stopPropagation()}
         >
-            {showCloseButton !== false && <button className={styles['close-button']} onClick={handleClose} aria-label={t('misc.close')}>
-                <img alt={t('misc.close')} src={XMarkIcon}/>
-            </button>}
-
-            {title && <h2 className={styles.title}>{title}</h2>}
+            {(title || showCloseButton !== false) && <header className={styles['modal-header']}>
+                {title && <h2 className={styles.title}>{title}</h2>}
+                {showCloseButton !== false && <button className={styles['close-button']} onClick={handleClose} aria-label={t('misc.close')}>
+                    <img alt="" src={XMarkIcon}/>
+                </button>}
+            </header>}
             {text && <p className={styles.text}>{text}</p>}
             {typeof children === 'function' ? children(handleClose) : children}
 

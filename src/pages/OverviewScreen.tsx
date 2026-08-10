@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import AnimeCard from '../components/AnimeCard';
 import AnimeCardHorizontal from '../components/AnimeCardHorizontal';
 import RemoteImage from '../components/RemoteImage';
 import { useApi } from '../shared/apiClient';
+import { useUser } from '../shared/contexts/userContext';
 import type { Anime, Comment, DiscoverInteresting, PagedResponse } from '../shared/types/api';
 import leftArrowIcon from '../assets/icons/left-arrow.svg';
 import rightArrowIcon from '../assets/icons/right-arrow.svg';
 import styles from './OverviewScreen.module.css';
+import { useAsyncLoad } from '../shared/useAsyncLoad';
 
 type DiscoverComment = Omit<Comment, 'release'> & {
     release?: { id: number; title_ru: string } | null;
@@ -26,40 +28,45 @@ const EMPTY_DATA: OverviewData = {
     interesting: [], recommendations: [], watching: [], discussing: [], comments: [],
 };
 
+let overviewCache: { token: string; data: OverviewData } | null = null;
+
 export default function OverviewScreen() {
     const api = useApi();
-    const [data, setData] = useState<OverviewData>(EMPTY_DATA);
-    const [isLoading, setIsLoading] = useState(true);
+    const { userToken } = useUser();
+    const navigate = useNavigate();
     const [activeInterestingIndex, setActiveInterestingIndex] = useState(0);
 
-    useEffect(() => {
-        let cancelled = false;
+    const { data = EMPTY_DATA, isLoading } = useAsyncLoad(signal => {
+        if (overviewCache?.token === userToken) return Promise.resolve(overviewCache.data);
 
-        const get = <T,>(path: string) => api.get<PagedResponse<T>>(path)
-            .catch(() => api.getViaAgent<PagedResponse<T>>(path));
+        const get = <T,>(path: string) => api.get<PagedResponse<T>>(path, { signal });
 
-        void Promise.allSettled([
+        const promise = Promise.allSettled([
             get<DiscoverInteresting>('/discover/interesting'),
             get<Anime>('/discover/recommendations/-1'),
             get<Anime>('/discover/watching/0'),
             get<Anime>('/discover/discussing'),
             get<DiscoverComment>('/discover/comments'),
         ] as const).then(([interesting, recommendations, watching, discussing, comments]) => {
-            if (cancelled) return;
-            setData({
+            if (signal.aborted) throw new DOMException('Запрос отменён', 'AbortError');
+
+            const result = {
                 interesting: getContent(interesting),
                 recommendations: getContent(recommendations),
                 watching: getContent(watching),
                 discussing: getContent(discussing),
                 comments: resolveCommentReleases(getContent(comments)),
-            });
-            setActiveInterestingIndex(0);
-        }).finally(() => {
-            if (!cancelled) setIsLoading(false);
+            };
+            overviewCache = { token: userToken, data: result };
+            return result;
         });
 
-        return () => { cancelled = true; };
-    }, [api]);
+        return promise;
+    }, [api, userToken], { initialData: overviewCache?.token === userToken ? overviewCache.data : EMPTY_DATA });
+
+    const visibleInterestingIndex = data.interesting.length > 0
+        ? activeInterestingIndex % data.interesting.length
+        : 0;
 
     return <main className={styles.page}>
         {isLoading && <div className={styles.loading} role="status"><span />Загружаем обзор…</div>}
@@ -69,7 +76,7 @@ export default function OverviewScreen() {
                 {data.interesting.length > 0 && <section className={styles.featured}>
                     <SectionTitle title="Интересное" />
                     <div className={styles.gallery}>
-                        <FeaturedItem key={data.interesting[activeInterestingIndex].id} item={data.interesting[activeInterestingIndex]} />
+                        <FeaturedItem key={data.interesting[visibleInterestingIndex].id} item={data.interesting[visibleInterestingIndex]} />
                         {data.interesting.length > 1 && <>
                             <button
                                 type="button"
@@ -94,6 +101,25 @@ export default function OverviewScreen() {
                     </div>
                 </section>}
             </div>}
+
+            <nav className={styles.quickActions} aria-label="Быстрые переходы">
+                <button type="button" className={`${styles.quickAction} ${styles.quickActionPopular}`} onClick={() => navigate('/filter', { state: { filter: { sort: 3 }, autoSearch: true } })}>
+                    <span className={styles.quickActionIcon} aria-hidden="true" />
+                    <span>Популярное</span>
+                </button>
+                <button type="button" className={`${styles.quickAction} ${styles.quickActionSchedule}`} onClick={() => navigate('/filter', { state: { filter: { status_id: 2 }, autoSearch: true } })}>
+                    <span className={styles.quickActionIcon} aria-hidden="true" />
+                    <span>Расписание</span>
+                </button>
+                <button type="button" className={`${styles.quickAction} ${styles.quickActionFilter}`} onClick={() => navigate('/filter')}>
+                    <span className={styles.quickActionIcon} aria-hidden="true" />
+                    <span>Фильтр</span>
+                </button>
+                <Link to="/random" className={`${styles.quickAction} ${styles.quickActionRandom}`}>
+                    <span className={styles.quickActionIcon} aria-hidden="true" />
+                    <span>Рандом</span>
+                </Link>
+            </nav>
 
             <section className={styles.section}>
                 <SectionTitle title="Рекомендуем тебе" description="Релизы, которые могут тебе понравиться" />

@@ -1,6 +1,6 @@
 import { lazy } from 'react';
 
-export const LatestReleasesScreen = lazy(() => import('../pages/LatestReleasesScreen'));
+export const HomepageScreen = lazy(() => import('../pages/HomepageScreen'));
 export const FavoritesScreen = lazy(() => import('../pages/FavoritesScreen'));
 export const ReleaseScreen = lazy(() => import('../pages/ReleaseScreen'));
 export const PlayerScreen = lazy(() => import('../pages/PlayerScreen'));
@@ -17,3 +17,5 @@ export const NotificationSettingsScreen = lazy(() => import('../pages/Notificati
 export const ReleaseNotificationSettingsScreen = lazy(() => import('../pages/ReleaseNotificationSettingsScreen'));
 export const FranchiseScreen = lazy(() => import('../pages/FranchiseScreen'));
 export const OverviewScreen = lazy(() => import('../pages/OverviewScreen'))
+export const FilterSearchScreen = lazy(() => import('../pages/FilterSearchScreen'));
+export const CollectionScreen = lazy(() => import('../pages/CollectionScreen'));

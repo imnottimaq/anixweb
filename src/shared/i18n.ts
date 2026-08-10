@@ -95,7 +95,7 @@ export const russian = {
     'comments.spoilerHint': 'Нажмите здесь, если хотите его увидеть',
     'comments.voteUp': 'Лайк',
     'comments.voteDown': 'Дизлайк',
-    'comments.hideReplies': 'Скрыть ответы',
+    'comments.hideReplies': 'Скрыть',
     'comments.deleteConfirmTitle': 'Вы уверены?',
     'comments.deleteConfirmText': 'Ваш комментарий будет удален. Это действие нельзя отменить.',
     'account.stats': 'Статистика',

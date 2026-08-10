@@ -10,10 +10,12 @@ export function useApi() {
     const { userToken } = useUser();
     const get = useCallback(<T>(path: string, init?: RequestInit) => apiGet<T>(path, userToken, init), [userToken]);
     const post = useCallback(<T>(path: string, body: unknown, headers?: ApiHeaders) => apiPost<T>(path, userToken, body, headers), [userToken]);
-    const getViaAgent = useCallback(<T>(path: string) => apiGetViaAgent<T>(path, userToken), [userToken]);
+    const postForm = useCallback(<T>(path: string, body: FormData) => apiPostForm<T>(path, userToken, body), [userToken]);
+    const getViaAgent = useCallback(<T>(path: string, init?: RequestInit) => apiGetViaAgent<T>(path, userToken, init), [userToken]);
     const postViaAgent = useCallback(<T>(path: string, body: unknown, headers?: ApiHeaders) => apiPostViaAgent<T>(path, userToken, body, headers), [userToken]);
+    const postFormViaAgent = useCallback(<T>(path: string, body: FormData) => apiPostFormViaAgent<T>(path, userToken, body), [userToken]);
 
-    return useMemo(() => ({ get, post, getViaAgent, postViaAgent }), [get, getViaAgent, post, postViaAgent]);
+    return useMemo(() => ({ get, post, postForm, getViaAgent, postViaAgent, postFormViaAgent }), [get, getViaAgent, post, postForm, postFormViaAgent, postViaAgent]);
 }
 
 function getApiUrl(path: string, token: string) {
@@ -43,8 +45,15 @@ async function apiPost<T>(path: string, token: string, body: unknown, headers?: 
     });
 }
 
-async function apiGetViaAgent<T>(path: string, token: string): Promise<T> {
-    return getJson<T>(`${AGENT_PROXY}${encodeURIComponent(getApiUrl(path, token))}`);
+async function apiPostForm<T>(path: string, token: string, body: FormData): Promise<T> {
+    return getJson<T>(getApiUrl(path, token), {
+        method: 'POST',
+        body,
+    });
+}
+
+async function apiGetViaAgent<T>(path: string, token: string, init?: RequestInit): Promise<T> {
+    return getJson<T>(`${AGENT_PROXY}${encodeURIComponent(getApiUrl(path, token))}`, init);
 }
 
 async function apiPostViaAgent<T>(path: string, token: string, body: unknown, headers?: ApiHeaders): Promise<T> {
@@ -52,5 +61,12 @@ async function apiPostViaAgent<T>(path: string, token: string, body: unknown, he
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...headers },
         body: JSON.stringify(body),
+    });
+}
+
+async function apiPostFormViaAgent<T>(path: string, token: string, body: FormData): Promise<T> {
+    return getJson<T>(`${AGENT_PROXY}${encodeURIComponent(getApiUrl(path, token))}`, {
+        method: 'POST',
+        body,
     });
 }

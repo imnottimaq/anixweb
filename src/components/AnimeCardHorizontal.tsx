@@ -6,6 +6,7 @@ import { profileListStatus } from "../shared/profileListStatus"
 import starIcon from '../assets/icons/star.svg'
 import RemoteImage from './RemoteImage';
 import { useSettings } from '../shared/contexts/settingsContext';
+import { plural } from '../shared/plural';
 
 export interface AnimeCardProps {
   anime: Anime;
@@ -41,19 +42,9 @@ export default function AnimeCardHorizontal({ anime, compact = false }: AnimeCar
         </p>
         {anime.description && <p className={styles['anime-description']}>{anime.description}</p>}
         {compact && anime.comment_per_day_count > 0 && <p className={styles['comment-activity']}>
-          {anime.comment_per_day_count} {getCommentWord(anime.comment_per_day_count)} за сутки
+          {anime.comment_per_day_count} {plural(anime.comment_per_day_count, 'комментарий', 'комментария', 'комментариев')} за сутки
         </p>}
       </div>
     </Link>
   );
-}
-
-function getCommentWord(count: number) {
-  const lastTwoDigits = count % 100;
-  const lastDigit = count % 10;
-
-  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return 'комментариев';
-  if (lastDigit === 1) return 'комментарий';
-  if (lastDigit >= 2 && lastDigit <= 4) return 'комментария';
-  return 'комментариев';
 }

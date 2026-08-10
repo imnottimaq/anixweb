@@ -1,30 +1,21 @@
-import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import ArrowLeftIcon from '../assets/icons/arrow-left.svg';
 import RemoteImage from '../components/RemoteImage';
 import { useApi } from '../shared/apiClient';
 import type { ReleaseNotificationsPreferencesAPIResponse } from '../shared/types/api';
+import { useAsyncLoad } from '../shared/useAsyncLoad';
 import styles from './ReleaseNotificationSettingsScreen.module.css';
 
 export default function ReleaseNotificationSettingsScreen() {
     const api = useApi();
     const navigate = useNavigate();
-    const [releases, setReleases] = useState<ReleaseNotificationsPreferencesAPIResponse['content']>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        let cancelled = false;
-
-        void api.get<ReleaseNotificationsPreferencesAPIResponse>('/profile/preference/notification/release/all/0')
-            .then(response => { if (!cancelled) setReleases(response.content ?? []); })
-            .catch(requestError => {
-                if (!cancelled) setError(requestError instanceof Error ? requestError.message : 'Не удалось загрузить релизы');
-            })
-            .finally(() => { if (!cancelled) setIsLoading(false); });
-
-        return () => { cancelled = true; };
-    }, [api]);
+    const { data, error, isLoading } = useAsyncLoad(
+        signal => api.get<ReleaseNotificationsPreferencesAPIResponse>('/profile/preference/notification/release/all/0', { signal }),
+        [api],
+        { initialData: { code: 0, content: [], total_count: 0, total_page_count: 0, current_page: 0 } },
+    );
+    const releases = data?.content ?? [];
+    const errorMessage = error instanceof Error ? error.message : error ? 'Не удалось загрузить релизы' : null;
 
     return <section className={styles.page}>
         <header className={styles.header}>
@@ -33,8 +24,8 @@ export default function ReleaseNotificationSettingsScreen() {
         </header>
 
         {isLoading && <p className={styles.message}>Загружаем релизы…</p>}
-        {error && <p className={`${styles.message} ${styles.error}`}>{error}</p>}
-        {!isLoading && !error && releases.length === 0 && <p className={styles.message}>Для отдельных релизов уведомления пока не настроены.</p>}
+        {errorMessage && <p className={`${styles.message} ${styles.error}`}>{errorMessage}</p>}
+        {!isLoading && !errorMessage && releases.length === 0 && <p className={styles.message}>Для отдельных релизов уведомления пока не настроены.</p>}
 
         <div className={styles.list}>
             {releases.map(release => <article className={styles.release} key={release.id}>

@@ -27,15 +27,17 @@
 .backButton {
     width: 34px;
     height: 34px;
+    display: grid;
+    place-items: center;
     flex: 0 0 34px;
     padding: 0;
-    border: 0;
+    border: 1px solid color-mix(in srgb, var(--text-color) 16%, transparent);
+    border-radius: 9px;
     color: var(--text-color);
-    background: transparent;
-    font-size: 29px;
-    line-height: 1;
+    background: var(--lighter-background-color);
     cursor: pointer;
 }
+.backIcon { display: block; width: 21px; height: 21px; background: var(--text-color); -webkit-mask: url('../assets/icons/arrow-left.svg') center / contain no-repeat; mask: url('../assets/icons/arrow-left.svg') center / contain no-repeat; }
 
 .section { margin-top: 48px; }
 .section:first-of-type { margin-top: 0; }

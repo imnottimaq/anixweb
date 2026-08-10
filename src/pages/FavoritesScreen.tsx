@@ -1,24 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import AnimeCard from '../components/AnimeCard';
 import AnimeCardHorizontal from '../components/AnimeCardHorizontal';
 import SortSelect, { type ReleaseSort } from '../components/SortSelect';
-import { type Anime } from '../shared/types/api';
+import { type Anime, type Collection, type PagedResponse } from '../shared/types/api';
 import { emptyTab, type TabData } from '../shared/types/internal';
 import { useUser } from '../shared/contexts/userContext';
 import { useSettings } from '../shared/contexts/settingsContext';
 import { useSearchScope, type SearchScope } from '../shared/contexts/searchContext';
-import styles from './LatestReleasesScreen.module.css';
+import styles from './HomepageScreen.module.css';
+import collectionStyles from './CollectionsScreen.module.css';
 import { useTranslation } from '../shared/useTranslation';
 import { useApi } from '../shared/apiClient';
+import RemoteImage from '../components/RemoteImage';
+import { plural } from '../shared/plural';
 
-type ProfilePage = 'favorites' | 'history' | 'watching' | 'planned' | 'completed' | 'onHold' | 'dropped';
+type ProfilePage = 'collections' | 'favorites' | 'history' | 'watching' | 'planned' | 'completed' | 'onHold' | 'dropped';
 
-const PAGE_ITEMS: { page: ProfilePage; buttonText: 'nav.favorites' | 'home.history' | 'status.watching' | 'status.planned' | 'status.watched' | 'status.hold_on' | 'status.dropped' }[] = [
-    { page: 'favorites', buttonText: 'nav.favorites' }, { page: 'history', buttonText: 'home.history' }, { page: 'watching', buttonText: 'status.watching' }, { page: 'planned', buttonText: 'status.planned' }, { page: 'completed', buttonText: 'status.watched' }, { page: 'onHold', buttonText: 'status.hold_on' }, { page: 'dropped', buttonText: 'status.dropped' },
+const PAGE_ITEMS: { page: ProfilePage; buttonText: 'nav.favorites' | 'home.history' | 'status.watching' | 'status.planned' | 'status.watched' | 'status.hold_on' | 'status.dropped'; label?: string }[] = [
+    { page: 'collections', buttonText: 'nav.favorites', label: 'Коллекции' }, { page: 'favorites', buttonText: 'nav.favorites' }, { page: 'history', buttonText: 'home.history' }, { page: 'watching', buttonText: 'status.watching' }, { page: 'planned', buttonText: 'status.planned' }, { page: 'completed', buttonText: 'status.watched' }, { page: 'onHold', buttonText: 'status.hold_on' }, { page: 'dropped', buttonText: 'status.dropped' },
 ];
 
-const PROFILE_LIST_IDS: Record<Exclude<ProfilePage, 'favorites' | 'history'>, number> = {
+const PROFILE_LIST_IDS: Record<Exclude<ProfilePage, 'collections' | 'favorites' | 'history'>, number> = {
     watching: 1,
     planned: 2,
     completed: 3,
@@ -36,6 +39,7 @@ const API_SORT_VALUES: Record<ReleaseSort, number> = {
 };
 
 const SEARCH_SCOPES: Record<ProfilePage, SearchScope> = {
+    collections: { type: 'collections' },
     favorites: { type: 'favorites' },
     history: { type: 'history' },
     watching: { type: 'profileList', list: 1 },
@@ -45,8 +49,12 @@ const SEARCH_SCOPES: Record<ProfilePage, SearchScope> = {
     dropped: { type: 'profileList', list: 5 },
 };
 
-function createTabs(): Record<ProfilePage, TabData> {
+type CollectionTabData = TabData & { collections: Collection[] };
+type FavoritesTabs = Record<Exclude<ProfilePage, 'collections'>, TabData> & { collections: CollectionTabData };
+
+function createTabs(): FavoritesTabs {
     return {
+        collections: { ...emptyTab(), collections: [] },
         favorites: emptyTab(),
         history: emptyTab(),
         watching: emptyTab(),
@@ -58,6 +66,11 @@ function createTabs(): Record<ProfilePage, TabData> {
 }
 
 export default function FavoritesScreen() {
+    const { profileId } = useParams<{ profileId?: string }>();
+    return <FavoritesScreenContent key={profileId ?? 'own'} profileId={profileId} />;
+}
+
+function FavoritesScreenContent({ profileId }: { profileId?: string }) {
     const { userToken } = useUser();
     const api = useApi();
     const navigate = useNavigate();
@@ -69,17 +82,22 @@ export default function FavoritesScreen() {
     const sortVersionRef = useRef(0);
     const [activePage, setActivePage] = useState<ProfilePage>('favorites');
     const [sort, setSort] = useState<ReleaseSort>('addedDesc');
-    const [tabs, setTabs] = useState<Record<ProfilePage, TabData>>(createTabs);
+    const [tabs, setTabs] = useState<FavoritesTabs>(createTabs);
+    const selectedProfileId = Number(profileId);
+    const isProfileFavorites = profileId !== undefined;
+    const hasValidProfileId = Number.isInteger(selectedProfileId) && selectedProfileId > 0;
 
-    const activeTab = tabs[activePage];
+    const isCollectionsPage = activePage === 'collections';
+    const activeTab = isCollectionsPage ? tabs.collections : tabs[activePage];
     const currentPageIsLoaded = activeTab.loadedPages.includes(activeTab.page);
-    const isInitialLoading = activeTab.isLoading && activeTab.releases.length === 0;
-    const isLoadingMore = activeTab.isLoading && activeTab.releases.length > 0;
+    const activeItemsCount = isCollectionsPage ? tabs.collections.collections.length : activeTab.releases.length;
+    const isInitialLoading = activeTab.isLoading && activeItemsCount === 0;
+    const isLoadingMore = activeTab.isLoading && activeItemsCount > 0;
 
     useEffect(() => {
-        setSearchScope(SEARCH_SCOPES[activePage]);
+        setSearchScope(isProfileFavorites ? { type: 'releases' } : SEARCH_SCOPES[activePage]);
         return () => setSearchScope({ type: 'releases' });
-    }, [activePage, setSearchScope]);
+    }, [activePage, isProfileFavorites, setSearchScope]);
 
     const handleSortChange = (nextSort: ReleaseSort) => {
         if (nextSort === sort) return;
@@ -90,12 +108,13 @@ export default function FavoritesScreen() {
     };
 
     useEffect(() => {
-        if (!userToken) return;
+        if ((!userToken && !isProfileFavorites) || (isProfileFavorites && !hasValidProfileId)) return;
+        if (isCollectionsPage) return;
         if (!activeTab.hasMore || currentPageIsLoaded) return;
 
         const requestedPage = activeTab.page;
         const sortVersion = sortVersionRef.current;
-        const requestKey = `${activePage}:${requestedPage}:${sortVersion}`;
+        const requestKey = `${selectedProfileId || 'own'}:${activePage}:${requestedPage}:${sortVersion}`;
         if (loadingRequestsRef.current.has(requestKey)) return;
 
         loadingRequestsRef.current.add(requestKey);
@@ -107,7 +126,7 @@ export default function FavoritesScreen() {
             },
         }));
 
-        getReleasesForTab(activePage, requestedPage, sort, api)
+        getReleasesForTab(activePage, requestedPage, sort, api, isProfileFavorites ? selectedProfileId : undefined)
             .then(newReleases => {
                 if (sortVersion !== sortVersionRef.current) return;
 
@@ -140,7 +159,47 @@ export default function FavoritesScreen() {
                 }));
             })
             .finally(() => loadingRequestsRef.current.delete(requestKey));
-    }, [activePage, activeTab.hasMore, activeTab.page, currentPageIsLoaded, sort, userToken, api]);
+    }, [activePage, activeTab.hasMore, activeTab.page, currentPageIsLoaded, sort, userToken, api, hasValidProfileId, isCollectionsPage, isProfileFavorites, selectedProfileId]);
+
+    useEffect(() => {
+        if (!userToken || !isCollectionsPage || !activeTab.hasMore || currentPageIsLoaded) return;
+
+        const requestedPage = activeTab.page;
+        const requestKey = `collections:${requestedPage}`;
+        if (loadingRequestsRef.current.has(requestKey)) return;
+
+        loadingRequestsRef.current.add(requestKey);
+        setTabs(previousTabs => ({
+            ...previousTabs,
+            collections: { ...previousTabs.collections, isLoading: true },
+        }));
+
+        api.get<PagedResponse<Collection>>(`/collectionFavorite/all/${requestedPage}`)
+            .then(data => {
+                setTabs(previousTabs => {
+                    const existingIds = new Set(previousTabs.collections.collections.map(collection => collection.id));
+                    const collections = (data.content ?? []).filter(collection => !existingIds.has(collection.id));
+                    return {
+                        ...previousTabs,
+                        collections: {
+                            ...previousTabs.collections,
+                            collections: [...previousTabs.collections.collections, ...collections],
+                            loadedPages: [...previousTabs.collections.loadedPages, requestedPage],
+                            isLoading: false,
+                            hasMore: collections.length > 0,
+                        },
+                    };
+                });
+            })
+            .catch(error => {
+                console.error('Не удалось загрузить сохранённые коллекции:', error);
+                setTabs(previousTabs => ({
+                    ...previousTabs,
+                    collections: { ...previousTabs.collections, isLoading: false },
+                }));
+            })
+            .finally(() => loadingRequestsRef.current.delete(requestKey));
+    }, [activeTab.hasMore, activeTab.page, api, currentPageIsLoaded, isCollectionsPage, userToken]);
 
     useEffect(() => {
         if (!currentPageIsLoaded || activeTab.isLoading || !activeTab.hasMore) return;
@@ -169,23 +228,28 @@ export default function FavoritesScreen() {
 
     return (
         <div className={styles.body}>
-            <div className={styles['side-panel']}>
-                {PAGE_ITEMS.map(({ page, buttonText }) => (
+            {!isProfileFavorites && <div className={styles['side-panel']}>
+                {PAGE_ITEMS.map(({ page, buttonText, label }) => (
                     <button
                         key={page}
                         className={activePage === page ? styles.active : ''}
                         onClick={() => setActivePage(page)}
                     >
-                        {t(buttonText)}
+                        {label ?? t(buttonText)}
                     </button>
                 ))}
-            </div>
+            </div>}
 
             <div className={styles.content}>
-                <div className={styles['sort-toolbar']}>
+                {isProfileFavorites && <h1>Избранное</h1>}
+                {!isCollectionsPage && <div className={styles['sort-toolbar']}>
                     <SortSelect value={sort} onChange={handleSortChange} />
-                </div>
-                <div className={`${styles['releases-grid']} ${settings.appearance.defaultCardType === 'horizontal' ? styles['horizontal-grid'] : ''}`}>
+                </div>}
+                {isCollectionsPage ? <div className={collectionStyles.list}>
+                    {tabs.collections.collections.map(collection => <CollectionCard key={collection.id} collection={collection} />)}
+                    <div ref={triggerRef} style={{ height: '20px', background: 'transparent' }} />
+                    {isLoadingMore && <div className={styles['loading-more']} role="status">{t('misc.loading')}</div>}
+                </div> : <div className={`${styles['releases-grid']} ${settings.appearance.defaultCardType === 'horizontal' ? styles['horizontal-grid'] : ''}`}>
                     {activeTab.releases.map(anime => (
                         settings.appearance.defaultCardType === 'vertical'
                             ? <AnimeCard key={anime.id} anime={anime} />
@@ -194,10 +258,11 @@ export default function FavoritesScreen() {
                     <div ref={triggerRef} style={{ height: '20px', background: 'transparent' }} />
                     {isLoadingMore && <div className={styles['loading-more']} role="status">{t('misc.loading')}</div>}
                 </div>
+                }
             </div>
 
             {isInitialLoading && <div className={styles['loading-overlay']} role="status" aria-label={t('misc.loading')} />}
-            {!userToken && <div className={styles['auth-overlay']} role="dialog" aria-modal="true" aria-label={t('auth.login')}>
+            {!userToken && !isProfileFavorites && <div className={styles['auth-overlay']} role="dialog" aria-modal="true" aria-label={t('auth.login')}>
                 <div className={styles['auth-card']}>
                     <h2>{t('auth.loginTitle')}</h2>
                     <p>{t('release.loginToChangeStatus')}</p>
@@ -208,9 +273,33 @@ export default function FavoritesScreen() {
     );
 }
 
-async function getReleasesForTab(page: ProfilePage, currentPage: number, sort: ReleaseSort, api: ReturnType<typeof useApi>): Promise<Anime[]> {
+function CollectionCard({ collection }: { collection: Collection }) {
+    return <article className={collectionStyles.collection}>
+        <Link className={collectionStyles.collectionLink} to={`/collection/${collection.id}`}>
+            <RemoteImage src={collection.image} className={collectionStyles.poster} alt={collection.title} />
+            <div className={collectionStyles.content}>
+                <h2>{collection.title}</h2>
+                {collection.description && <p className={collectionStyles.description}>{collection.description}</p>}
+            </div>
+        </Link>
+        <div className={collectionStyles.footer}>
+            <Link className={collectionStyles.creator} to={`/account/${collection.creator.id}`}>
+                <RemoteImage src={collection.creator.avatar} alt="" />
+                <span>{collection.creator.login}</span>
+            </Link>
+            <div className={collectionStyles.stats}>
+                <span>{collection.comment_count} {plural(collection.comment_count, 'комментарий', 'комментария', 'комментариев')}</span>
+                <span>{collection.favorites_count} сохранений</span>
+            </div>
+        </div>
+    </article>;
+}
+
+async function getReleasesForTab(page: ProfilePage, currentPage: number, sort: ReleaseSort, api: ReturnType<typeof useApi>, profileId?: number): Promise<Anime[]> {
     const query = `extended_mode=true&sort=${API_SORT_VALUES[sort]}`;
-    const path = page === 'favorites'
+    const path = profileId
+        ? `/profile/list/all/${profileId}/0/${currentPage}?${query}`
+        : page === 'favorites'
         ? `/favorite/all/${currentPage}?${query}`
         : page === 'history'
             ? `/history/${currentPage}?${query}`

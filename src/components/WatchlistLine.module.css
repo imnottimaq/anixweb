@@ -96,7 +96,6 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 8px;
     border-radius: 999px;
     color: color-mix(in srgb, var(--text-color) 72%, transparent);
     font-size: 14px;

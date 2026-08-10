@@ -5,7 +5,7 @@ import { type Anime, type Filter } from '../shared/types/api';
 import { emptyTab, type Page, type TabData } from '../shared/types/internal';
 import { useUser } from '../shared/contexts/userContext';
 import { useSettings } from '../shared/contexts/settingsContext';
-import styles from './LatestReleasesScreen.module.css';
+import styles from './HomepageScreen.module.css';
 import FilterModal from '../modals/FilterModal';
 import { useTranslation } from '../shared/useTranslation';
 
@@ -76,7 +76,7 @@ function getMyFilters(): Filter {
     }
 }
 
-export default function LatestReleasesScreen() {
+export default function HomepageScreen() {
     const { userToken } = useUser();
     const { settings } = useSettings();
     const { t } = useTranslation();

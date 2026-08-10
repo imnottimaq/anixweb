@@ -38,12 +38,20 @@
     animation: modal-out 180ms ease-in both;
 }
 
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    min-height: 32px;
+    margin-bottom: 12px;
+}
+
 .close-button {
     display: grid;
     place-items: center;
-    position: absolute;
-    top: 12px;
-    right: 12px;
+    width: 32px;
+    flex: 0 0 32px;
     height: 32px;
     padding: 0;
     border: 0;
@@ -61,25 +69,24 @@
     height: 20px;
 }
 
-.title {
-    margin: 2px 40px 8px 0;
+[data-theme="dark"] .close-button img {
+    filter: invert(1);
 }
 
-.sticky-header .title {
+.title {
+    margin: 0;
+    font-size: 20px;
+    line-height: 1.2;
+}
+
+.sticky-header .modal-header {
     position: sticky;
     top: -20px;
-    z-index: 1;
-    margin: -20px -20px 8px;
-    padding: 22px 60px 12px 20px;
-    background: var(--background-color);
-}
-
-.sticky-header .close-button {
-    position: sticky;
-    top: 0;
     z-index: 2;
-    align-self: flex-end;
-    margin-bottom: -32px;
+    margin: -20px -20px 14px;
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent);
+    background: var(--background-color);
 }
 
 .text {
@@ -162,6 +169,12 @@
         width: calc(100vw - 24px);
         max-height: calc(100vh - 24px);
         padding: 16px;
+    }
+
+    .sticky-header .modal-header {
+        top: -16px;
+        margin: -16px -16px 14px;
+        padding: 14px 16px 10px;
     }
 
     .actions {

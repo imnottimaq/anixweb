@@ -69,7 +69,6 @@ export default function NotificationSettingsScreen() {
         let cancelled = false;
 
         void api.get<NotificationsPreferencesAPIResponse>('/profile/preference/notification/my')
-            .catch(() => api.getViaAgent<NotificationsPreferencesAPIResponse>('/profile/preference/notification/my'))
             .then(response => {
                 if (cancelled) return;
 
@@ -121,11 +120,7 @@ export default function NotificationSettingsScreen() {
         try {
             await api.post<{ code: number }>('/profile/preference/notification/type/edit', body);
         } catch {
-            try {
-                await api.postViaAgent<{ code: number }>('/profile/preference/notification/type/edit', body);
-            } catch {
-                return false;
-            }
+            return false;
         }
 
         updateNotifications({ selectedDubs: draftDubs });
@@ -138,11 +133,7 @@ export default function NotificationSettingsScreen() {
         try {
             await api.get<{ code: number }>(endpoint);
         } catch {
-            try {
-                await api.getViaAgent<{ code: number }>(endpoint);
-            } catch {
-                return;
-            }
+            return;
         } finally {
             setSavingToggle(null);
         }

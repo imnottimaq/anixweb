@@ -42,11 +42,7 @@ export default function FranchiseScreen() {
 
     const loadPage = useCallback((async (page: number) => {
         const path = `/related/${franchiseId}/${page}`;
-        try {
-            return await api.get<RelatedResponse>(path);
-        } catch {
-            return api.getViaAgent<RelatedResponse>(path);
-        }
+        return api.get<RelatedResponse>(path);
     }), [api, franchiseId])
 
     useEffect(() => {
@@ -105,7 +101,7 @@ export default function FranchiseScreen() {
 
     return <main className={styles.page}>
         <header className={styles.header}>
-            <button type="button" className={styles.backButton} aria-label="Назад" onClick={() => navigate(-1)}>←</button>
+            <button type="button" className={styles.backButton} aria-label="Назад" onClick={() => navigate(-1)}><span className={styles.backIcon} aria-hidden="true" /></button>
             {poster && <RemoteImage className={styles.cover} src={poster} alt="" />}
         </header>
 

@@ -1,10 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom"
-import { Swiper, SwiperSlide } from 'swiper/react';
-import { Navigation, Pagination } from 'swiper/modules';
-import 'swiper/css';
-import 'swiper/css/navigation';
-import 'swiper/css/pagination';
 import styles from './ReleaseScreen.module.css'
 import { type Anime } from "../shared/types/api";
 import ReleaseCard from "../components/ReleaseCard";
@@ -16,6 +11,9 @@ import DubSelectModal from "../modals/DubSelectModal";
 import WatchlistLine from "../components/WatchlistLine";
 import RemoteImage from '../components/RemoteImage';
 import { useTranslation } from '../shared/useTranslation';
+import { plural } from '../shared/plural';
+import { Modal } from '../modals/ModalTemplate';
+import { useAsyncLoad } from '../shared/useAsyncLoad';
 
 //Icons
 import peopleIcon from "../assets/icons/users.svg"
@@ -24,19 +22,19 @@ import tagsIcon from "../assets/icons/tags.svg"
 import albumIcon from "../assets/icons/album-collection.svg"
 import favoriteIcon from '../assets/icons/bookmark.svg'
 import sendIcon from '../assets/icons/send.svg'
+import leftArrowIcon from '../assets/icons/left-arrow.svg'
+import rightArrowIcon from '../assets/icons/right-arrow.svg'
+import commentsIcon from '../assets/icons/message-circle-dots.svg'
 
 import { setPlayerSession } from '../shared/playerSession'
-import { createWatchRoom } from '../shared/watchRoom'
-import { getRoomParticipant } from '../shared/roomParticipant'
-import { useRoomPresence } from '../shared/contexts/roomContext'
 import RecommendedRelease from "../components/RecommendedRelease";
 import { useApi } from "../shared/apiClient";
+import type { PagedResponse } from '../shared/types/api';
 
 export default function ReleaseScreen(){
     const {id} = useParams<{id: string}>();
-    const {userToken, userId, setUserId} = useUser();
+    const {userToken, setUserId} = useUser();
     const {settings} = useSettings();
-    const { activeRoomId } = useRoomPresence();
     const { t } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
@@ -53,6 +51,7 @@ export default function ReleaseScreen(){
 
     const [animeData, setAnimeData] = useState<Anime>(partialData);
     const [screenshots, setScreenshots] = useState<string[]>([]);
+    const [activeScreenshotIndex, setActiveScreenshotIndex] = useState(0);
     const [loadedPoster, setLoadedPoster] = useState<string | null>(null);
     const [loadedScreenshots, setLoadedScreenshots] = useState<Record<string, boolean>>({});
     const [isDubScreenOpen, setIsDubScreenOpen] = useState(false);
@@ -66,31 +65,37 @@ export default function ReleaseScreen(){
     const [newReply, setNewReply] = useState<{ parentCommentId: number; comment: CommentType } | null>(null);
     const [editTarget, setEditTarget] = useState<CommentType | null>(null);
     const [editedComment, setEditedComment] = useState<{ commentId: number; message: string; spoiler: boolean } | null>(null);
+    const [isCommentsOpen, setIsCommentsOpen] = useState(false);
+    const [shouldFocusCommentInput, setShouldFocusCommentInput] = useState(false);
     const commentInputRef = useRef<HTMLTextAreaElement>(null);
 
     const isReleaseLoading = loadedRequestKey !== requestKey;
     const isCommentTooShort = commentText.trim().length < 5;
+    const releaseId = Number(id);
+    const isValidReleaseId = Number.isInteger(releaseId) && releaseId > 0;
+    const { data: commentsData, error: commentsLoadError, isLoading: isCommentsLoading, reload: reloadComments } = useAsyncLoad(
+        signal => api.get<PagedResponse<CommentType>>(`/release/comment/all/${releaseId}/0`, { signal }),
+        [api, releaseId],
+        {
+            enabled: isValidReleaseId,
+            initialData: { code: 0, content: [], total_count: 0, total_page_count: 0, current_page: 0 },
+        },
+    );
+    const releaseComments = commentsData?.content ?? [];
 
-    const createWatchRoomForRelease = async () => {
-        if (activeRoomId) {
-            navigate(`/anime/${animeData.id}?room=${encodeURIComponent(activeRoomId)}`);
-            return;
-        }
-        if (userId <= 0) {
-            alert('Войдите в аккаунт, чтобы создать комнату');
-            return;
-        }
-        try {
-            const room = await createWatchRoom({
-                title: `Просмотр: ${animeData.title_ru}`,
-                visibility: 'private',
-                host: getRoomParticipant(userId),
-            });
-            navigate(`/anime/${animeData.id}?room=${encodeURIComponent(room.roomId)}`);
-        } catch (error) {
-            console.error('Не удалось создать комнату', error);
-            alert(error instanceof Error ? error.message : 'Не удалось создать комнату');
-        }
+    useEffect(() => {
+        if (!isCommentsOpen || !shouldFocusCommentInput) return;
+
+        const frame = window.requestAnimationFrame(() => {
+            commentInputRef.current?.focus();
+            setShouldFocusCommentInput(false);
+        });
+        return () => window.cancelAnimationFrame(frame);
+    }, [isCommentsOpen, shouldFocusCommentInput]);
+
+    const openCommentEditor = () => {
+        setShouldFocusCommentInput(true);
+        setIsCommentsOpen(true);
     };
 
     const startReply = (comment: CommentType) => {
@@ -98,7 +103,7 @@ export default function ReleaseScreen(){
         setEditTarget(null);
         setCommentText(`${comment.profile.login}, `);
         setCommentError(null);
-        window.requestAnimationFrame(() => commentInputRef.current?.focus());
+        openCommentEditor();
     };
 
     const startEdit = (comment: CommentType) => {
@@ -107,7 +112,7 @@ export default function ReleaseScreen(){
         setCommentText(comment.message);
         setCommentSpoiler(comment.is_spoiler);
         setCommentError(null);
-        window.requestAnimationFrame(() => commentInputRef.current?.focus());
+        openCommentEditor();
     };
 
     const sendComment = async () => {
@@ -127,7 +132,7 @@ export default function ReleaseScreen(){
 
         try {
             if (editTarget) {
-                await api.postViaAgent<{code?:number}>(`/release/comment/edit/${editTarget.id}`, {message, spoiler: commentSpoiler});
+                await api.post<{code?:number}>(`/release/comment/edit/${editTarget.id}`, {message, spoiler: commentSpoiler});
                 setEditedComment({ commentId: editTarget.id, message, spoiler: commentSpoiler });
             } else {
                 const result = await api.postViaAgent<{code: number, comment: CommentType | null}>
@@ -157,6 +162,7 @@ export default function ReleaseScreen(){
             setCommentSpoiler(false);
             setReplyTarget(null);
             setEditTarget(null);
+            reloadComments();
         } catch (error) {
             setCommentError(error instanceof Error ? error.message : t('release.loadError'));
         } finally {
@@ -170,6 +176,7 @@ export default function ReleaseScreen(){
                 const release = data.release;
                 setAnimeData(release);
                 setScreenshots(release.screenshot_images);
+                setActiveScreenshotIndex(0);
             })
             .catch(error => console.error('Не удалось загрузить релиз:', error))
             .finally(() => setLoadedRequestKey(requestKey));
@@ -185,6 +192,9 @@ export default function ReleaseScreen(){
 
     const isReleaseNotStarted = !animeData.episodes_released;
     const comingSoonText = getComingSoonText(animeData, settings.appearance.language, t('release.soon'));
+    const visibleScreenshots = screenshots.length > 1
+        ? [screenshots[activeScreenshotIndex], screenshots[(activeScreenshotIndex + 1) % screenshots.length]]
+        : screenshots;
 
     return(
         <div className={styles['body']}>
@@ -241,12 +251,13 @@ export default function ReleaseScreen(){
                             }}
                     ><img src={favoriteIcon} className={`${styles['icon-smaller']} ${animeData.is_favorite ? styles['favorited'] : ''}`}></img>{animeData?.favorites_count || 0}</button>
                 </div>
-                {isReleaseNotStarted ? (
-                    <button type="button" disabled className={`${styles['watch-btn']} ${styles['watch-btn-soon']}`}>{comingSoonText}</button>
-                ) : (
-                    <button onClick={() => setIsDubScreenOpen(true)} className={styles['watch-btn']}>{t('release.play')}</button>
-                )}
-                {!roomId && <button type="button" onClick={() => void createWatchRoomForRelease()} className={styles['watch-room-btn']}>{activeRoomId ? 'Смотреть в текущей комнате' : 'Смотреть вместе'}</button>}
+                <div className={styles['watch-actions']}>
+                    {isReleaseNotStarted ? (
+                        <button type="button" disabled className={`${styles['watch-btn']} ${styles['watch-btn-soon']}`}>{comingSoonText}</button>
+                    ) : (
+                        <button onClick={() => setIsDubScreenOpen(true)} className={styles['watch-btn']}>{t('release.play')}</button>
+                    )}
+                </div>
                 <div className={`${styles['grade-container']}`}>
                     <div className={styles['grade']}>
                         <p>{t('release.rating')}</p>
@@ -300,37 +311,29 @@ export default function ReleaseScreen(){
                     <div className={`${styles['release-details']} ${screenshots.length === 0 ? styles['release-details-no-screenshots'] : ''}`}>
                         <div className={styles['release-media']}>
                             {screenshots.length > 0 && (
-                                <div className={styles['swiper-container']}>
-                                    <Swiper
-                                        modules={[Navigation, Pagination]}
-                                        spaceBetween={10}
-                                        slidesPerView={2}
-                                        breakpoints={{
-                                            0: { slidesPerView: 1 },
-                                            640: { slidesPerView: 2 },
-                                        }}
-                                        navigation
-                                        pagination={{ clickable: true }}
-                                        loop={screenshots.length > 2}
-                                        style={{
-                                            '--swiper-navigation-color': 'var(--accent-color, #ff5c5c)',
-                                            '--swiper-pagination-color': 'var(--accent-color, #ff5c5c)',
-                                        } as React.CSSProperties}
-                                    >
-                                        {screenshots.map((url, index) => (
-                                            <SwiperSlide key={url}>
-                                                <div className={`${styles['screenshot-wrapper']} ${loadedScreenshots[url] ? styles['media-loaded'] : styles['media-loading']}`}>
-                                                    <RemoteImage
-                                                        src={url}
-                                                        alt={`Скриншот ${index + 1}`}
-                                                        className={styles['screenshot-img']}
-                                                        onLoad={() => setLoadedScreenshots(previous => ({ ...previous, [url]: true }))}
-                                                        onError={() => setLoadedScreenshots(previous => ({ ...previous, [url]: true }))}
-                                                    />
-                                                </div>
-                                            </SwiperSlide>
-                                        ))}
-                                    </Swiper>
+                                <div className={styles['screenshot-gallery']} aria-label="Галерея кадров">
+                                    <div className={styles['screenshot-track']}>
+                                        {visibleScreenshots.map((url, offset) => {
+                                            const index = (activeScreenshotIndex + offset) % screenshots.length;
+
+                                            return <div key={url} className={`${styles['screenshot-wrapper']} ${loadedScreenshots[url] ? styles['media-loaded'] : styles['media-loading']}`}>
+                                                <RemoteImage
+                                                    src={url}
+                                                    alt={`Скриншот ${index + 1}`}
+                                                    className={styles['screenshot-img']}
+                                                    onLoad={() => setLoadedScreenshots(previous => ({ ...previous, [url]: true }))}
+                                                    onError={() => setLoadedScreenshots(previous => ({ ...previous, [url]: true }))}
+                                                />
+                                            </div>;
+                                        })}
+                                    </div>
+                                    {screenshots.length > 1 && <>
+                                        <button type="button" className={`${styles['screenshot-arrow']} ${styles['screenshot-arrow-prev']}`} aria-label="Предыдущий кадр" onClick={() => setActiveScreenshotIndex(index => (index - 1 + screenshots.length) % screenshots.length)}><img src={leftArrowIcon} alt="" /></button>
+                                        <button type="button" className={`${styles['screenshot-arrow']} ${styles['screenshot-arrow-next']}`} aria-label="Следующий кадр" onClick={() => setActiveScreenshotIndex(index => (index + 1) % screenshots.length)}><img src={rightArrowIcon} alt="" /></button>
+                                        <div className={styles['screenshot-pagination']}>
+                                            {screenshots.map((url, index) => <button key={url} type="button" className={`${styles['screenshot-dot']} ${index === activeScreenshotIndex ? styles['screenshot-dot-active'] : ''}`} aria-label={`Показать кадр ${index + 1}`} onClick={() => setActiveScreenshotIndex(index)} />)}
+                                        </div>
+                                    </>}
                                 </div>
                             )}
                             <div>
@@ -378,7 +381,55 @@ export default function ReleaseScreen(){
                     <section className={styles['comments-section']}>
                         <div className={styles['comments-heading']}>
                             <h3>{t('release.commentSection')}</h3>
+                            <button type="button" className={styles['comments-open-btn']} onClick={() => setIsCommentsOpen(true)}>
+                                <img src={commentsIcon} alt="" />
+                                {animeData.comments_count || animeData.comment_count || 0}
+                            </button>
                         </div>
+                        <button type="button" className={styles['comment-page-trigger']} onClick={openCommentEditor}>
+                            {t('comments.writePlaceholder')}
+                        </button>
+                        {isCommentsLoading && <p className={styles['empty-comments']}>{t('misc.loading')}</p>}
+                        {commentsLoadError && <p className={styles['comment-error']}>{t('release.loadError')}</p>}
+                        {!isCommentsLoading && !commentsLoadError && releaseComments.length === 0 && <p className={styles['empty-comments']}>{t('release.noComments')}</p>}
+                        {!isCommentsLoading && <div className={styles['comments-page-list']}>
+                            {releaseComments.map((comment: CommentType) => (
+                                <Comment
+                                    key={comment.id}
+                                    comment={comment}
+                                    releaseId={animeData.id}
+                                    onReply={startReply}
+                                    onEdit={startEdit}
+                                    newReply={newReply}
+                                    editedComment={editedComment}
+                                    onDelete={reloadComments}
+                                />
+                            ))}
+                        </div>}
+                    </section>
+                    <Modal
+                        isOpen={isCommentsOpen}
+                        onClose={() => setIsCommentsOpen(false)}
+                        title={t('release.commentSection')}
+                        stickyHeader
+                        contentClassName={styles['comments-modal']}
+                        contentStyle={{ width: 'min(1180px, calc(100vw - 32px))', maxHeight: '80vh' }}
+                    >
+                        {isCommentsLoading && <p className={styles['empty-comments']}>{t('misc.loading')}</p>}
+                        {commentsLoadError && <p className={styles['comment-error']}>{t('release.loadError')}</p>}
+                        {!isCommentsLoading && !commentsLoadError && releaseComments.length === 0 && <p className={styles['empty-comments']}>{t('release.noComments')}</p>}
+                        {!isCommentsLoading && releaseComments.map((comment: CommentType) => (
+                            <Comment
+                                key={comment.id}
+                                comment={comment}
+                                releaseId={animeData.id}
+                                onReply={startReply}
+                                onEdit={startEdit}
+                                newReply={newReply}
+                                editedComment={editedComment}
+                                onDelete={reloadComments}
+                            />
+                        ))}
                         <form className={styles['comment-area']} onSubmit={(event) => {
                             event.preventDefault();
                             void sendComment();
@@ -410,9 +461,7 @@ export default function ReleaseScreen(){
                                     />
                                     <span>{t('comments.spoiler')}</span>
                                 </label>
-                                <span className={styles['comment-counter']}>
-                                    {isCommentTooShort ? t('comments.minLength') : `${commentText.length}/1000`}
-                                </span>
+                                <span className={styles['comment-counter']}>{commentText.length}/1000</span>
                                 <button
                                     type="submit"
                                     className={styles['send-btn']}
@@ -424,22 +473,7 @@ export default function ReleaseScreen(){
                             </div>
                             {commentError && <p className={styles['comment-error']}>{commentError}</p>}
                         </form>
-                        {animeData.comments.length === 0 && <p className={styles['empty-comments']}>{t('release.noComments')}</p>}
-                        {animeData.comments.map((comment: CommentType) => (
-                            <Comment
-                                key={comment.id}
-                                comment={comment}
-                                releaseId={animeData.id}
-                                onReply={startReply}
-                                onEdit={startEdit}
-                                newReply={newReply}
-                                editedComment={editedComment}
-                            />
-                        ))}
-                        {
-                        // <button>Смотреть все</button> //TODO: реализовать
-                        }
-                    </section>
+                    </Modal>
                 </div>
             </div>
             {(isDubScreenOpen || roomAutoSelect) && <DubSelectModal 
@@ -468,16 +502,6 @@ export default function ReleaseScreen(){
             />}
         </div>
     )
-}
-
-function plural(value: number, one: string, few: string, many: string) {
-    const lastTwoDigits = Math.abs(value) % 100;
-    const lastDigit = lastTwoDigits % 10;
-
-    if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return many;
-    if (lastDigit === 1) return one;
-    if (lastDigit >= 2 && lastDigit <= 4) return few;
-    return many;
 }
 
 function getComingSoonText(release: Anime, language: 'russian' | 'english', fallback: string) {

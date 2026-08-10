@@ -259,4 +259,18 @@ export interface DiscoverInteresting{
   action: number, // id релиза
 }
 
-
+export interface Collection{
+  id: number,
+  creator: Profile,
+  title: string,
+  description: string,
+  image: string,
+  releases: Anime[],
+  creation_date: number,
+  last_update_date: number,
+  comment_count: number,
+  favorites_count: number,
+  is_favorite: boolean,
+  is_private?: boolean,
+  isPrivate?: boolean,
+}

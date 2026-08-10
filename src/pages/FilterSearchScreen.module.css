@@ -1,0 +1,45 @@
+.page {
+    box-sizing: border-box;
+    min-height: 100%;
+    padding: 34px 28px 70px;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 28px;
+}
+
+.header h1 { margin: 0; font-size: clamp(24px, 2.5vw, 32px); }
+.header p { margin: 6px 0 0; color: var(--text-secondary); }
+
+.changeButton {
+    flex: 0 0 auto;
+    padding: 10px 15px;
+    border: 0;
+    border-radius: 10px;
+    color: #fff;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    background: var(--accent-color);
+}
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 18px; }
+.horizontal { grid-template-columns: 1fr; gap: 14px; }
+.placeholder, .empty, .error { padding: 24px; border: 1px dashed color-mix(in srgb, var(--text-color) 18%, transparent); border-radius: 13px; color: var(--text-secondary); text-align: center; }
+.error { border-color: color-mix(in srgb, #e75757 55%, transparent); color: #e75757; }
+.loading { display: grid; min-height: 260px; place-content: center; gap: 12px; color: var(--text-secondary); text-align: center; }
+.loading span { width: 32px; height: 32px; margin: auto; border: 3px solid color-mix(in srgb, var(--text-color) 18%, transparent); border-top-color: var(--accent-color); border-radius: 50%; animation: spin .8s linear infinite; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 680px) {
+    .page { padding: 24px 16px 48px; }
+    .header { align-items: flex-start; flex-direction: column; }
+    .changeButton { width: 100%; }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); gap: 12px; }
+    .horizontal { grid-template-columns: 1fr; }
+}

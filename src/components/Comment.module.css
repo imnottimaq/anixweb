@@ -160,6 +160,17 @@
     color: var(--accent-color);
 }
 
+.reply-button:disabled,
+.vote button:disabled {
+    cursor: default;
+}
+
+.reply-button:disabled:hover,
+.vote button:disabled:hover {
+    color: color-mix(in srgb, var(--text-color) 65%, transparent);
+    background: transparent;
+}
+
 .reply-button .arrow {
     width: 15px;
     height: 15px;
@@ -285,6 +296,10 @@
     margin-left: 44px;
 }
 
+.vote .vote-neutral { color: var(--text-color); }
+.vote .vote-positive { color: var(--status-watching); }
+.vote .vote-negative { color: var(--status-dropped); }
+
 .vote button {
     display: grid;
     width: 25px;
@@ -299,6 +314,10 @@
 
 .vote button:hover {
     background: var(--lighter-background-color);
+}
+
+.vote button:disabled:hover {
+    background: transparent;
 }
 
 .vote span {

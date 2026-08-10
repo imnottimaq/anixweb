@@ -17,6 +17,7 @@ import ReleaseCard from "../components/ReleaseCard"
 import RemoteImage from '../components/RemoteImage'
 import { useApi } from '../shared/apiClient';
 import { Modal } from '../modals/ModalTemplate';
+import { saveRoomIdentity } from '../shared/roomParticipant';
 
 interface ProfileAPIResponse{
     code: number;
@@ -49,8 +50,6 @@ export default function AccountScreen(){
     
     useEffect(() => {
         let isCancelled = false;
-        setIsLoading(true);
-        setUserObject(null);
 
         if (!userToken) {
             setIsLoading(false);
@@ -69,6 +68,9 @@ export default function AccountScreen(){
                 const profile = data.profile;
                 setIsMyProfile(data.is_my_profile)
                 if (!profile) throw new Error('Сервер вернул профиль без данных');
+                if (!isCancelled && (data.is_my_profile || profile.id === userId)) {
+                    saveRoomIdentity({ id: profile.id, login: profile.login, avatar: profile.avatar ?? null });
+                }
                 if (!isCancelled) setUserObject(profile);
             } catch (error) {
                 console.error('Не удалось загрузить профиль:', error);
@@ -101,13 +103,9 @@ export default function AccountScreen(){
         try {
             await api.get<{ code: number }>(endpoint);
         } catch {
-            try {
-                await api.getViaAgent<{ code: number }>(endpoint);
-            } catch {
-                setFriendActionError('Не удалось обновить заявку в друзья');
-                setIsFriendActionLoading(false);
-                return false;
-            }
+            setFriendActionError('Не удалось обновить заявку в друзья');
+            setIsFriendActionLoading(false);
+            return false;
         }
 
         setUserObject(previous => previous ? { ...previous, friend_status: nextStatus } : previous);
@@ -197,7 +195,7 @@ export default function AccountScreen(){
                 <div className={styles['statistics-card']}>
                     <div className={styles['stat-line']}>
                         <h2>{t('account.stats')}</h2>
-                        <a onClick={() => navigate("/favorites")}>{t('account.viewAll')}</a>
+                        <a onClick={() => navigate(isMyProfile ? "/favorites" : `/favorites/${userObject?.id}`)}>{t('account.viewAll')}</a>
                     </div>
                     <p className={styles['statistics-caption']}>{t('account.distribution')}</p>
                     <WatchlistLine watching_count={userObject?.watching_count || 0}

@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./SearchBar.module.css"
-import { type Anime, type PagedResponse } from "../shared/types/api";
-import { useNavigate } from "react-router-dom";
+import { type Anime, type Collection, type PagedResponse } from "../shared/types/api";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useSettings } from "../shared/contexts/settingsContext";
 import { useSearchScope, type SearchScope } from "../shared/contexts/searchContext";
 import AnimeCard from "./AnimeCard";
@@ -34,8 +34,9 @@ interface SearchProfile {
 }
 
 type ProfileSearchResponse = PagedResponse<SearchProfile> & { profiles: SearchProfile[] };
+type CollectionSearchResponse = PagedResponse<Collection> & { collections: Collection[] };
 
-type SearchResults = ReleaseSearchResponse | ProfileSearchResponse;
+type SearchResults = ReleaseSearchResponse | ProfileSearchResponse | CollectionSearchResponse;
 
 export default function SearchButton(){
     const [query, setQuery] = useState('');
@@ -46,8 +47,59 @@ export default function SearchButton(){
     const { searchScope } = useSearchScope();
     const api = useApi();
     const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false);
+    const searchRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     const navigate = useNavigate()
+    const { pathname } = useLocation();
+    const previousPathname = useRef(pathname);
+
+    const clearSearch = useCallback(() => {
+        setQuery('');
+        setSearchResults(undefined);
+        setIsSearchOpen(false);
+        setIsLoading(false);
+        window.requestAnimationFrame(() => inputRef.current?.focus());
+    }, []);
+
+    const collapseSearch = useCallback(() => {
+        setQuery('');
+        setSearchResults(undefined);
+        setIsSearchOpen(false);
+        setIsLoading(false);
+        setIsExpanded(false);
+    }, []);
+
+    useEffect(() => {
+        if (!isExpanded) return;
+
+        const frame = window.requestAnimationFrame(() => inputRef.current?.focus());
+        return () => window.cancelAnimationFrame(frame);
+    }, [isExpanded]);
+
+    useEffect(() => {
+        if (!isExpanded) return;
+
+        const handlePointerDown = (event: MouseEvent) => {
+            if (!searchRef.current?.contains(event.target as Node)) collapseSearch();
+        };
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') collapseSearch();
+        };
+
+        document.addEventListener('mousedown', handlePointerDown);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', handlePointerDown);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [collapseSearch, isExpanded]);
+
+    useEffect(() => {
+        if (previousPathname.current !== pathname) collapseSearch();
+        previousPathname.current = pathname;
+    }, [collapseSearch, pathname]);
 
     const setHistory = (query: string) => {
         const value = query.trim();
@@ -67,48 +119,66 @@ export default function SearchButton(){
 
     useEffect(() => {
         const value = query.trim();
-        if (!value) return;
+        if (!value || !isExpanded) return;
 
+        let isCurrent = true;
         const timer = window.setTimeout(() => {
             setIsLoading(true);
             GetSearchResults(value, searchScope, api, settings.content.proxySearchThroughShikimori)
                 .then(data => {
+                    if (!isCurrent) return;
                     setIsSearchOpen(true);
                     setSearchResults(data);
                     setHistory(value);
                 })
-                .catch(error => console.error('Не удалось выполнить поиск:', error))
+                .catch(error => {
+                    if (isCurrent) console.error('Не удалось выполнить поиск:', error);
+                })
                 .finally(() => {
-                    setIsLoading(false);
+                    if (isCurrent) setIsLoading(false);
                 });
         }, 500)
 
-        return () => window.clearTimeout(timer)
-    }, [api, query, searchScope, settings.content.proxySearchThroughShikimori])
-
-    const clearSearch = () => {
-        setQuery('');
-        setSearchResults(undefined);
-        setIsSearchOpen(false);
-    }
+        return () => {
+            isCurrent = false;
+            window.clearTimeout(timer);
+        };
+    }, [api, isExpanded, query, searchScope, settings.content.proxySearchThroughShikimori])
 
     const isProfileSearch = searchScope.type === 'profiles';
+    const isCollectionSearch = searchScope.type === 'collections';
+    const searchLabel = isProfileSearch ? t('search.users') : isCollectionSearch ? 'Коллекции' : t('search.anime');
     const profileResults = searchResults && 'profiles' in searchResults ? searchResults.profiles : [];
+    const collectionResults = searchResults && 'collections' in searchResults ? searchResults.collections : [];
     const releaseResults = searchResults && 'releases' in searchResults ? searchResults : undefined;
 
     return (
-        <div className={styles.search}>
-            <label className={styles['search-field']}>
+        <div ref={searchRef} className={`${styles.search} ${isExpanded ? styles.expanded : ''}`}>
+            {!isExpanded ? <button
+                type="button"
+                className={styles['search-trigger']}
+                onClick={() => setIsExpanded(true)}
+                aria-label={searchLabel}
+                title={searchLabel}
+                aria-expanded="false"
+            >
+                <img className={styles['search-icon']} src={SearchIcon} alt="" />
+            </button> : <label className={styles['search-field']}>
                 <img className={styles['search-icon']} src={SearchIcon} alt="" />
                 <input
+                    ref={inputRef}
                     value={query}
                     onChange={e => {
                         const value = e.target.value;
                         setQuery(value);
                         setIsSearchOpen(Boolean(value.trim()));
+                        if (!value.trim()) {
+                            setSearchResults(undefined);
+                            setIsLoading(false);
+                        }
                     }}
-                    placeholder={isProfileSearch ? t('search.users') : t('search.anime')}
-                    aria-label={isProfileSearch ? t('search.users') : t('search.anime')}
+                    placeholder={searchLabel}
+                    aria-label={searchLabel}
                 />
                 {query && <button
                     type="button"
@@ -116,12 +186,14 @@ export default function SearchButton(){
                     onClick={clearSearch}
                     aria-label={t('search.clear')}
                 >×</button>}
-            </label>
-            {isSearchOpen && <div className={styles['search-overlay']}>
+            </label>}
+            {isSearchOpen && <div className={styles['search-overlay']} onMouseDown={event => {
+                if (event.target === event.currentTarget) collapseSearch();
+            }}>
                 <div className={styles['search-content']}>
                     {isLoading && <p className={styles.message}>{t('search.waiting')}</p>}
                     {!isLoading && releaseResults?.related && <button type="button" className={styles['related-release']} onClick={() => {
-                        clearSearch();
+                        collapseSearch();
                         navigate(`/franchise/${releaseResults.related?.id || 0}`, { state: { franchise: releaseResults.related } });
                     }}>
                         <span className={styles['related-posters']} aria-hidden="true">
@@ -137,7 +209,7 @@ export default function SearchButton(){
                     </button>}
                     {!isLoading && releaseResults && <div className={`${styles.results} ${settings.appearance.defaultCardType === 'horizontal' ? styles['horizontal-results'] : ''}`}>
                         {releaseResults.releases.map(item => (
-                            <div key={item.id} onClick={() => setIsSearchOpen(false)}>
+                            <div key={item.id} onClick={collapseSearch}>
                                 {settings.appearance.defaultCardType === 'vertical'
                                     ? <AnimeCard key={item.id} anime={item} />
                                     : <AnimeCardHorizontal key={item.id} anime={item} />}</div>
@@ -146,7 +218,7 @@ export default function SearchButton(){
                     {!isLoading && isProfileSearch && profileResults.length > 0 && <div className={styles['profile-results']}>
                         {profileResults.map(profile => (
                             <button key={profile.id} type="button" className={styles['profile-result']} onClick={() => {
-                                clearSearch();
+                                collapseSearch();
                                 navigate(`/account/${profile.id}`);
                             }}>
                                 {profile.avatar
@@ -160,7 +232,26 @@ export default function SearchButton(){
                             </button>
                         ))}
                     </div>}
-                    {!isLoading && searchResults && (isProfileSearch ? profileResults.length === 0 : releaseResults?.releases.length === 0) && <p className={styles.message}>{t('search.empty')}</p>}
+                    {!isLoading && isCollectionSearch && collectionResults.length > 0 && <div className={styles['collection-results']}>
+                        {collectionResults.map(collection => <button key={collection.id} type="button" className={styles['collection-result']} onClick={() => {
+                            collapseSearch();
+                            navigate(`/collection/${collection.id}`);
+                        }}>
+                            <RemoteImage src={collection.image} alt="" />
+                            <span className={styles['collection-info']}>
+                                <strong>{collection.title}</strong>
+                                {collection.description && <small>{collection.description}</small>}
+                            </span>
+                            <span className={styles['collection-footer']}>
+                                <span className={styles['collection-creator']}>
+                                    <RemoteImage src={collection.creator.avatar} alt="" />
+                                    <span>{collection.creator.login}</span>
+                                </span>
+                                <span className={styles['collection-stats']}>{collection.comment_count} комм. · {collection.favorites_count} сохранений</span>
+                            </span>
+                        </button>)}
+                    </div>}
+                    {!isLoading && searchResults && (isProfileSearch ? profileResults.length === 0 : isCollectionSearch ? collectionResults.length === 0 : releaseResults?.releases.length === 0) && <p className={styles.message}>{t('search.empty')}</p>}
                 </div>
             </div>}
         </div>
@@ -175,6 +266,8 @@ async function GetSearchResults(
 ): Promise<SearchResults> {
     const endpoint = searchScope.type === 'profiles'
         ? '/search/profiles/0'
+        : searchScope.type === 'collections'
+            ? '/search/collections/0'
         : searchScope.type === 'favorites'
             ? '/search/favorites/0'
             : searchScope.type === 'history'
@@ -191,7 +284,8 @@ async function GetSearchResults(
         related?: ReleaseSearchResponse['related'];
         releases?: Anime[];
         profiles?: SearchProfile[];
-        content?: Anime[] | SearchProfile[];
+        collections?: Collection[];
+        content?: Anime[] | SearchProfile[] | Collection[];
         total_count?: number;
         total_page_count?: number;
         current_page?: number;
@@ -203,6 +297,17 @@ async function GetSearchResults(
                 code: data.code,
                 content: profiles,
                 profiles,
+                total_count: data.total_count ?? 0,
+                total_page_count: data.total_page_count ?? 0,
+                current_page: data.current_page ?? 0,
+            };
+        }
+        if (searchScope.type === 'collections') {
+            const collections = (data.collections ?? data.content ?? []) as Collection[];
+            return {
+                code: data.code,
+                content: collections,
+                collections,
                 total_count: data.total_count ?? 0,
                 total_page_count: data.total_page_count ?? 0,
                 current_page: data.current_page ?? 0,

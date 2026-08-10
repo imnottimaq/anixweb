@@ -5,6 +5,7 @@ export type SearchScope =
     | { type: 'profiles' }
     | { type: 'favorites' }
     | { type: 'history' }
+    | { type: 'collections' }
     | { type: 'profileList'; list: 1 | 2 | 3 | 4 | 5 };
 
 export const SearchContext = createContext<{
