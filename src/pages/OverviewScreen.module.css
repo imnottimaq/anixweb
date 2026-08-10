@@ -1,5 +1,5 @@
 .page {
-
+    width: min(1440px, 100%);
     box-sizing: border-box;
     margin: 0 auto;
     padding: 34px 28px 70px;
@@ -36,7 +36,7 @@
     min-width: 0;
     overflow: hidden;
     border-radius: 15px;
-    color: var(--quick-action-color);
+    color: #fff;
     background: var(--lighter-background-color);
     text-decoration: none;
     isolation: isolate;
@@ -67,6 +67,7 @@
 
 .galleryButton img { width: 21px; height: 21px; filter: brightness(0) invert(1); }
 .galleryButton:hover { background: var(--accent-color); }
+.galleryButton:focus-visible, .featuredItem:focus-visible, .comment:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 3px; }
 .galleryPrevious { left: 16px; }
 .galleryNext { right: 16px; }
 
@@ -143,7 +144,7 @@
 .commentBody { display: grid; min-width: 0; gap: 4px; }
 .commentBody > span:first-child { overflow: hidden; color: var(--text-secondary); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .commentBody b { color: var(--text-color); }
-.commentRating { position: absolute; top: 12px; right: 12px; display: inline-grid; box-sizing: border-box; min-width: 26px; height: 28px; padding: 0 7px; border: 1px solid springgreen; border-radius: 7px; place-items: center; color: springgreen; font-size: 13px; font-style: normal; font-weight: 700; line-height: 1; }
+.commentRating { position: absolute; top: 12px; right: 12px; display: inline-grid; box-sizing: border-box; min-width: 26px; height: 28px; padding: 0 7px; border: 1px solid var(--status-watching); border-radius: 7px; place-items: center; color: var(--status-watching); font-size: 13px; font-style: normal; font-weight: 700; line-height: 1; }
 .commentMessage { display: -webkit-box; overflow: hidden; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 
 .loading, .empty { display: grid; min-height: 310px; place-content: center; gap: 12px; color: var(--text-secondary); text-align: center; }

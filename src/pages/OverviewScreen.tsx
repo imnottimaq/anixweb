@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AnimeCard from '../components/AnimeCard';
 import AnimeCardHorizontal from '../components/AnimeCardHorizontal';
+import PageState from '../components/PageState';
+import { PageLayout } from '../components/PageLayout';
 import RemoteImage from '../components/RemoteImage';
 import { useApi } from '../shared/apiClient';
 import { useUser } from '../shared/contexts/userContext';
@@ -22,10 +24,11 @@ type OverviewData = {
     watching: Anime[];
     discussing: Anime[];
     comments: DiscoverComment[];
+    failedSections: number;
 };
 
 const EMPTY_DATA: OverviewData = {
-    interesting: [], recommendations: [], watching: [], discussing: [], comments: [],
+    interesting: [], recommendations: [], watching: [], discussing: [], comments: [], failedSections: 0,
 };
 
 let overviewCache: { token: string; data: OverviewData } | null = null;
@@ -36,7 +39,7 @@ export default function OverviewScreen() {
     const navigate = useNavigate();
     const [activeInterestingIndex, setActiveInterestingIndex] = useState(0);
 
-    const { data = EMPTY_DATA, isLoading } = useAsyncLoad(signal => {
+    const { data = EMPTY_DATA, isLoading, error, reload } = useAsyncLoad(signal => {
         if (overviewCache?.token === userToken) return Promise.resolve(overviewCache.data);
 
         const get = <T,>(path: string) => api.get<PagedResponse<T>>(path, { signal });
@@ -47,8 +50,11 @@ export default function OverviewScreen() {
             get<Anime>('/discover/watching/0'),
             get<Anime>('/discover/discussing'),
             get<DiscoverComment>('/discover/comments'),
-        ] as const).then(([interesting, recommendations, watching, discussing, comments]) => {
+        ] as const).then(results => {
             if (signal.aborted) throw new DOMException('Запрос отменён', 'AbortError');
+            const [interesting, recommendations, watching, discussing, comments] = results;
+            const failedSections = results.filter(result => result.status === 'rejected').length;
+            if (failedSections === results.length) throw new Error('Не удалось загрузить обзор.');
 
             const result = {
                 interesting: getContent(interesting),
@@ -56,6 +62,7 @@ export default function OverviewScreen() {
                 watching: getContent(watching),
                 discussing: getContent(discussing),
                 comments: resolveCommentReleases(getContent(comments)),
+                failedSections,
             };
             overviewCache = { token: userToken, data: result };
             return result;
@@ -68,10 +75,11 @@ export default function OverviewScreen() {
         ? activeInterestingIndex % data.interesting.length
         : 0;
 
-    return <main className={styles.page}>
-        {isLoading && <div className={styles.loading} role="status"><span />Загружаем обзор…</div>}
+    return <PageLayout className={styles.page} size="wide">
+        {isLoading && <PageState status="loading" message="Загружаем обзор…" />}
+        {!isLoading && Boolean(error) && <PageState status="error" message="Не удалось загрузить обзор." onRetry={reload} />}
 
-        {!isLoading && <>
+        {!isLoading && !error && <>
             {(data.interesting.length > 0 || data.discussing.length > 0) && <div className={styles.topLayout}>
                 {data.interesting.length > 0 && <section className={styles.featured}>
                     <SectionTitle title="Интересное" />
@@ -146,7 +154,7 @@ export default function OverviewScreen() {
 
             {!data.interesting.length && !data.recommendations.length && !data.watching.length && !data.discussing.length && <p className={styles.empty}>Пока нечего показать. Попробуй открыть страницу позже.</p>}
         </>}
-    </main>;
+    </PageLayout>;
 }
 
 function getContent<T>(result: PromiseSettledResult<PagedResponse<T>>): T[] {

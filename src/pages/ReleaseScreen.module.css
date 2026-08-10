@@ -660,9 +660,8 @@
     padding: 11px 12px;
     border: 1px solid var(--border-color);
     border-radius: 9px;
+    background-color: var(--background-color);
     cursor: text;
-    color: color-mix(in srgb, var(--text-color) 58%, transparent);
-    background: var(--lighter-background-color);
     font: inherit;
     text-align: left;
 }

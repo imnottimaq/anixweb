@@ -1,7 +1,10 @@
 .body {
   display: flex;
-  gap: 20px;
-  padding: 0 20px;
+  width: min(1440px, 100%);
+  margin: 0 auto;
+  box-sizing: border-box;
+  gap: 24px;
+  padding: 34px 24px 64px;
 }
 
 .loading-overlay {
@@ -96,7 +99,7 @@
   border: 0;
   border-radius: 10px;
   cursor: pointer;
-  color: var(--background-color);
+  color: var(--accent-foreground);
   background: var(--accent-color);
   font: inherit;
   font-weight: 700;
@@ -129,7 +132,7 @@
 }
 
 .side-panel button.active {
-  color: var(--background-color);
+  color: var(--accent-foreground);
   background-color: var(--accent-color);
 }
 
@@ -154,7 +157,7 @@
 
 .releases-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -173,7 +176,7 @@
   padding: 12px 20px;
   border: 0;
   border-radius: 12px;
-  color: var(--background-color);
+  color: var(--accent-foreground);
   background: var(--accent-color);
   cursor: pointer;
   font-size: 16px;
@@ -186,7 +189,9 @@
   margin: 12px 0;
 }
 
-.filter-error { color: var(--status-dropped); }
+.filter-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; border: 1px dashed color-mix(in srgb, var(--status-dropped) 55%, transparent); border-radius: 12px; color: var(--status-dropped); }
+.filter-error button { padding: 8px 12px; border: 0; border-radius: 8px; color: var(--accent-foreground); background: var(--accent-color); cursor: pointer; font: inherit; font-weight: 700; }
+.filter-error button:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 2px; }
 .filter-empty { color: var(--text-secondary); }
 
 .configure-button:hover {
@@ -216,11 +221,26 @@
 
 @media (max-width: 760px) {
   .body {
-    padding: 12px;
+    flex-direction: column;
+    padding: 20px 14px 44px;
   }
 
   .side-panel {
-    display: none;
+    position: static;
+    display: flex;
+    width: 100%;
+    height: auto;
+    flex-direction: row;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scroll-snap-type: x proximity;
+  }
+
+  .side-panel button {
+    flex: 0 0 auto;
+    padding: 11px 14px;
+    white-space: nowrap;
+    scroll-snap-align: start;
   }
 
   .releases-grid {

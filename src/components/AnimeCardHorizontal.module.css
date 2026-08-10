@@ -15,7 +15,7 @@
 
 .card:hover {
   border-color: var(--border-color);
-  background: var(--lighter-background-color);
+  background: transparent;
 }
 
 .poster {
@@ -24,7 +24,7 @@
   aspect-ratio: 75 / 106;
   overflow: hidden;
   border-radius: 0.5rem;
-  background: color-mix(in srgb, var(--text-color) 10%, var(--background-color));
+  background: transparent;
 }
 
 .compact .poster { flex-basis: 117px; }
@@ -44,7 +44,7 @@
   position: absolute;
   z-index: 1;
   inset: 0;
-  background: linear-gradient(105deg, color-mix(in srgb, var(--text-color) 6%, var(--background-color)) 24%, color-mix(in srgb, var(--text-color) 15%, var(--background-color)) 42%, color-mix(in srgb, var(--text-color) 6%, var(--background-color)) 60%);
+  background: transparent;
   background-size: 220% 100%;
   animation: poster-shimmer 1.25s ease-in-out infinite;
 }

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import AnimeCardHorizontal from '../components/AnimeCardHorizontal';
+import { PageHeader, PageLayout } from '../components/PageLayout';
+import PageState from '../components/PageState';
 import RemoteImage from '../components/RemoteImage';
 import { useApi } from '../shared/apiClient';
 import type { Anime } from '../shared/types/api';
@@ -28,7 +30,6 @@ type RelatedResponse = {
 export default function FranchiseScreen() {
     const { id } = useParams<{ id: string }>();
     const location = useLocation();
-    const navigate = useNavigate();
     const api = useApi();
     const franchiseFromState = location.state?.franchise as FranchiseInfo | undefined;
     const franchiseId = Number(id);
@@ -39,6 +40,7 @@ export default function FranchiseScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [retryIndex, setRetryIndex] = useState(0);
 
     const loadPage = useCallback((async (page: number) => {
         const path = `/related/${franchiseId}/${page}`;
@@ -76,7 +78,7 @@ export default function FranchiseScreen() {
             });
 
         return () => { cancelled = true; };
-    }, [franchiseFromState, franchiseId, loadPage]);
+    }, [franchiseFromState, franchiseId, loadPage, retryIndex]);
 
     const loadMore = async () => {
         if (isLoadingMore || currentPage >= totalPageCount) return;
@@ -99,26 +101,26 @@ export default function FranchiseScreen() {
     const title = franchise?.name_ru || franchise?.name || 'Франшиза';
     const poster = franchise?.image || franchise?.images?.[0];
 
-    return <main className={styles.page}>
-        <header className={styles.header}>
-            <button type="button" className={styles.backButton} aria-label="Назад" onClick={() => navigate(-1)}><span className={styles.backIcon} aria-hidden="true" /></button>
-            {poster && <RemoteImage className={styles.cover} src={poster} alt="" />}
-        </header>
+    return <PageLayout size="wide" className={styles.page}>
+        <PageHeader title={title} description={franchise?.description} back />
 
-        {franchise && <section className={styles.hero}>
-            <div className={styles.description}>
-                <h2>{title}</h2>
-                {franchise.description && <p>{franchise.description}</p>}
-            </div>
+        {poster && <section className={styles.hero}>
+            <RemoteImage className={styles.cover} src={poster} alt={`Обложка: ${title}`} />
         </section>}
 
         <section className={styles.releases}>
             <div className={styles.sectionHeader}>
                 <h2>Релизы франшизы</h2>
             </div>
-            {isLoading && <div className="route-loader" role="status">Загрузка…</div>}
-            {error && <p className={styles.error}>{error}</p>}
-            {!isLoading && !error && releases.length === 0 && <p className={styles.empty}>В этой франшизе пока нет релизов.</p>}
+            {isLoading && <PageState status="loading" message="Загружаем релизы франшизы…" />}
+            {!isLoading && error && <PageState
+                status="error"
+                message={error}
+                onRetry={Number.isFinite(franchiseId) && franchiseId > 0
+                    ? () => releases.length > 0 ? void loadMore() : setRetryIndex(index => index + 1)
+                    : undefined}
+            />}
+            {!isLoading && !error && releases.length === 0 && <PageState status="empty" message="В этой франшизе пока нет релизов." />}
             <div className={styles.timeline}>
                 {releases.map(release => <div key={release.id} className={styles.timelineItem}>
                     <AnimeCardHorizontal anime={release} />
@@ -126,5 +128,5 @@ export default function FranchiseScreen() {
             </div>
             {currentPage < totalPageCount && <button type="button" className={styles.moreButton} disabled={isLoadingMore} onClick={() => void loadMore()}>{isLoadingMore ? 'Загружаем…' : 'Показать ещё'}</button>}
         </section>
-    </main>;
+    </PageLayout>;
 }

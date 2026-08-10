@@ -1,103 +1,27 @@
 .body {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    display: grid;
     min-height: calc(100dvh - 100px);
-    width: 100%;
-}
-
-.form-container {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    max-width: 320px;
-    gap: 10px;
-}
-
-.form-fields {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.form-container input {
-    appearance: none;
-    border: 1px solid var(--border-color, #ccc);
-    border-radius: 0.5rem;
-    width: 100%;
-    height: 40px;
-    padding: 0 12px;
+    padding: 32px 20px;
     box-sizing: border-box;
-    background-color: var(--card-bg, #fff);
-    color: var(--text-color);
+    place-items: center;
 }
 
-.actions {
-    display: flex;
-    justify-content: space-between;
-    margin: 4px 0 10px 0;
-}
-
-.actions a {
-    text-decoration: none;
-    color: var(--text-secondary, #666);
-    font-size: 0.85rem;
-}
-
-.actions a:hover {
-    text-decoration: underline;
-}
-
-.form-container button {
-    background-color: var(--accent-color);
-    color: var(--background-color);
-    border-radius: 2rem;
-    border: 0;
-    padding: 8px 24px;
-    height: 36px;
-    cursor: pointer;
-    align-self: center;
-}
-
-.code-row {
-    display: flex;
-    gap: 8px;
-}
-
-.code-row input {
-    min-width: 0;
-    flex: 1;
-}
-
-.form-container .send-code-button {
-    height: 40px;
-    flex: 0 0 auto;
-    padding: 0 12px;
-    border-radius: .5rem;
-    font-size: 13px;
-    white-space: nowrap;
-}
-
-.form-container .submit-button {
-    width: 100%;
-    height: 40px;
-    margin-top: 4px;
-}
-
-.form-container button:disabled {
-    cursor: not-allowed;
-    opacity: .48;
-}
-
-.code-hint {
-    margin: -2px 0 0;
-    color: var(--text-secondary, #666);
-    font-size: 13px;
-}
-
-.error {
-    margin: 0;
-    color: var(--status-dropped, #d33);
-    font-size: 14px;
-}
+.auth-card { width: min(380px, 100%); padding: clamp(24px, 6vw, 36px); box-sizing: border-box; border: 1px solid var(--border-color); border-radius: 18px; background: transparent; }
+.auth-card h2 { margin: 0 0 22px; font-size: clamp(24px, 6vw, 30px); text-align: center; }
+.form-container, .form-fields { display: flex; flex-direction: column; gap: 14px; }
+.field { display: grid; gap: 7px; color: var(--text-secondary); font-size: 14px; font-weight: 600; }
+.form-container input { appearance: none; width: 100%; height: 44px; padding: 0 12px; box-sizing: border-box; border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-color); background: var(--background-color); font: inherit; }
+.form-container input:focus-visible, .form-container button:focus-visible, .actions a:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 2px; }
+.actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; margin: 0 0 4px; }
+.actions a { color: var(--text-secondary); font-size: 14px; text-decoration: none; }
+.actions a:hover { color: var(--accent-color); text-decoration: underline; }
+.form-container button { min-height: 42px; padding: 8px 18px; border: 0; border-radius: 10px; color: var(--accent-text-color); background: var(--accent-color); font: inherit; font-weight: 700; cursor: pointer; }
+.form-container button:disabled { cursor: not-allowed; opacity: .52; }
+.code-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; }
+.code-row .field { min-width: 0; }
+.form-container .send-code-button { white-space: nowrap; }
+.form-container .submit-button { width: 100%; }
+.code-hint, .error { margin: 0; font-size: 14px; line-height: 1.4; }
+.code-hint { color: var(--text-secondary); }
+.error { color: var(--status-dropped); }
+@media (max-width: 460px) { .body { padding: 20px 12px; align-items: start; } .auth-card { padding: 24px 18px; } .code-row { grid-template-columns: 1fr; } .form-container .send-code-button { width: 100%; } }

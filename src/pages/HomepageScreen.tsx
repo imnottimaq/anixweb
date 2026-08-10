@@ -86,6 +86,7 @@ export default function HomepageScreen() {
     const [myFilters, setMyFilters] = useState<Filter>(getMyFilters);
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
     const [filterError, setFilterError] = useState<string | null>(null);
+    const [retryVersion, setRetryVersion] = useState(0);
     const [tabs, setTabs] = useState<Record<Page, TabData>>(createTabs);
 
     const activeTab = tabs[activePage];
@@ -150,7 +151,7 @@ export default function HomepageScreen() {
             .finally(() => {
                 loadingRequestsRef.current.delete(requestKey);
             });
-    }, [activeFilter, activePage, activeTab.hasMore, activeTab.page, currentPageIsLoaded, isMyTabUnconfigured, userToken]);
+    }, [activeFilter, activePage, activeTab.hasMore, activeTab.page, currentPageIsLoaded, isMyTabUnconfigured, userToken, retryVersion]);
 
     useEffect(() => {
         if (isMyTabUnconfigured || !currentPageIsLoaded || activeTab.isLoading || !activeTab.hasMore) return;
@@ -180,10 +181,12 @@ export default function HomepageScreen() {
 
     return (
         <div className={styles.body}>
-            <div className={styles['side-panel']}>
+            <div className={styles['side-panel']} role="tablist" aria-label="Каталог релизов">
                 {PAGE_ITEMS.map(({ page, buttonText }) => (
                     <button
                         key={page}
+                        role="tab"
+                        aria-selected={activePage === page}
                         className={activePage === page ? styles.active : ''}
                         onClick={() => setActivePage(page)}
                     >
@@ -200,7 +203,7 @@ export default function HomepageScreen() {
                 ) : (
                     <>
                         {activePage === 'my' && <button type="button" className={styles['configure-button']} onClick={() => setIsFilterModalOpen(true)}>{t('misc.changeFilters')}</button>}
-                        {filterError && <p className={styles['filter-error']}>{filterError}</p>}
+                        {filterError && <div className={styles['filter-error']} role="alert"><span>{filterError}</span><button type="button" onClick={() => { setFilterError(null); setRetryVersion(version => version + 1); }}>Попробовать снова</button></div>}
                         {!filterError && !activeTab.isLoading && activeTab.releases.length === 0 && <p className={styles['filter-empty']}>{t('search.empty')}</p>}
                         <div className={`${styles['releases-grid']} ${settings.appearance.defaultCardType === 'horizontal' ? styles['horizontal-grid'] : ''}`}>
                             {activeTab.releases.map(anime => (

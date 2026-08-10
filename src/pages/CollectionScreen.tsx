@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import AnimeCardHorizontal from '../components/AnimeCardHorizontal';
+import { PageHeader, PageLayout } from '../components/PageLayout';
+import PageState from '../components/PageState';
 import CommentComponent from '../components/Comment';
 import RemoteImage from '../components/RemoteImage';
 import { Modal } from '../modals/ModalTemplate';
@@ -235,15 +237,12 @@ export default function CollectionScreen() {
         }
     };
 
-    return <main className={styles.page}>
-        <header className={styles.header}>
-            <button type="button" className={styles.backButton} aria-label="Назад" onClick={() => navigate(-1)}><span className={styles.backIcon} aria-hidden="true" /></button>
-        </header>
+    return <PageLayout size="wide" className={styles.page}>
+        <PageHeader title={collection?.title ?? 'Коллекция'} back />
 
         {collection && <section className={styles.hero}>
             {collection.image && <RemoteImage className={styles.cover} src={collection.image} alt="" />}
             <div className={styles.description}>
-                <h1>{collection.title}</h1>
                 {isPrivate && <p className={styles.privateNotice}>Это закрытая коллекция — она доступна только автору.</p>}
                 {collection.description && <p>{collection.description}</p>}
                 <Link className={styles.creator} to={`/account/${collection.creator.id}`}>
@@ -273,9 +272,9 @@ export default function CollectionScreen() {
 
         <section className={styles.releases}>
             <div className={styles.sectionHeader}><h2>Релизы коллекции</h2></div>
-            {isLoading && <div className="route-loader" role="status">Загрузка…</div>}
-            {errorMessage && <p className={styles.error}>{errorMessage}</p>}
-            {!isLoading && !errorMessage && releases.length === 0 && <p className={styles.empty}>В этой коллекции пока нет релизов.</p>}
+            {isLoading && <PageState status="loading" message="Загружаем коллекцию…" />}
+            {!isLoading && errorMessage && <PageState status="error" message={errorMessage} onRetry={isValidId ? reload : undefined} />}
+            {!isLoading && !errorMessage && releases.length === 0 && <PageState status="empty" message="В этой коллекции пока нет релизов." />}
             <div className={styles.releaseList}>
                 {releases.map(release => <AnimeCardHorizontal key={release.id} anime={release} />)}
             </div>
@@ -380,7 +379,7 @@ export default function CollectionScreen() {
                 { label: isDeleting ? 'Удаляем…' : 'Удалить', variant: 'danger', onClick: () => void deleteCollection() },
             ]}
         />
-    </main>;
+    </PageLayout>;
 }
 
 function toComment(comment: CollectionComment): Comment {

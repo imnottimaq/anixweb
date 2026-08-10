@@ -9,6 +9,32 @@
   --lighter-accent-color: #f3f2ee;
   --accent-text-color: #121212;
 
+  /* Shared layout and component tokens. Existing variables above remain aliases' sources. */
+  --page-gutter: clamp(14px, 3vw, 28px);
+  --page-gutter-block: 34px;
+  --page-bottom-space: 56px;
+  --content-max-width: 1180px;
+  --content-max-width-wide: 1380px;
+  --surface-page: var(--background-color);
+  --surface-card: transparent;
+  --surface-raised: var(--lighter-background-color);
+  --surface-muted: color-mix(in srgb, var(--text-color) 10%, var(--background-color));
+  --surface-border: var(--border-color);
+  --surface-border-subtle: color-mix(in srgb, var(--text-color) 10%, transparent);
+  --radius-sm: 6px;
+  --radius-control: 9px;
+  --radius-card: 14px;
+  --radius-pill: 999px;
+  --control-height: 40px;
+  --focus-ring-color: color-mix(in srgb, var(--accent-color) 72%, transparent);
+  --focus-ring: 2px solid var(--focus-ring-color);
+  --focus-ring-offset: 2px;
+  --accent-foreground: var(--accent-text-color);
+  --motion-fast: 160ms ease;
+  --motion-normal: 240ms ease;
+  --elevation-low: 0 1px 4px rgb(0 0 0 / 25%);
+  --elevation-card: 0 8px 24px rgb(0 0 0 / 14%);
+
   --status-watching: #27ae60;
   --status-plan: #9b51e0;
   --status-completed: #2f80ed;
@@ -26,7 +52,9 @@
   --card-bg: #f7f8fa;
   --border-color: #d5d8df;
   --accent-color: #FF6060;
-  
+  --accent-text-color: #ffffff;
+  --accent-foreground: var(--accent-text-color);
+
   --lighter-accent-color: #ff8a8a;
   --status-watching: #6fcf87;
   --status-plan: #c28ae9;
@@ -39,7 +67,7 @@
 
 @font-face {
   font-family: 'Proxima Nova';
-  src: url('./assets/fonts/ProximaNovaRegular.woff') format('woff2');
+  src: url('./assets/fonts/ProximaNovaRegular.woff') format('woff');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -47,10 +75,24 @@
 
 @font-face {
   font-family: 'Proxima Nova';
-  src: url('./assets/fonts/ProximaNovaBold.woff') format('woff2');
+  src: url('./assets/fonts/ProximaNovaBold.woff') format('woff');
   font-weight: 700; 
   font-style: normal;
   font-display: swap;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
 }
 
 body {
@@ -136,62 +178,20 @@ button, input, select, textarea {
 }
 
 
-/* From Uiverse.io by arghyaBiswasDev (https://uiverse.io/arghyaBiswasDev/shaggy-ape-11)*/
-/* The switch - the box around the slider */
-.switch {
-  font-size: 17px;
-  position: relative;
-  display: inline-block;
-  width: 3.5em;
-  height: 2em;
-}
-
-/* Hide default HTML checkbox */
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-/* The slider */
-.slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: var(--background-color);
-  border: 1px solid #adb5bd;
-  transition: .4s;
-  border-radius: 30px;
-}
-
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 1.4em;
-  width: 1.4em;
-  border-radius: 20px;
-  left: 0.27em;
-  bottom: 0.25em;
-  background-color: #adb5bd;
-  transition: .4s;
-}
-
-input:checked + .slider {
-  background-color: var(--accent-color);
-  border: 1px solid var(--accent-color);
-}
-
-input:checked + .slider:before {
-  transform: translateX(1.4em);
-  background-color: var(--background-color);
-}
-
 .route-loader {
   display: grid;
   min-height: 50vh;
   place-items: center;
   color: var(--text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

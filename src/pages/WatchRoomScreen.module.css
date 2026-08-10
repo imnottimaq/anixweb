@@ -16,7 +16,7 @@
     padding: 20px;
     border: 1px solid var(--border-color);
     border-radius: 16px;
-    background: var(--card-bg);
+    background: transparent;
 }
 
 .card h2 { margin-top: 0; }
@@ -28,12 +28,21 @@
 }
 
 .card input, .card select {
+    width: 100%;
+    min-width: 0;
     padding: 10px 12px;
+    box-sizing: border-box;
     border: 1px solid var(--border-color);
     border-radius: 9px;
     color: var(--text-color);
     background: var(--background-color);
     font: inherit;
+}
+
+.card input:focus-visible, .card select:focus-visible, .card button:focus-visible,
+.rooms a:focus-visible, .release-results a:focus-visible, .back:focus-visible, .open-release:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 3px;
 }
 
 .card button, .open-release {
@@ -91,5 +100,18 @@
 .open-release { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; white-space: nowrap; }
 
 @media (max-width: 700px) {
+    .page { padding: 24px 14px 44px; overflow-x: hidden; }
     .grid { grid-template-columns: 1fr; }
+    .roomHeader, .cardHeading { align-items: flex-start; flex-direction: column; }
+    .room-actions { width: 100%; flex-wrap: wrap; }
+    .room-actions button { flex: 1 1 150px; }
+    .join-by-code { grid-template-columns: 1fr; }
+    .join-by-code button { width: 100%; }
+    .card { min-width: 0; padding: 16px; }
+    .participants > div { min-width: 0; }
+    .participant > span:last-child { overflow-wrap: anywhere; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .card button, .rooms a, .release-results a { scroll-behavior: auto; transition: none; }
 }

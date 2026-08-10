@@ -15,6 +15,8 @@ import InstIcon from '../assets/icons/instagram.svg'
 import TtIcon from '../assets/icons/tiktok.svg'
 import ReleaseCard from "../components/ReleaseCard"
 import RemoteImage from '../components/RemoteImage'
+import { PageLayout } from '../components/PageLayout';
+import PageState from '../components/PageState';
 import { useApi } from '../shared/apiClient';
 import { Modal } from '../modals/ModalTemplate';
 import { saveRoomIdentity } from '../shared/roomParticipant';
@@ -34,6 +36,8 @@ export default function AccountScreen(){
     const [userObject, setUserObject] = useState<Profile | null>(null);
     const [isMyProfile, setIsMyProfile] = useState<boolean | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const [loadAttempt, setLoadAttempt] = useState(0);
     const [isFriendActionLoading, setIsFriendActionLoading] = useState(false);
     const [friendActionError, setFriendActionError] = useState<string | null>(null);
     const [isCancelRequestModalOpen, setIsCancelRequestModalOpen] = useState(false);
@@ -58,11 +62,14 @@ export default function AccountScreen(){
 
         const profileId = id ? Number(id) : userId;
         if (!Number.isFinite(profileId) || profileId <= 0) {
+            setLoadError('Профиль не найден.');
             setIsLoading(false);
             return () => { isCancelled = true; };
         }
 
         const loadProfile = async () => {
+            setIsLoading(true);
+            setLoadError(null);
             try {
                 const data = await api.get<ProfileAPIResponse>(`/profile/${profileId}`);
                 const profile = data.profile;
@@ -74,6 +81,7 @@ export default function AccountScreen(){
                 if (!isCancelled) setUserObject(profile);
             } catch (error) {
                 console.error('Не удалось загрузить профиль:', error);
+                if (!isCancelled) setLoadError(error instanceof Error ? error.message : 'Не удалось загрузить профиль.');
             } finally {
                 if (!isCancelled) setIsLoading(false);
             }
@@ -82,7 +90,7 @@ export default function AccountScreen(){
         void loadProfile();
 
         return () => { isCancelled = true; };
-    }, [api, id, userId, userToken])
+    }, [api, id, userId, userToken, loadAttempt])
 
     const watchDynamic = userObject?.watch_dynamics?.slice(-10) ?? [];
     const maxValue = Math.max(...watchDynamic.map(({ count }) => count), 1);
@@ -121,8 +129,14 @@ export default function AccountScreen(){
         return 'Добавить в друзья';
     };
 
+    if (isLoading) return <PageLayout size="wide"><PageState status="loading" message="Загружаем профиль…" /></PageLayout>;
+    if (loadError || !userObject) return <PageLayout size="wide">
+        <PageState status="error" message={loadError ?? 'Профиль не найден.'} onRetry={() => setLoadAttempt(attempt => attempt + 1)} />
+    </PageLayout>;
+
     return (
-        <div className={styles['body']} key={userObject?.id}>
+        <PageLayout size="wide">
+            <div className={styles['body']} key={userObject.id}>
             <div className={styles['profile-grid']}>
                 <div className={styles['profile-card']}>
                     <div className="flex-row">
@@ -132,17 +146,17 @@ export default function AccountScreen(){
                                 <div className={styles['user-info']}>
                                     <div className={styles['user-name-row']}>
                                         <p>{userObject?.login}</p>
-                                        <span className={styles['rating']}>{userObject?.rating_score}</span>
+                                        <span className={styles['rating']} aria-label={`Рейтинг: ${userObject.rating_score}`}>{userObject.rating_score}</span>
                                     </div>
                                     <p>{userObject?.status}</p>
                                 </div>
                             </div>
                             <div className={styles['user-socials']}>
-                                {userObject?.vk_page && <a className={styles['vk']} href={"https://vk.com/" + userObject?.vk_page}><img className={styles['social-icon']} src={VkIcon}/></a>}
-                                {userObject?.tg_page && <a className={styles['tg']} href={"https://t.me/" + userObject?.tg_page}><img className={styles['social-icon']} src={TgIcon}/></a>}
-                                {userObject?.discord_page && <a className={styles['discord']}><img className={styles['social-icon']} src={DiscordIcon}/></a>}
-                                {userObject?.inst_page && <a className={styles['inst']} href={"https://instagram.com/" + userObject?.inst_page}><img className={styles['social-icon']} src={InstIcon}/></a>}
-                                {userObject?.tt_page && <a className={styles['tt']} href={"https://tiktok.com/@" + userObject?.tt_page}><img className={styles['social-icon']} src={TtIcon}/></a>}
+                                {userObject.vk_page && <a className={styles.vk} href={"https://vk.com/" + userObject.vk_page} aria-label="Профиль ВКонтакте"><img className={styles['social-icon']} src={VkIcon} alt="" /></a>}
+                                {userObject.tg_page && <a className={styles.tg} href={"https://t.me/" + userObject.tg_page} aria-label="Профиль в Telegram"><img className={styles['social-icon']} src={TgIcon} alt="" /></a>}
+                                {userObject.discord_page && <span className={styles.discord} aria-label={`Discord: ${userObject.discord_page}`}><img className={styles['social-icon']} src={DiscordIcon} alt="" /></span>}
+                                {userObject.inst_page && <a className={styles.inst} href={"https://instagram.com/" + userObject.inst_page} aria-label="Профиль в Instagram"><img className={styles['social-icon']} src={InstIcon} alt="" /></a>}
+                                {userObject.tt_page && <a className={styles.tt} href={"https://tiktok.com/@" + userObject.tt_page} aria-label="Профиль в TikTok"><img className={styles['social-icon']} src={TtIcon} alt="" /></a>}
                             </div>
                             <div className={styles['user-roles']}>
                                 {userObject?.roles?.map(role => {
@@ -176,26 +190,26 @@ export default function AccountScreen(){
                     <div className={styles['stat-number-div']}>
                         <div className={styles['stat-number']}>
                             <p>{userObject?.comment_count}</p>
-                            <a>{t('account.comments')}</a>
+                            <span>{t('account.comments')}</span>
                         </div>
                         <div className={styles['stat-number']}>
                             <p>{userObject?.video_count}</p>
-                            <a>{t('account.videos')}</a>
+                            <span>{t('account.videos')}</span>
                         </div>
                         <div className={styles['stat-number']}>
                             <p>{userObject?.collection_count}</p>
-                            <a>{t('account.collections')}</a>
+                            <span>{t('account.collections')}</span>
                         </div>
                         <div className={styles['stat-number']}>
                             <p>{userObject?.friend_count}</p>
-                            <a>{t('account.friends')}</a>
+                            <span>{t('account.friends')}</span>
                         </div>
                     </div>
                 </div>
                 <div className={styles['statistics-card']}>
                     <div className={styles['stat-line']}>
                         <h2>{t('account.stats')}</h2>
-                        <a onClick={() => navigate(isMyProfile ? "/favorites" : `/favorites/${userObject?.id}`)}>{t('account.viewAll')}</a>
+                        <button type="button" className={styles['view-all']} onClick={() => navigate(isMyProfile ? "/favorites" : `/favorites/${userObject.id}`)}>{t('account.viewAll')}</button>
                     </div>
                     <p className={styles['statistics-caption']}>{t('account.distribution')}</p>
                     <WatchlistLine watching_count={userObject?.watching_count || 0}
@@ -218,7 +232,7 @@ export default function AccountScreen(){
                     <h2>{t('account.dynamics')}</h2>
                     <div className={styles['chart']}>
                         {watchDynamic.map((item) => (
-                            <div className={styles['column']}>
+                            <div className={styles['column']} key={`${item.timestamp}-${item.count}`}>
                                 <span>{item.count}</span>
                                 <div className={styles['bar']} style={{height:`${Math.max(10, (item.count / maxValue) * 180)}px`}}/>
                                 <span className={styles['date']}>{formatTimestamp(item.timestamp)}</span>
@@ -246,6 +260,7 @@ export default function AccountScreen(){
                             timestamp={item.last_view_timestamp}
                             />
                     )}
+                </div>
             </div>
             <Modal
                 isOpen={isCancelRequestModalOpen}
@@ -270,8 +285,7 @@ export default function AccountScreen(){
                 </>}
             </Modal>
         </div>
-            {isLoading && <div className={styles['loading-overlay']} />}
-        </div>
+        </PageLayout>
     )
 
 }

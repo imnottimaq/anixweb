@@ -1,4 +1,5 @@
 import styles from '../pages/SettingsScreen.module.css'
+import Toggle from './Toggle'
 
 interface ToggleSettingsItem {
     title: string,
@@ -15,10 +16,13 @@ export default function ToggleSettingsItem({title, desc, checked, disabled = fal
                 <h2>{title}</h2>
                 <p>{desc}</p>
             </div>
-            <label className={styles.switch}>
-                <input type="checkbox" disabled={disabled} checked={checked} onChange={e => onChange(e.target.checked)}/>
-                <span className={styles.slider}></span>
-            </label>
+            <Toggle
+                className={styles.switch}
+                label={title}
+                disabled={disabled}
+                checked={checked}
+                onChange={onChange}
+            />
         </div>
     )
 }

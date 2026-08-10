@@ -1,19 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import AnimeCard from '../components/AnimeCard';
 import AnimeCardHorizontal from '../components/AnimeCardHorizontal';
+import CollectionCard from '../components/CollectionCard';
 import SortSelect, { type ReleaseSort } from '../components/SortSelect';
 import { type Anime, type Collection, type PagedResponse } from '../shared/types/api';
 import { emptyTab, type TabData } from '../shared/types/internal';
 import { useUser } from '../shared/contexts/userContext';
 import { useSettings } from '../shared/contexts/settingsContext';
 import { useSearchScope, type SearchScope } from '../shared/contexts/searchContext';
-import styles from './HomepageScreen.module.css';
-import collectionStyles from './CollectionsScreen.module.css';
+import styles from './FavoritesScreen.module.css';
 import { useTranslation } from '../shared/useTranslation';
 import { useApi } from '../shared/apiClient';
-import RemoteImage from '../components/RemoteImage';
-import { plural } from '../shared/plural';
 
 type ProfilePage = 'collections' | 'favorites' | 'history' | 'watching' | 'planned' | 'completed' | 'onHold' | 'dropped';
 type ReleasePage = Exclude<ProfilePage, 'collections'>;
@@ -84,6 +82,8 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
     const [activePage, setActivePage] = useState<ProfilePage>('favorites');
     const [sort, setSort] = useState<ReleaseSort>('addedDesc');
     const [tabs, setTabs] = useState<FavoritesTabs>(createTabs);
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const [retryVersion, setRetryVersion] = useState(0);
     const selectedProfileId = Number(profileId);
     const isProfileFavorites = profileId !== undefined;
     const hasValidProfileId = Number.isInteger(selectedProfileId) && selectedProfileId > 0;
@@ -119,6 +119,7 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
         if (loadingRequestsRef.current.has(requestKey)) return;
 
         loadingRequestsRef.current.add(requestKey);
+        setLoadError(null);
         setTabs(previousTabs => ({
             ...previousTabs,
             [activePage]: {
@@ -151,6 +152,7 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
             .catch(error => {
                 if (sortVersion !== sortVersionRef.current) return;
                 console.error('Не удалось загрузить список:', error);
+                setLoadError('Не удалось загрузить список. Проверьте соединение и попробуйте снова.');
                 setTabs(previousTabs => ({
                     ...previousTabs,
                     [activePage]: {
@@ -160,7 +162,7 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
                 }));
             })
             .finally(() => loadingRequestsRef.current.delete(requestKey));
-    }, [activePage, activeTab.hasMore, activeTab.page, currentPageIsLoaded, sort, userToken, api, hasValidProfileId, isCollectionsPage, isProfileFavorites, selectedProfileId]);
+    }, [activePage, activeTab.hasMore, activeTab.page, currentPageIsLoaded, sort, userToken, api, hasValidProfileId, isCollectionsPage, isProfileFavorites, selectedProfileId, retryVersion]);
 
     useEffect(() => {
         if (!userToken || !isCollectionsPage || !activeTab.hasMore || currentPageIsLoaded) return;
@@ -170,6 +172,7 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
         if (loadingRequestsRef.current.has(requestKey)) return;
 
         loadingRequestsRef.current.add(requestKey);
+        setLoadError(null);
         setTabs(previousTabs => ({
             ...previousTabs,
             collections: { ...previousTabs.collections, isLoading: true },
@@ -194,13 +197,14 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
             })
             .catch(error => {
                 console.error('Не удалось загрузить сохранённые коллекции:', error);
+                setLoadError('Не удалось загрузить коллекции. Проверьте соединение и попробуйте снова.');
                 setTabs(previousTabs => ({
                     ...previousTabs,
                     collections: { ...previousTabs.collections, isLoading: false },
                 }));
             })
             .finally(() => loadingRequestsRef.current.delete(requestKey));
-    }, [activeTab.hasMore, activeTab.page, api, currentPageIsLoaded, isCollectionsPage, userToken]);
+    }, [activeTab.hasMore, activeTab.page, api, currentPageIsLoaded, isCollectionsPage, userToken, retryVersion]);
 
     useEffect(() => {
         if (!currentPageIsLoaded || activeTab.isLoading || !activeTab.hasMore) return;
@@ -229,10 +233,12 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
 
     return (
         <div className={styles.body}>
-            {!isProfileFavorites && <div className={styles['side-panel']}>
+            {!isProfileFavorites && <div className={styles['side-panel']} role="tablist" aria-label="Разделы профиля">
                 {PAGE_ITEMS.map(({ page, buttonText, label }) => (
                     <button
                         key={page}
+                        role="tab"
+                        aria-selected={activePage === page}
                         className={activePage === page ? styles.active : ''}
                         onClick={() => setActivePage(page)}
                     >
@@ -246,7 +252,9 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
                 {!isCollectionsPage && <div className={styles['sort-toolbar']}>
                     <SortSelect value={sort} onChange={handleSortChange} />
                 </div>}
-                {isCollectionsPage ? <div className={collectionStyles.list}>
+                {loadError && <div className={styles.error} role="alert"><span>{loadError}</span><button type="button" onClick={() => { setLoadError(null); setRetryVersion(version => version + 1); }}>Попробовать снова</button></div>}
+                {!loadError && !isInitialLoading && activeItemsCount === 0 && <p className={styles.empty}>Здесь пока ничего нет.</p>}
+                {isCollectionsPage ? <div className={styles.collectionsGrid}>
                     {tabs.collections.collections.map(collection => <CollectionCard key={collection.id} collection={collection} />)}
                     <div ref={triggerRef} style={{ height: '20px', background: 'transparent' }} />
                     {isLoadingMore && <div className={styles['loading-more']} role="status">{t('misc.loading')}</div>}
@@ -272,28 +280,6 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
             </div>}
         </div>
     );
-}
-
-function CollectionCard({ collection }: { collection: Collection }) {
-    return <article className={collectionStyles.collection}>
-        <Link className={collectionStyles.collectionLink} to={`/collection/${collection.id}`}>
-            <RemoteImage src={collection.image} className={collectionStyles.poster} alt={collection.title} />
-            <div className={collectionStyles.content}>
-                <h2>{collection.title}</h2>
-                {collection.description && <p className={collectionStyles.description}>{collection.description}</p>}
-            </div>
-        </Link>
-        <div className={collectionStyles.footer}>
-            <Link className={collectionStyles.creator} to={`/account/${collection.creator.id}`}>
-                <RemoteImage src={collection.creator.avatar} alt="" />
-                <span>{collection.creator.login}</span>
-            </Link>
-            <div className={collectionStyles.stats}>
-                <span>{collection.comment_count} {plural(collection.comment_count, 'комментарий', 'комментария', 'комментариев')}</span>
-                <span>{collection.favorites_count} сохранений</span>
-            </div>
-        </div>
-    </article>;
 }
 
 async function getReleasesForTab(page: ReleasePage, currentPage: number, sort: ReleaseSort, api: ReturnType<typeof useApi>, profileId?: number): Promise<Anime[]> {

@@ -1,8 +1,5 @@
 .body {
-  box-sizing: border-box;
-  width: min(1440px, 100%);
-  margin: 0 auto;
-  padding: 28px clamp(16px, 3vw, 40px) 48px;
+  width: 100%;
 }
 
 .profile-grid,
@@ -29,8 +26,9 @@
   box-sizing: border-box;
   min-width: 0;
   padding: clamp(16px, 2vw, 22px);
-  border-radius: 16px;
-  background: var(--background-color);
+  border: 0;
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
 }
 
 .body h2 {
@@ -93,10 +91,10 @@
   min-width: 26px;
   height: 28px;
   padding: 0 7px;
-  border: 1px solid springgreen;
+  border: 1px solid var(--status-watching);
   border-radius: 7px;
   place-items: center;
-  color: springgreen;
+  color: var(--status-watching);
   font-size: 13px;
   font-weight: 700;
   line-height: 1;
@@ -212,7 +210,8 @@
   margin-top: 18px;
 }
 
-.user-socials a {
+.user-socials a,
+.user-socials > span {
   display: grid;
   width: 34px;
   height: 34px;
@@ -242,7 +241,7 @@
   background: color-mix(in srgb, #229ed9 13%, var(--background-color));
 }
 
-.user-socials a.discord {
+.user-socials .discord {
   border-color: #5865f2;
   background: color-mix(in srgb, #5865f2 13%, var(--background-color));
 }
@@ -284,7 +283,7 @@
   line-height: 1;
 }
 
-.stat-number a {
+.stat-number span {
   color: color-mix(in srgb, var(--text-color) 64%, transparent);
   font-size: 11px;
   overflow-wrap: anywhere;
@@ -302,18 +301,30 @@
   margin: 0;
 }
 
-.stat-line a {
+.view-all {
   margin-left: auto;
+  padding: 4px;
+  border: 0;
   cursor: pointer;
   color: var(--accent-color);
+  background: transparent;
+  font: inherit;
   font-size: 13px;
   font-weight: 700;
   text-decoration: none;
   white-space: nowrap;
 }
 
-.stat-line a:hover {
+.view-all:hover {
   text-decoration: underline;
+}
+
+.view-all:focus-visible,
+.edit-button:focus-visible,
+.friend-button:focus-visible,
+.user-socials a:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .statistics-caption {
@@ -501,10 +512,6 @@
 }
 
 @media (max-width: 680px) {
-  .body {
-    padding: 18px 12px 32px;
-  }
-
   .profile-grid,
   .lists-grid {
     grid-template-columns: minmax(0, 1fr);

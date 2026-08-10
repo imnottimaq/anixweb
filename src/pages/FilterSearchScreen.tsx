@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import PageState from '../components/PageState';
+import { PageHeader, PageLayout } from '../components/PageLayout';
 import AnimeCard from '../components/AnimeCard';
 import AnimeCardHorizontal from '../components/AnimeCardHorizontal';
 import FilterModal from '../modals/FilterModal';
@@ -56,7 +58,7 @@ export default function FilterSearchScreen() {
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(() => !routeState?.autoSearch);
     const [hasSearched, setHasSearched] = useState(() => routeState?.autoSearch ?? false);
     const isApplyingFilterRef = useRef(false);
-    const { data: results = [], isLoading, error } = useAsyncLoad(
+    const { data: results = [], isLoading, error, reload } = useAsyncLoad(
         () => api.post<{ content?: Anime[] }>('/filter/0?extended_mode=true', { ...EMPTY_FILTER, ...filter })
             .then(data => data.content ?? []),
         [api, filter],
@@ -70,19 +72,17 @@ export default function FilterSearchScreen() {
         setHasSearched(true);
     };
 
-    return <main className={styles.page}>
-        <header className={styles.header}>
-            <div>
-                <h1>Поиск по фильтрам</h1>
-                <p>Подберите релизы по жанру, году, статусу и другим параметрам.</p>
-            </div>
-            <button type="button" className={styles.changeButton} onClick={() => setIsFilterModalOpen(true)}>Изменить фильтры</button>
-        </header>
+    return <PageLayout className={styles.page} size="wide">
+        <PageHeader
+            title="Поиск по фильтрам"
+            description="Подберите релизы по жанру, году, статусу и другим параметрам."
+            actions={<button type="button" className={styles.changeButton} onClick={() => setIsFilterModalOpen(true)}>Изменить фильтры</button>}
+        />
 
-        {!hasSearched && <div className={styles.placeholder}>Настройте фильтры, чтобы начать поиск.</div>}
-        {isLoading && <div className={styles.loading} role="status"><span />Ищем релизы…</div>}
-        {Boolean(error) && <p className={styles.error}>Не удалось загрузить релизы: {error instanceof Error ? error.message : 'неизвестная ошибка'}</p>}
-        {hasSearched && !isLoading && !error && results.length === 0 && <p className={styles.empty}>По выбранным фильтрам ничего не найдено.</p>}
+        {!hasSearched && <PageState status="empty" message="Настройте фильтры, чтобы начать поиск." />}
+        {isLoading && <PageState status="loading" message="Ищем релизы…" />}
+        {!isLoading && Boolean(error) && <PageState status="error" message={`Не удалось загрузить релизы: ${error instanceof Error ? error.message : 'неизвестная ошибка'}`} onRetry={reload} />}
+        {hasSearched && !isLoading && !error && results.length === 0 && <PageState status="empty" message="По выбранным фильтрам ничего не найдено." />}
         {!isLoading && results.length > 0 && <div className={`${styles.grid} ${settings.appearance.defaultCardType === 'horizontal' ? styles.horizontal : ''}`}>
             {results.map(anime => settings.appearance.defaultCardType === 'horizontal'
                 ? <AnimeCardHorizontal key={anime.id} anime={anime} />
@@ -104,5 +104,5 @@ export default function FilterSearchScreen() {
             filter={filter}
             setFilter={applyFilter}
         />
-    </main>;
+    </PageLayout>;
 }

@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useUser } from "../shared/contexts/userContext";
 import styles from './LoginScreen.module.css'
-import { useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { useTranslation } from '../shared/useTranslation';
 import { resolveAndStoreProfileIdentity } from '../shared/profileIdentity';
 
@@ -10,8 +10,6 @@ export default function RecoverScreen() {
     const [password, setPassword] = useState("")
     const [confirmPassword, setConfirmPassword] = useState("")
 
-    const navigate = useNavigate()
-    
     const {userToken, setUserToken, setUserId } = useUser()
     const [hash, setHash] = useState("")
     const [code, setCode] = useState("")
@@ -20,11 +18,12 @@ export default function RecoverScreen() {
 
     const isCodeRequestDisabled = !username || !password || password !== confirmPassword;
 
-    if (userToken !== "") navigate('/account')
+    if (userToken !== "") return <Navigate to="/account" replace />
 
 
     return (
         <div className={styles['body']}>
+            <section className={styles['auth-card']}>
             <h2>{t('auth.restoreTitle')}</h2>
             <div className={styles['form-container']}>
                 
@@ -33,6 +32,7 @@ export default function RecoverScreen() {
                         <input 
                             type="text"
                             name="username"
+                            autoComplete="username"
                             placeholder={t('auth.login')}
                             value={username}
                             onChange={e => setUsername(e.target.value)}
@@ -40,7 +40,8 @@ export default function RecoverScreen() {
                        
                         <input 
                             type="password"
-                            name="password" 
+                            name="password"
+                            autoComplete="new-password"
                             placeholder={t('auth.password')}
                             value={password}
                             onChange={e => setPassword(e.target.value)}
@@ -48,7 +49,8 @@ export default function RecoverScreen() {
 
                         <input 
                             type="password"
-                            name="confirmPassword" 
+                            name="confirmPassword"
+                            autoComplete="new-password"
                             placeholder={t('auth.confirmPassword')}
                             value={confirmPassword}
                             onChange={e => setConfirmPassword(e.target.value)}
@@ -58,6 +60,7 @@ export default function RecoverScreen() {
                             <input
                                 type="text"
                                 inputMode="numeric"
+                                autoComplete="one-time-code"
                                 placeholder={t('auth.emailCode')}
                                 onChange={e => setCode(e.target.value)}
                                 value={code}
@@ -93,6 +96,7 @@ export default function RecoverScreen() {
                         </button>
                 </div>
             </div>
+            </section>
         </div>
     )
 }

@@ -10,7 +10,7 @@
 }
 
 .release-card:hover {
-    background: var(--lighter-background-color);
+    background: transparent;
 }
 
 .release-card img {

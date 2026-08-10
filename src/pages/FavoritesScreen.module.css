@@ -1,0 +1,33 @@
+.body {
+    display: flex;
+    width: min(1440px, 100%);
+    min-height: 100%;
+    margin: 0 auto;
+    padding: 34px 24px 64px;
+    box-sizing: border-box;
+    gap: 24px;
+}
+.side-panel { position: sticky; top: 76px; display: flex; flex: 0 0 210px; height: fit-content; flex-direction: column; gap: 5px; }
+.side-panel button { padding: 13px 15px; border: 0; border-radius: 11px; color: var(--text-color); background: transparent; cursor: pointer; font: inherit; text-align: left; }
+.side-panel button:hover { background: var(--lighter-background-color); }
+.side-panel button.active { color: var(--accent-foreground); background: var(--accent-color); font-weight: 700; }
+.side-panel button:focus-visible, .error button:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 2px; }
+.content { flex: 1; min-width: 0; }
+.content h1 { margin: 0 0 22px; }
+.sort-toolbar { display: flex; justify-content: flex-end; margin-bottom: 18px; }
+.releases-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 18px; }
+.horizontal-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.collectionsGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.loading-more { grid-column: 1 / -1; padding: 18px; color: var(--text-secondary); text-align: center; }
+.loading-overlay { position: fixed; z-index: 101; inset: 0; display: grid; place-items: center; pointer-events: none; background: rgb(0 0 0 / 12%); backdrop-filter: blur(3px); }
+.loading-overlay::before { content: ''; width: 36px; height: 36px; border: 3px solid color-mix(in srgb, var(--text-color) 20%, transparent); border-top-color: var(--accent-color); border-radius: 50%; animation: spin .8s linear infinite; }
+.empty, .error { margin: 20px 0; padding: 24px; border: 1px dashed var(--border-color); border-radius: 13px; color: var(--text-secondary); text-align: center; }
+.error { display: grid; justify-items: center; gap: 12px; color: var(--status-dropped); }
+.error button { padding: 8px 13px; border: 0; border-radius: 9px; color: var(--accent-foreground); background: var(--accent-color); cursor: pointer; font: inherit; font-weight: 700; }
+.auth-overlay { position: fixed; z-index: 100; inset: 0; display: grid; padding: 24px; place-items: center; background: rgb(0 0 0 / 46%); backdrop-filter: blur(6px); }
+.auth-card { width: min(380px, 100%); padding: 24px; border: 1px solid var(--border-color); border-radius: 16px; box-sizing: border-box; background: var(--lighter-background-color); text-align: center; }
+.auth-card h2 { margin: 0; }.auth-card p { margin: 10px 0 20px; color: var(--text-secondary); }.auth-card button { padding: 11px 18px; border: 0; border-radius: 10px; color: var(--accent-foreground); background: var(--accent-color); cursor: pointer; font: inherit; font-weight: 700; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 1100px) { .releases-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } .collectionsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .body { flex-direction: column; padding: 20px 14px 44px; gap: 18px; } .side-panel { position: static; flex: none; width: 100%; flex-direction: row; overflow-x: auto; scrollbar-width: thin; scroll-snap-type: x proximity; } .side-panel button { flex: 0 0 auto; white-space: nowrap; scroll-snap-align: start; } .releases-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .horizontal-grid, .collectionsGrid { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .loading-overlay::before { animation: none; } }

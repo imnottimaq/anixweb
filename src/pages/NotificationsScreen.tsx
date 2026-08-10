@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import RemoteImage from '../components/RemoteImage';
+import { PageHeader, PageLayout } from '../components/PageLayout';
+import PageState from '../components/PageState';
 import { useApi } from '../shared/apiClient';
 import type { AnixartNotification, NotificationProfile } from '../shared/types/api';
 import SettingsIcon from '../assets/icons/gear.svg';
@@ -22,6 +24,7 @@ export default function NotificationsScreen() {
     const [filter, setFilter] = useState<NotificationFilter>('all');
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [loadAttempt, setLoadAttempt] = useState(0);
 
     useEffect(() => {
         let cancelled = false;
@@ -54,7 +57,7 @@ export default function NotificationsScreen() {
         void markAsRead;
 
         return () => { cancelled = true; };
-    }, [api]);
+    }, [api, loadAttempt]);
 
     const visibleNotifications = useMemo(() => notifications.filter(notification => {
         if (filter === 'all') return true;
@@ -64,32 +67,29 @@ export default function NotificationsScreen() {
         return notification.type === 'releaseComment';
     }), [filter, notifications]);
 
-    return <section className={styles.page}>
-        <header className={styles.header}>
-            <div className={styles.headerCopy}>
-                <h1>Уведомления</h1>
-                <div className={styles.headerMeta}>
-                    <p>Всё важное по твоим релизам и активности.</p>
-                    <label className={styles.filter}>
-                        <select value={filter} onChange={event => setFilter(event.target.value as NotificationFilter)}>
-                            {FILTERS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
-                        </select>
-                    </label>
-                </div>
-            </div>
-            <div className={styles.actions}>
+    return <PageLayout>
+        <PageHeader
+            title="Уведомления"
+            description="Всё важное по твоим релизам и активности."
+            actions={<>
+                <label className={styles.filter}>
+                    <span className={styles.visuallyHidden}>Фильтр уведомлений</span>
+                    <select value={filter} onChange={event => setFilter(event.target.value as NotificationFilter)}>
+                        {FILTERS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
+                    </select>
+                </label>
                 <Link className={styles.settingsLink} to="/notifications/settings" aria-label="Настройки уведомлений" title="Настройки уведомлений"><img src={SettingsIcon} alt="" /></Link>
-            </div>
-        </header>
+            </>}
+        />
 
-        {isLoading && <p className={styles.message}>Загружаем уведомления…</p>}
-        {error && <p className={`${styles.message} ${styles.error}`}>{error}</p>}
-        {!isLoading && !error && visibleNotifications.length === 0 && <p className={styles.message}>Здесь пока ничего нет.</p>}
+        {isLoading && <PageState status="loading" message="Загружаем уведомления…" />}
+        {!isLoading && error && <PageState status="error" message={error} onRetry={() => setLoadAttempt(attempt => attempt + 1)} />}
+        {!isLoading && !error && visibleNotifications.length === 0 && <PageState status="empty" message="Здесь пока нет уведомлений по выбранному фильтру." />}
 
-        <div className={styles.list}>
+        {!isLoading && !error && <div className={styles.list}>
             {visibleNotifications.map(notification => <NotificationItem key={`${notification.type}-${notification.id}`} notification={notification} />)}
-        </div>
-    </section>;
+        </div>}
+    </PageLayout>;
 }
 
 function NotificationItem({ notification }: { notification: AnixartNotification }) {

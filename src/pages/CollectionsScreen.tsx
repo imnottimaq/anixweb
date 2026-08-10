@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import RemoteImage from '../components/RemoteImage';
+import CollectionCard from '../components/CollectionCard';
 import { useApi } from '../shared/apiClient';
-import { plural } from '../shared/plural';
 import type { Anime, Collection, PagedResponse } from '../shared/types/api';
 import { useAsyncLoad } from '../shared/useAsyncLoad';
 import { useSearchScope } from '../shared/contexts/searchContext';
@@ -241,7 +240,7 @@ export default function CollectionsScreen() {
                 <p>Подборки аниме от сообщества</p>
             </div>
             <div className={styles.toolbar}>
-                <button type="button" className={styles.toolbarButton} onClick={() => setIsCreateModalOpen(true)}>Создать коллекцию</button>
+                <button type="button" className={`${styles.toolbarButton} ${styles.createButton}`} onClick={() => setIsCreateModalOpen(true)}>Создать коллекцию</button>
                 <button type="button" className={`${styles.toolbarButton} ${isMine ? styles.toolbarButtonActive : ''}`} onClick={() => changeView(isMine ? 'all' : 'mine')}>{isMine ? 'Все коллекции' : 'Мои коллекции'}</button>
                 <div className={styles.sortDropdown}>
                     <SelectDropdown value={sort} options={COLLECTION_SORTS} onChange={changeSort} ariaLabel="Сортировка коллекций" />
@@ -252,25 +251,7 @@ export default function CollectionsScreen() {
         {errorMessage && <p className={`${styles.message} ${styles.error}`}>{errorMessage}</p>}
         {!isCurrentViewLoading && !errorMessage && collections.length === 0 && <p className={styles.message}>Коллекций пока нет.</p>}
         <div className={styles.list}>
-            {collections.map(collection => <article key={collection.id} className={styles.collection}>
-                <Link className={styles.collectionLink} to={`/collection/${collection.id}`} aria-label={`Открыть коллекцию «${collection.title}»`}>
-                    <RemoteImage src={collection.image} className={styles.poster} alt={collection.title} />
-                    <div className={styles.content}>
-                        <h2>{collection.title}</h2>
-                        {collection.description && <p className={styles.description}>{collection.description}</p>}
-                    </div>
-                </Link>
-                <div className={styles.footer}>
-                    <Link className={styles.creator} to={`/account/${collection.creator.id}`}>
-                        <RemoteImage src={collection.creator.avatar} alt="" />
-                        <span>{collection.creator.login}</span>
-                    </Link>
-                    <div className={styles.stats}>
-                        <span>{collection.comment_count} {plural(collection.comment_count, 'комментарий', 'комментария', 'комментариев')}</span>
-                        <span>{collection.favorites_count} сохранений</span>
-                    </div>
-                </div>
-            </article>)}
+            {collections.map(collection => <CollectionCard key={collection.id} collection={collection} />)}
         </div>
         {hasMore && <div ref={triggerRef} className={styles.loadMoreTrigger} />}
         {isLoadingMore && <p className={styles.loadingMore}>Загружаем ещё коллекции…</p>}
