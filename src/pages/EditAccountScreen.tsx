@@ -4,6 +4,8 @@ import { useApi } from '../shared/apiClient';
 import { useUser } from '../shared/contexts/userContext';
 import type { Profile } from '../shared/types/api';
 import RemoteImage from '../components/RemoteImage';
+import { PageHeader, PageLayout } from '../components/PageLayout';
+import PageState from '../components/PageState';
 import { Modal } from '../modals/ModalTemplate';
 import styles from './EditAccountScreen.module.css';
 
@@ -390,17 +392,11 @@ export default function EditAccountScreen() {
         if (avatarPreview) URL.revokeObjectURL(avatarPreview);
     }, [avatarPreview]);
 
-    if (isLoading) return <div className="route-loader" role="status">Загрузка…</div>;
+    if (isLoading) return <PageLayout><PageState status="loading" message="Загружаем профиль…" /></PageLayout>;
 
     return (
-        <main className={styles.body}>
-            <header className={styles.header}>
-                <button type="button" className={styles.backButton} aria-label="Вернуться к профилю" onClick={() => navigate('/account')}><span className={styles.backIcon} aria-hidden="true" /></button>
-                <div>
-                    <h1>Редактирование профиля</h1>
-                    <p>Настройте информацию, которая отображается в вашем профиле.</p>
-                </div>
-            </header>
+        <PageLayout>
+            <PageHeader title="Редактирование профиля" description="Настройте информацию, которая отображается в вашем профиле." back />
 
             <section className={styles.section}>
                 <h2>Основное</h2>
@@ -490,6 +486,6 @@ export default function EditAccountScreen() {
                     <div className={styles.modalActions}><button type="button" onClick={close}>Отмена</button><button type="button" disabled={!currentEmail || !newEmail || !emailPassword || isEmailSaving} onClick={() => void changeEmail(close)}>{isEmailSaving ? 'Меняем…' : 'Изменить email'}</button></div>
                 </div>}
             </Modal>
-        </main>
+        </PageLayout>
     );
 }

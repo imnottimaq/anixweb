@@ -1,45 +1,4 @@
-.body {
-    width: min(860px, 100%);
-    box-sizing: border-box;
-    margin: 0 auto;
-    padding: 42px 28px 72px;
-}
-
-.header {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    margin-bottom: 34px;
-}
-
-.header h1 {
-    margin: 0;
-    color: var(--text-color);
-    font-size: clamp(28px, 3vw, 38px);
-    line-height: 1.1;
-}
-
-.header p {
-    margin: 7px 0 0;
-    color: var(--text-secondary);
-}
-
-.backButton {
-    width: 34px;
-    height: 34px;
-    display: grid;
-    place-items: center;
-    flex: 0 0 34px;
-    padding: 0;
-    border: 1px solid color-mix(in srgb, var(--text-color) 16%, transparent);
-    border-radius: 9px;
-    color: var(--text-color);
-    background: var(--lighter-background-color);
-    cursor: pointer;
-}
-.backIcon { display: block; width: 21px; height: 21px; background: var(--text-color); -webkit-mask: url('../assets/icons/arrow-left.svg') center / contain no-repeat; mask: url('../assets/icons/arrow-left.svg') center / contain no-repeat; }
-
-.section { margin-top: 48px; }
+.section { margin-top: 42px; }
 .section:first-of-type { margin-top: 0; }
 
 .section h2 {
@@ -86,8 +45,8 @@
 }
 
 .avatarControl img {
-    width: 208px;
-    height: 208px;
+    width: 88px;
+    height: 88px;
     border: 1px solid var(--border-color);
     border-radius: 50%;
     object-fit: cover;

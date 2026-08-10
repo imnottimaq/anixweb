@@ -1,4 +1,5 @@
 .page {
+    width: min(1440px, 100%);
     box-sizing: border-box;
     min-height: 100%;
     padding: 34px 28px 70px;
@@ -20,12 +21,13 @@
     padding: 10px 15px;
     border: 0;
     border-radius: 10px;
-    color: #fff;
+    color: var(--accent-foreground);
     font: inherit;
     font-weight: 700;
     cursor: pointer;
     background: var(--accent-color);
 }
+.changeButton:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 3px; }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 18px; }
 .horizontal { grid-template-columns: 1fr; gap: 14px; }

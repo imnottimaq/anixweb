@@ -1,4 +1,5 @@
 import ToggleSettingsItem from '../components/ToggleSettingsItem'
+import { PageHeader, PageLayout } from '../components/PageLayout'
 import { useSettings } from '../shared/contexts/settingsContext'
 import { useEffect, useState } from 'react'
 import { canUseAnime4KVideo, checkAnime4KVideoSupport } from '../shared/anime4kSupport'
@@ -40,9 +41,10 @@ export default function SettingsScreen(){
     }, []);
 
     return (
-        <div className={styles['body']}>
+        <PageLayout>
+            <PageHeader title="Настройки" description="Настройте внешний вид, контент и проигрыватель." />
             <div className={styles['content']}>
-                <h1>{t('settings.appearance')}</h1>
+                <h2 className={styles.sectionTitle}>{t('settings.appearance')}</h2>
                 <div className={styles['settings-item']}>
                     <div className={styles['setting-copy']}>
                         <h2>{t('settings.language')}</h2>
@@ -156,6 +158,6 @@ export default function SettingsScreen(){
                     </label>
                 </section>
             </div>
-        </div>
+        </PageLayout>
     )
 }

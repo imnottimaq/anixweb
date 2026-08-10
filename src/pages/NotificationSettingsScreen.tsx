@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import ArrowLeftIcon from '../assets/icons/arrow-left.svg';
+import { Link } from 'react-router-dom';
+import { PageHeader, PageLayout } from '../components/PageLayout';
+import Toggle from '../components/Toggle';
 import { Modal } from '../modals/ModalTemplate';
 import { useApi } from '../shared/apiClient';
 import { useSettings } from '../shared/contexts/settingsContext';
@@ -30,7 +31,6 @@ type NotificationMode = 'all' | 'selected_lists' | 'selected_releases';
 
 export default function NotificationSettingsScreen() {
     const api = useApi();
-    const navigate = useNavigate();
     const { settings, setSettings } = useSettings();
     const [isListsModalOpen, setIsListsModalOpen] = useState(false);
     const [isDubsModalOpen, setIsDubsModalOpen] = useState(false);
@@ -141,16 +141,11 @@ export default function NotificationSettingsScreen() {
         update();
     };
 
-    return <section className={styles.page}>
-        <header className={styles.header}>
-            <button className={styles.back} type="button" onClick={() => navigate(-1)} aria-label="Назад">
-                <img src={ArrowLeftIcon} alt="" />
-            </button>
-            <h1>Настройки уведомлений</h1>
-        </header>
+    return <PageLayout>
+        <PageHeader title="Настройки уведомлений" description="Выберите, о каких событиях вы хотите узнавать." back />
 
         <SettingsGroup title="Уведомления о сериях">
-            <Toggle
+            <SettingToggle
                 title="Получать уведомления"
                 description="О выходе новых серий"
                 checked={settings.notifications.recieveNotifications}
@@ -184,7 +179,7 @@ export default function NotificationSettingsScreen() {
                     <strong>Уведомления от озвучек</strong>
                     <span>{selectedDubsText}</span>
                 </button>
-                <Toggle
+                <SettingToggle
                     title="Получать только одно уведомление"
                     description="Только от одной из выбранных озвучек, которая выпустит новую серию первой"
                     checked={settings.notifications.getOnlyOneNotification}
@@ -199,7 +194,7 @@ export default function NotificationSettingsScreen() {
         </SettingsGroup>
 
         <SettingsGroup title="Уведомления о новых релизах">
-            <Toggle
+            <SettingToggle
                 title="Получать уведомления"
                 description="Если в приложении будет добавлен связанный релиз, который находится у вас в закладках"
                 checked={settings.notifications.notificationOnRelatedRelease}
@@ -213,7 +208,7 @@ export default function NotificationSettingsScreen() {
         </SettingsGroup>
 
         <SettingsGroup title="Уведомления о комментариях">
-            <Toggle
+            <SettingToggle
                 title="Уведомления об ответах"
                 description="Если кто-то отвечает на ваши комментарии"
                 checked={settings.notifications.repliesNotifications}
@@ -224,7 +219,7 @@ export default function NotificationSettingsScreen() {
                     () => updateNotifications({ repliesNotifications }),
                 )}
             />
-            <Toggle
+            <SettingToggle
                 title="Уведомления о комментариях своих коллекций"
                 description="Если кто-то комментирует ваши коллекции"
                 checked={settings.notifications.commentsOnCollectionNotification}
@@ -289,7 +284,7 @@ export default function NotificationSettingsScreen() {
                 </div>
             </>}
         </Modal>
-    </section>;
+    </PageLayout>;
 }
 
 function SettingsGroup({ title, children }: { title: string; children: ReactNode }) {
@@ -299,7 +294,7 @@ function SettingsGroup({ title, children }: { title: string; children: ReactNode
     </section>;
 }
 
-function Toggle({ title, description, checked, disabled = false, onChange }: {
+function SettingToggle({ title, description, checked, disabled = false, onChange }: {
     title: string;
     description: string;
     checked: boolean;
@@ -308,10 +303,7 @@ function Toggle({ title, description, checked, disabled = false, onChange }: {
 }) {
     return <div className={styles.toggleRow}>
         <div><h3>{title}</h3><p>{description}</p></div>
-        <label className={styles.switch}>
-            <input type="checkbox" checked={checked} disabled={disabled} onChange={event => onChange(event.target.checked)} />
-            <span />
-        </label>
+        <Toggle checked={checked} disabled={disabled} onChange={onChange} label={title} />
     </div>;
 }
 

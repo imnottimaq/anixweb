@@ -1,0 +1,18 @@
+.toggle {
+    position: relative;
+    display: inline-block;
+    width: 48px;
+    height: 28px;
+    flex: 0 0 48px;
+    cursor: pointer;
+}
+
+.toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.track { position: absolute; inset: 0; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--text-color) 24%, transparent); transition: background var(--motion-fast); }
+.track::after { content: ''; position: absolute; top: 4px; left: 4px; width: 20px; height: 20px; border-radius: 50%; background: var(--background-color); box-shadow: var(--elevation-low); transition: transform var(--motion-fast); }
+.toggle input:checked + .track { background: var(--accent-color); }
+.toggle input:checked + .track::after { transform: translateX(20px); }
+.toggle input:disabled + .track { cursor: not-allowed; opacity: .45; }
+.toggle input:focus-visible + .track { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+
+.visuallyHidden { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

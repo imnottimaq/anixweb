@@ -42,7 +42,7 @@
     border-radius: 9px;
     cursor: pointer;
     color: var(--text-color);
-    background: var(--lighter-background-color);
+    background: transparent;
     font: inherit;
     font-size: 13px;
     font-weight: 700;
@@ -59,7 +59,14 @@
 .toolbarButtonActive {
     border-color: color-mix(in srgb, var(--accent-color) 62%, var(--border-color));
     color: var(--accent-color);
-    background: color-mix(in srgb, var(--accent-color) 10%, var(--background-color));
+    background: transparent;
+}
+
+.createButton,
+.createButton:hover {
+    border-color: var(--accent-color);
+    color: var(--accent-foreground);
+    background: var(--accent-color);
 }
 
 .createModal { width: min(460px, calc(100vw - 32px)); }
@@ -200,13 +207,14 @@
     border: 0;
     border-radius: 9px;
     cursor: pointer;
-    color: var(--background-color);
+    color: var(--accent-foreground);
     background: var(--accent-color);
     font: inherit;
     font-weight: 700;
 }
 
 .createSubmit:disabled { cursor: not-allowed; opacity: .55; }
+.toolbarButton:focus-visible, .createSubmit:focus-visible, .releaseSearchResults button:focus-visible, .selectedReleases button:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 2px; }
 
 .list {
     display: grid;
