@@ -11,7 +11,7 @@ import { useRoomPresence } from '../shared/contexts/roomContext';
 import styles from './RootLayout.module.css';
 
 export default function RootLayout() {
-  const { settings } = useSettings();
+  const { settings, setSettings } = useSettings();
   const { t } = useTranslation();
   const { activeRoomId } = useRoomPresence();
   const { theme } = settings.appearance;
@@ -22,6 +22,13 @@ export default function RootLayout() {
   const closeOnboarding = () => {
     localStorage.setItem('onboarded', 'true');
     setIsFirstTimeOpeningState(false);
+  };
+
+  const changeLanguageToEnglish = () => {
+    setSettings(previous => ({
+      ...previous,
+      appearance: { ...previous.appearance, language: 'english' }
+    }));
   };
 
   useEffect(() => {
@@ -108,9 +115,9 @@ export default function RootLayout() {
         text={t('modal.unofficialClientNotice')}
         actions={[
           {
-            label: t('modal.closeSite'),
+            label: 'Change language to English',
             variant: 'secondary',
-            onClick: () => window.location.href = 'https://google.com'
+            onClick: changeLanguageToEnglish
           },
           {
             label: t('misc.continue'),
