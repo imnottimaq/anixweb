@@ -272,9 +272,44 @@
 .stat-number {
   min-width: 0;
   padding: 10px 4px;
+  border: 0;
   border-radius: 10px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
   text-align: center;
 }
+
+.friends-stat { cursor: pointer; }
+.friends-stat:hover { background: color-mix(in srgb, var(--accent-color) 11%, transparent); }
+.friends-stat:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+
+.collections-stat { cursor: pointer; }
+.collections-stat:hover { background: color-mix(in srgb, var(--accent-color) 11%, transparent); }
+.collections-stat:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+.stat-number:disabled { cursor: default; }
+
+.comments-stat { cursor: pointer; }
+.comments-stat:hover { background: color-mix(in srgb, var(--accent-color) 11%, transparent); }
+.comments-stat:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+
+.profile-comments-modal { --modal-width: min(1040px, calc(100vw - 32px)); }
+.profile-comments-tabs { display: flex; gap: 6px; margin: 0 0 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
+.profile-comments-tabs button { min-height: 34px; padding: 0 12px; border: 0; border-radius: var(--radius-control); cursor: pointer; color: var(--text-secondary); background: transparent; font: inherit; }
+.profile-comments-tabs button:hover { color: var(--text-color); background: var(--lighter-background-color); }
+.profile-comments-tabs button.active { color: var(--accent-foreground); background: var(--accent-color); }
+.profile-comments-tabs button:focus-visible, .profile-comments-pagination button:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+.profile-comments-state { margin: 24px 0; color: var(--text-secondary); text-align: center; }
+.profile-comments-error { margin: 24px 0; color: var(--status-dropped); text-align: center; }
+.profile-comments-error button { padding: 0; border: 0; cursor: pointer; color: inherit; background: transparent; font: inherit; text-decoration: underline; }
+.profile-comment { margin: 14px 0; }
+.profile-comment-context { display: flex; min-width: 0; align-items: baseline; gap: 6px; padding: 9px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-control); color: var(--text-secondary); background: var(--lighter-background-color); font-size: 12px; text-decoration: none; }
+.profile-comment-context strong { overflow: hidden; color: var(--text-color); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+a.profile-comment-context:hover strong { color: var(--accent-color); text-decoration: underline; }
+a.profile-comment-context:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+.profile-comments-pagination { display: flex; align-items: center; justify-content: center; gap: 12px; padding-top: 12px; color: var(--text-secondary); }
+.profile-comments-pagination button { min-height: 34px; padding: 0 12px; border: 1px solid var(--border-color); border-radius: var(--radius-control); cursor: pointer; color: var(--text-color); background: transparent; font: inherit; }
+.profile-comments-pagination button:disabled { cursor: default; opacity: .5; }
 
 .stat-number p {
   margin: 0 0 4px;

@@ -20,13 +20,16 @@ const PAGE_ITEMS: { page: ProfilePage; buttonText: 'nav.favorites' | 'home.histo
     { page: 'collections', buttonText: 'nav.favorites', label: 'Коллекции' }, { page: 'favorites', buttonText: 'nav.favorites' }, { page: 'history', buttonText: 'home.history' }, { page: 'watching', buttonText: 'status.watching' }, { page: 'planned', buttonText: 'status.planned' }, { page: 'completed', buttonText: 'status.watched' }, { page: 'onHold', buttonText: 'status.hold_on' }, { page: 'dropped', buttonText: 'status.dropped' },
 ];
 
-const PROFILE_LIST_IDS: Record<Exclude<ProfilePage, 'collections' | 'favorites' | 'history'>, number> = {
+const PROFILE_LIST_IDS: Record<Exclude<ProfilePage, 'collections' | 'history'>, number> = {
+    favorites: 0,
     watching: 1,
     planned: 2,
     completed: 3,
     onHold: 4,
     dropped: 5,
 };
+
+const EXTERNAL_PROFILE_PAGE_ITEMS = PAGE_ITEMS.filter(({ page }) => page !== 'collections' && page !== 'history');
 
 const API_SORT_VALUES: Record<ReleaseSort, number> = {
     addedDesc: 1,
@@ -79,7 +82,12 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
     const triggerRef = useRef<HTMLDivElement | null>(null);
     const loadingRequestsRef = useRef(new Set<string>());
     const sortVersionRef = useRef(0);
-    const [activePage, setActivePage] = useState<ProfilePage>('favorites');
+    const [activePage, setActivePage] = useState<ProfilePage>(() => {
+        if (profileId) return 'favorites';
+        return settings.content.defaultTabOnFavorites === 'hold_on'
+            ? 'onHold'
+            : settings.content.defaultTabOnFavorites;
+    });
     const [sort, setSort] = useState<ReleaseSort>('addedDesc');
     const [tabs, setTabs] = useState<FavoritesTabs>(createTabs);
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -165,10 +173,10 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
     }, [activePage, activeTab.hasMore, activeTab.page, currentPageIsLoaded, sort, userToken, api, hasValidProfileId, isCollectionsPage, isProfileFavorites, selectedProfileId, retryVersion]);
 
     useEffect(() => {
-        if (!userToken || !isCollectionsPage || !activeTab.hasMore || currentPageIsLoaded) return;
+        if ((!userToken && !isProfileFavorites) || !isCollectionsPage || !activeTab.hasMore || currentPageIsLoaded) return;
 
         const requestedPage = activeTab.page;
-        const requestKey = `collections:${requestedPage}`;
+        const requestKey = `${isProfileFavorites ? `profile-collections:${selectedProfileId}` : 'collections'}:${requestedPage}`;
         if (loadingRequestsRef.current.has(requestKey)) return;
 
         loadingRequestsRef.current.add(requestKey);
@@ -178,7 +186,11 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
             collections: { ...previousTabs.collections, isLoading: true },
         }));
 
-        api.get<PagedResponse<Collection>>(`/collectionFavorite/all/${requestedPage}`)
+        const path = isProfileFavorites
+            ? `/collection/all/profile/${selectedProfileId}/${requestedPage}?previous_page=${requestedPage - 1}&sort=5`
+            : `/collectionFavorite/all/${requestedPage}`;
+
+        api.get<PagedResponse<Collection>>(path)
             .then(data => {
                 setTabs(previousTabs => {
                     const existingIds = new Set(previousTabs.collections.collections.map(collection => collection.id));
@@ -196,7 +208,7 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
                 });
             })
             .catch(error => {
-                console.error('Не удалось загрузить сохранённые коллекции:', error);
+                console.error('Не удалось загрузить коллекции:', error);
                 setLoadError('Не удалось загрузить коллекции. Проверьте соединение и попробуйте снова.');
                 setTabs(previousTabs => ({
                     ...previousTabs,
@@ -204,7 +216,7 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
                 }));
             })
             .finally(() => loadingRequestsRef.current.delete(requestKey));
-    }, [activeTab.hasMore, activeTab.page, api, currentPageIsLoaded, isCollectionsPage, userToken, retryVersion]);
+    }, [activeTab.hasMore, activeTab.page, api, currentPageIsLoaded, isCollectionsPage, isProfileFavorites, selectedProfileId, userToken, retryVersion]);
 
     useEffect(() => {
         if (!currentPageIsLoaded || activeTab.isLoading || !activeTab.hasMore) return;
@@ -233,8 +245,8 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
 
     return (
         <div className={styles.body}>
-            {!isProfileFavorites && <div className={styles['side-panel']} role="tablist" aria-label="Разделы профиля">
-                {PAGE_ITEMS.map(({ page, buttonText, label }) => (
+            <div className={styles['side-panel']} role="tablist" aria-label="Разделы профиля">
+                {(isProfileFavorites ? EXTERNAL_PROFILE_PAGE_ITEMS : PAGE_ITEMS).map(({ page, buttonText, label }) => (
                     <button
                         key={page}
                         role="tab"
@@ -245,10 +257,10 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
                         {label ?? t(buttonText)}
                     </button>
                 ))}
-            </div>}
+            </div>
 
             <div className={styles.content}>
-                {isProfileFavorites && <h1>Избранное</h1>}
+                {isProfileFavorites && <h1>Списки пользователя</h1>}
                 {!isCollectionsPage && <div className={styles['sort-toolbar']}>
                     <SortSelect value={sort} onChange={handleSortChange} />
                 </div>}
@@ -285,7 +297,7 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
 async function getReleasesForTab(page: ReleasePage, currentPage: number, sort: ReleaseSort, api: ReturnType<typeof useApi>, profileId?: number): Promise<Anime[]> {
     const query = `extended_mode=true&sort=${API_SORT_VALUES[sort]}`;
     const path = profileId
-        ? `/profile/list/all/${profileId}/0/${currentPage}?${query}`
+        ? `/profile/list/all/${profileId}/${PROFILE_LIST_IDS[page as Exclude<ReleasePage, 'history'>]}/${currentPage}?${query}`
         : page === 'favorites'
         ? `/favorite/all/${currentPage}?${query}`
         : page === 'history'

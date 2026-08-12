@@ -132,19 +132,22 @@ function ConnectedRoom({ roomId }: { roomId: string }) {
 
     useEffect(() => {
         const query = releaseQuery.trim();
-        if (!isController || room?.media || query.length < 2) {
-            setReleaseResults([]);
-            return;
-        }
+        if (!isController || room?.media || query.length < 2) return;
 
+        let isCurrent = true;
         const timeout = window.setTimeout(() => {
             setIsSearching(true);
             searchReleases(query, api)
-                .then(setReleaseResults)
-                .catch(error => setMessage(error instanceof Error ? error.message : 'Не удалось выполнить поиск'))
-                .finally(() => setIsSearching(false));
+                .then(results => { if (isCurrent) setReleaseResults(results); })
+                .catch(error => {
+                    if (isCurrent) setMessage(error instanceof Error ? error.message : 'Не удалось выполнить поиск');
+                })
+                .finally(() => { if (isCurrent) setIsSearching(false); });
         }, 350);
-        return () => window.clearTimeout(timeout);
+        return () => {
+            isCurrent = false;
+            window.clearTimeout(timeout);
+        };
     }, [api, isController, releaseQuery, room?.media]);
 
     const grant = (profileId: number, canControl: boolean) => socketRef.current.send({ type: canControl ? 'grant_control' : 'revoke_control', profileId });
@@ -162,7 +165,14 @@ function ConnectedRoom({ roomId }: { roomId: string }) {
         <Link className={styles.back} to="/together">← Все комнаты</Link>
         <div className={styles.roomHeader}><div><h1>{room?.title ?? 'Комната'}</h1><p>{room ? (room.visibility === 'private' ? 'Приватная комната' : 'Открытая комната') : 'Подключаемся…'}{room?.joinCode ? ` · код ${room.joinCode}` : ''}</p></div><div className={styles['room-actions']}><button className={styles['copy-link']} type="button" onClick={() => navigator.clipboard.writeText(window.location.href)}>Скопировать ссылку</button>{room?.joinCode && <button className={styles['copy-link']} type="button" onClick={() => navigator.clipboard.writeText(room.joinCode)}>Скопировать код</button>}<button className={styles['leave-room']} type="button" onClick={leaveRoom}>Покинуть</button></div></div>
         <div className={styles.grid}>
-            <div className={styles.card}><h2>Сейчас смотрим</h2>{room?.media ? <><strong>{room.media.releaseName}</strong><p>{room.media.episodeName}</p><Link className={styles['open-release']} to={`/anime/${room.media.releaseId}?room=${encodeURIComponent(roomId)}`}>Открыть релиз</Link></> : isController ? <><p className={styles.muted}>Найди релиз, затем выбери озвучку и серию. После этого выбор автоматически попадёт всем в комнату.</p><label className={styles['search-label']}>Поиск аниме<input autoFocus value={releaseQuery} placeholder="Название аниме" onChange={event => setReleaseQuery(event.target.value)} /></label>{isSearching && <p className={styles.muted}>Ищем…</p>}{releaseQuery.trim().length >= 2 && !isSearching && <div className={styles['release-results']}>{releaseResults.length ? releaseResults.map(release => <Link key={release.id} to={`/anime/${release.id}?room=${encodeURIComponent(roomId)}`} state={{ partialAnime: release }}><strong>{release.title_ru}</strong><span>{release.year || 'Год неизвестен'} · {release.episodes_released || 0} эп.</span></Link>) : <p className={styles.muted}>Ничего не найдено.</p>}</div>}</> : <p className={styles.muted}>Ожидаем, пока хост выберет серию.</p>}</div>
+            <div className={styles.card}><h2>Сейчас смотрим</h2>{room?.media ? <><strong>{room.media.releaseName}</strong><p>{room.media.episodeName}</p><Link className={styles['open-release']} to={`/anime/${room.media.releaseId}?room=${encodeURIComponent(roomId)}`}>Открыть релиз</Link></> : isController ? <><p className={styles.muted}>Найди релиз, затем выбери озвучку и серию. После этого выбор автоматически попадёт всем в комнату.</p><label className={styles['search-label']}>Поиск аниме<input autoFocus value={releaseQuery} placeholder="Название аниме" onChange={event => {
+                const value = event.target.value;
+                setReleaseQuery(value);
+                if (value.trim().length < 2) {
+                    setReleaseResults([]);
+                    setIsSearching(false);
+                }
+            }} /></label>{isSearching && <p className={styles.muted}>Ищем…</p>}{releaseQuery.trim().length >= 2 && !isSearching && <div className={styles['release-results']}>{releaseResults.length ? releaseResults.map(release => <Link key={release.id} to={`/anime/${release.id}?room=${encodeURIComponent(roomId)}`} state={{ partialAnime: release }}><strong>{release.title_ru}</strong><span>{release.year || 'Год неизвестен'} · {release.episodes_released || 0} эп.</span></Link>) : <p className={styles.muted}>Ничего не найдено.</p>}</div>}</> : <p className={styles.muted}>Ожидаем, пока хост выберет серию.</p>}</div>
             <div className={styles.card}><h2>Участники ({room?.participants.length ?? 0})</h2><div className={styles.participants}>{room?.participants.map(participant => {
                 const profile = participantProfiles[participant.profileId];
                 const login = profile?.login ?? participant.login;

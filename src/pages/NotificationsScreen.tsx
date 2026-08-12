@@ -126,6 +126,7 @@ function NotificationItem({ notification }: { notification: AnixartNotification 
         return <NotificationRow
             notification={notification}
             profile={comment.profile}
+            to={`/collection/${comment.collection.id}`}
             text={<>Новый комментарий к вашей коллекции <b>{comment.collection.title}</b> от пользователя <b>{comment.profile?.login ?? 'пользователя'}</b>: {comment.message}</>}
         />;
     }

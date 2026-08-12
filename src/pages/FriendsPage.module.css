@@ -1,0 +1,194 @@
+.page { min-height: 420px; }
+
+.total {
+    color: var(--text-secondary);
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.tabs {
+    display: flex;
+    width: fit-content;
+    max-width: 100%;
+    gap: 4px;
+    padding: 4px;
+    overflow-x: auto;
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-control);
+    background: var(--surface-raised);
+}
+
+.tabs button {
+    display: inline-flex;
+    min-height: 34px;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: calc(var(--radius-control) - 4px);
+    cursor: pointer;
+    color: var(--text-secondary);
+    background: transparent;
+    font: inherit;
+    white-space: nowrap;
+}
+
+.tabs button:hover { color: var(--text-color); }
+.tabs button:focus-visible,
+.cardActions button:focus-visible,
+.loginButton:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+
+.tabs .tabActive { color: var(--accent-text-color); background: var(--accent-color); }
+
+.tabs span {
+    display: grid;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 999px;
+    place-items: center;
+    color: inherit;
+    background: color-mix(in srgb, currentColor 16%, transparent);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.list { display: grid; gap: 10px; }
+
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 20px;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.pagination button {
+    min-height: 34px;
+    padding: 0 13px;
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-control);
+    cursor: pointer;
+    color: var(--text-color);
+    background: var(--surface-raised);
+    font: inherit;
+}
+
+.pagination button:hover { border-color: var(--accent-color); }
+.pagination button:disabled { cursor: default; opacity: .55; }
+.pagination button:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+
+.card {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 16px;
+    padding: 13px 14px;
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-card);
+    background: var(--surface-card);
+}
+
+.profileLink {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 13px;
+    color: inherit;
+    text-decoration: none;
+}
+
+.avatar {
+    position: relative;
+    display: grid;
+    width: 52px;
+    height: 52px;
+    flex: 0 0 52px;
+    overflow: hidden;
+    border-radius: 50%;
+    place-items: center;
+    color: var(--text-secondary);
+    background: color-mix(in srgb, var(--text-color) 8%, transparent);
+    font-size: 18px;
+}
+
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.online {
+    position: absolute;
+    right: 1px;
+    bottom: 2px;
+    width: 11px;
+    height: 11px;
+    border: 2px solid var(--surface-card);
+    border-radius: 50%;
+    background: var(--status-watching);
+}
+
+.profileInfo { display: grid; min-width: 0; gap: 3px; }
+.profileInfo strong { overflow: hidden; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
+.profileInfo span { overflow: hidden; color: var(--text-secondary); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.profileInfo small { color: var(--status-watching); font-size: 12px; }
+
+.cardActions { display: flex; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+
+.cardActions button,
+.loginButton,
+.confirmActions button {
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-control);
+    cursor: pointer;
+    color: var(--text-color);
+    background: var(--surface-raised);
+    font: inherit;
+    font-size: 13px;
+}
+
+.cardActions button:hover,
+.confirmActions button:hover { border-color: var(--accent-color); }
+.cardActions button:disabled,
+.confirmActions button:disabled { cursor: default; opacity: .6; }
+
+.cardActions .acceptButton,
+.loginButton { border-color: var(--accent-color); color: var(--accent-text-color); background: var(--accent-color); }
+
+.inlineError {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 14px;
+    color: var(--status-dropped);
+    font-size: 14px;
+}
+
+.inlineError button {
+    padding: 0;
+    border: 0;
+    cursor: pointer;
+    color: inherit;
+    background: transparent;
+    font: inherit;
+    text-decoration: underline;
+}
+
+.loginButton { display: block; margin: -120px auto 0; }
+
+.confirmContent { padding: 0 20px 20px; }
+.confirmContent p { margin: 0; color: var(--text-secondary); line-height: 1.45; }
+.confirmActions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.confirmActions .dangerButton { border-color: var(--status-dropped); color: #fff; background: var(--status-dropped); }
+
+@media (max-width: 620px) {
+    .tabs { width: 100%; }
+    .tabs button { flex: 1 0 auto; }
+    .card { align-items: flex-start; flex-direction: column; gap: 12px; }
+    .profileLink { width: 100%; }
+    .cardActions { width: 100%; justify-content: stretch; }
+    .cardActions button { flex: 1 1 auto; }
+}

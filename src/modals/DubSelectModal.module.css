@@ -7,6 +7,11 @@
     overflow-y: auto;
 }
 
+.episode-row {
+    display: flex;
+    align-items: center;
+}
+
 button.episode,
 button.seen{
     display: flex;
@@ -15,6 +20,16 @@ button.seen{
     appearance: none;
     border: 0;
     background-color: transparent;
+}
+
+button.episode {
+    flex: 1;
+    min-width: 0;
+}
+
+button.seen {
+    flex: 0 0 auto;
+    padding: 8px;
 }
 
 .episode h3{

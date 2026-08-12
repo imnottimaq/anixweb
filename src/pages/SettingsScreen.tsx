@@ -4,6 +4,7 @@ import { useSettings } from '../shared/contexts/settingsContext'
 import { useEffect, useState } from 'react'
 import { canUseAnime4KVideo, checkAnime4KVideoSupport } from '../shared/anime4kSupport'
 import { useTranslation } from '../shared/useTranslation'
+import { defaultPlayerKeybindings, playerKeybindingActions, type PlayerKeybindingAction } from '../shared/types/settings'
 import styles from './SettingsScreen.module.css'
 
 export default function SettingsScreen(){
@@ -12,6 +13,8 @@ export default function SettingsScreen(){
     const [webGpuStatus, setWebGpuStatus] = useState<'checking' | 'supported' | 'unsupported'>(() => (
         canUseAnime4KVideo() ? 'checking' : 'unsupported'
     ));
+    const [capturingBinding, setCapturingBinding] = useState<PlayerKeybindingAction | null>(null);
+    const keybindings = settings.player.keybindings ?? defaultPlayerKeybindings;
     const updateAppearance = (appearance: Partial<typeof settings.appearance>) => setSettings(previous => ({
         ...previous,
         appearance: { ...previous.appearance, ...appearance },
@@ -24,6 +27,19 @@ export default function SettingsScreen(){
         ...previous,
         player: { ...previous.player, ...player },
     }));
+    const keybindingLabels: Record<PlayerKeybindingAction, string> = {
+        togglePlayback: 'Воспроизведение / пауза',
+        seekBackward: 'Перемотать назад на 5 секунд',
+        seekForward: 'Перемотать вперёд на 5 секунд',
+        volumeDown: 'Уменьшить громкость',
+        volumeUp: 'Увеличить громкость',
+        toggleMute: 'Включить / выключить звук',
+        toggleFullscreen: 'Полноэкранный режим',
+        previousEpisode: 'Предыдущая серия',
+        nextEpisode: 'Следующая серия',
+        skipOpening: 'Пропустить опенинг',
+    };
+    const formatKey = (code: string) => ({ Space: 'Пробел', ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓' }[code] ?? code.replace(/^Key/, ''));
 
     useEffect(() => {
         let isCancelled = false;
@@ -156,6 +172,39 @@ export default function SettingsScreen(){
                             <input className={styles['number-input']} type="number" min="5" max="180" disabled={!settings.player.showSkipOpeningButton} value={settings.player.skipOpeningValue} onChange={event => updatePlayer({ skipOpeningValue: Math.min(180, Math.max(5, Number(event.target.value) || 5)) })}/>
                         </div>
                     </label>
+                    <div className={styles['keybindings-setting']}>
+                        <div className={styles['keybindings-heading']}>
+                            <span><strong>Горячие клавиши</strong><small>Нажмите на клавишу, затем нажмите нужную кнопку. Повторяющиеся бинды заменяются.</small></span>
+                            <button type="button" onClick={() => updatePlayer({ keybindings: { ...defaultPlayerKeybindings } })}>Сбросить</button>
+                        </div>
+                        <div className={styles['keybindings-list']}>
+                            {playerKeybindingActions.map(action => <div className={styles['keybinding-row']} key={action}>
+                                <span>{keybindingLabels[action]}</span>
+                                <button
+                                    type="button"
+                                    className={capturingBinding === action ? styles['keybinding-capturing'] : ''}
+                                    onClick={() => setCapturingBinding(action)}
+                                    onKeyDown={event => {
+                                        if (capturingBinding !== action) return;
+                                        event.preventDefault();
+                                        if (event.code === 'Escape') {
+                                            setCapturingBinding(null);
+                                            return;
+                                        }
+                                        setSettings(previous => {
+                                            const keybindings = { ...defaultPlayerKeybindings, ...previous.player.keybindings };
+                                            playerKeybindingActions.forEach(otherAction => {
+                                                if (otherAction !== action && keybindings[otherAction] === event.code) keybindings[otherAction] = '';
+                                            });
+                                            keybindings[action] = event.code;
+                                            return { ...previous, player: { ...previous.player, keybindings } };
+                                        });
+                                        setCapturingBinding(null);
+                                    }}
+                                >{capturingBinding === action ? 'Нажмите клавишу…' : formatKey(keybindings[action]) || 'Не назначено'}</button>
+                            </div>)}
+                        </div>
+                    </div>
                 </section>
             </div>
         </PageLayout>

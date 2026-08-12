@@ -1,6 +1,35 @@
 import type { Dub } from "../../modals/DubSelectModal";
 import type { Anime } from "./api";
 
+export const playerKeybindingActions = [
+    'togglePlayback',
+    'seekBackward',
+    'seekForward',
+    'volumeDown',
+    'volumeUp',
+    'toggleMute',
+    'toggleFullscreen',
+    'previousEpisode',
+    'nextEpisode',
+    'skipOpening',
+] as const;
+
+export type PlayerKeybindingAction = typeof playerKeybindingActions[number];
+export type PlayerKeybindings = Record<PlayerKeybindingAction, string>;
+
+export const defaultPlayerKeybindings: PlayerKeybindings = {
+    togglePlayback: 'Space',
+    seekBackward: 'ArrowLeft',
+    seekForward: 'ArrowRight',
+    volumeDown: 'ArrowDown',
+    volumeUp: 'ArrowUp',
+    toggleMute: 'KeyM',
+    toggleFullscreen: 'KeyF',
+    previousEpisode: 'KeyP',
+    nextEpisode: 'KeyN',
+    skipOpening: 'KeyS',
+};
+
 export interface AppSettings {
     player: {
         defaultQuality: 'auto'| '1080' | '720' | '480' | '360';
@@ -10,6 +39,7 @@ export interface AppSettings {
         qualityUpgradeMode: 'weak' | 'medium' | 'strong';
         showSkipOpeningButton: boolean;
         skipOpeningValue: number; // in seconds
+        keybindings: PlayerKeybindings;
     },
     content: {
         defaultTabOnHome: 'latest' | 'my' | 'ongoing' | 'announced' | 'finished' | 'films';
@@ -49,6 +79,7 @@ export const defaultAppSettings:AppSettings = {
         qualityUpgradeMode: 'medium',
         showSkipOpeningButton: true,
         skipOpeningValue: 84,
+        keybindings: defaultPlayerKeybindings,
     },
     content:{
         defaultTabOnHome: 'latest',

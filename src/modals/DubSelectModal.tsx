@@ -57,24 +57,43 @@ export default function DubSelectModal({ isOpen, onClose, releaseId, token, auto
     const [episodesData, setEpisodesData] = useState<Episode[]>([]);
     const [selectedDub, setSelectedDub] = useState(0);
     const [selectedSource, setSelectedSource] = useState(0);
+    const [isSourcesLoading, setIsSourcesLoading] = useState(false);
+    const [isEpisodesLoading, setIsEpisodesLoading] = useState(false);
     const [episodeToUnwatch, setEpisodeToUnwatch] = useState<Episode | null>(null);
     const autoSelectedRef = useRef<string | null>(null);
+    const dubsRequestRef = useRef(0);
+    const sourcesRequestRef = useRef(0);
+    const episodesRequestRef = useRef(0);
     const episodeProgress = getWatchProgress()[String(releaseId)] ?? {};
 
     const loadEpisodes = useCallback((relId: number, dubId: number, srcId: number) => {
+        const requestId = ++episodesRequestRef.current;
+        setIsEpisodesLoading(true);
+        setEpisodesData([]);
         GetEpisodes(api, relId, dubId, srcId)
             .then(data => {
-                setEpisodesData(data.episodes || []);
+                if (requestId === episodesRequestRef.current) setEpisodesData(data.episodes || []);
             })
-            .catch(err => console.error(err));
+            .catch(err => {
+                if (requestId === episodesRequestRef.current) console.error(err);
+            })
+            .finally(() => {
+                if (requestId === episodesRequestRef.current) setIsEpisodesLoading(false);
+            });
     },[api])
 
     const loadSources = useCallback((relId: number, dubId: number) => {
+        const requestId = ++sourcesRequestRef.current;
+        episodesRequestRef.current += 1;
+        setIsSourcesLoading(true);
+        setIsEpisodesLoading(false);
+        setSourcesData([]);
+        setEpisodesData([]);
         GetSources(api, relId, dubId)
             .then(data => {
+                if (requestId !== sourcesRequestRef.current) return;
                 const sources: Source[] = data.sources || [];
                 setSourcesData(sources);
-                setEpisodesData([]);
 
                 if (sources.length > 0) {
                     const roomSource = autoSelect && sources.find(source => source.id === autoSelect.sourceId);
@@ -84,15 +103,30 @@ export default function DubSelectModal({ isOpen, onClose, releaseId, token, auto
                     const sourceId = roomSource?.id ?? rememberedSource?.id ?? sources[0].id;
                     setSelectedSource(sourceId);
                     loadEpisodes(relId, dubId, sourceId);
+                } else {
+                    setSelectedSource(0);
                 }
             })
-            .catch(err => console.error(err));
+            .catch(err => {
+                if (requestId === sourcesRequestRef.current) console.error(err);
+            })
+            .finally(() => {
+                if (requestId === sourcesRequestRef.current) setIsSourcesLoading(false);
+            });
     }, [api, autoSelect, loadEpisodes, settings.content.rememberSource, settings.content.rememberedSourceId])
     
     useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen) {
+            dubsRequestRef.current += 1;
+            sourcesRequestRef.current += 1;
+            episodesRequestRef.current += 1;
+            autoSelectedRef.current = null;
+            return;
+        }
+        const requestId = ++dubsRequestRef.current;
         GetDubs(api, releaseId)
             .then(data => {
+                if (requestId !== dubsRequestRef.current) return;
                 const dubs: Dub[] = data.types || [];
                 setDubsData(dubs);
                 
@@ -106,17 +140,23 @@ export default function DubSelectModal({ isOpen, onClose, releaseId, token, auto
                     loadSources(releaseId, dubId);
                 }
             })
-            .catch(err => console.error(err))
+            .catch(err => {
+                if (requestId === dubsRequestRef.current) console.error(err);
+            })
     }, [api, autoSelect, isOpen, loadSources, releaseId, settings.content.rememberDub, settings.content.rememberedDubId])
 
     const selectEpisode = useCallback(async (episode: Episode, shouldMarkWatched: boolean) => {
-        if (shouldMarkWatched && token) await SetWatched(api, releaseId, selectedSource, episode.position);
+        const sourceId = selectedSource;
+        const dubId = selectedDub;
+        const episodes = episodesData.map(({ name, position, url }) => ({ name, position, url }));
         const sources = await extractVideoLinks(episode.url);
-        if (sources) onEpisodeSelect(sources, {
+        if (!sources) throw new Error('Не удалось получить ссылки на видео');
+        if (shouldMarkWatched && token) await SetWatched(api, releaseId, sourceId, episode.position);
+        onEpisodeSelect(sources, {
             name: episode.name,
             position: episode.position,
             url: episode.url,
-        }, episodesData.map(({ name, position, url }) => ({ name, position, url })), selectedSource, selectedDub);
+        }, episodes, sourceId, dubId);
     }, [api, episodesData, onEpisodeSelect, releaseId, selectedDub, selectedSource, token]);
 
     useEffect(() => {
@@ -160,7 +200,7 @@ export default function DubSelectModal({ isOpen, onClose, releaseId, token, auto
                                 return <option key={`dub-${dub.id}`} value={dub.id}>{dub.name} {dub.episodes_count} сер. | {dub.view_count} прос.</option>
                             })}
                         </select>
-                        {sourcesData.length > 0 && (
+                        {(sourcesData.length > 0 || isSourcesLoading) && (
                             <select onChange={e => {
                             const sourceId = +e.target.value;
                             setSelectedSource(sourceId);
@@ -171,7 +211,7 @@ export default function DubSelectModal({ isOpen, onClose, releaseId, token, auto
                                 }));
                             }
                             loadEpisodes(releaseId, selectedDub, sourceId)}}
-                            disabled={sourcesData.length < 2}
+                            disabled={isSourcesLoading || sourcesData.length < 2}
                             style={{marginRight:'10px'}}
                             value={selectedSource}>
                                 {sourcesData.map((source) => {
@@ -183,10 +223,12 @@ export default function DubSelectModal({ isOpen, onClose, releaseId, token, auto
                     </div>
                 </div>
                 <div className={styles.episodes}>
-                    {episodesData && episodesData.map((episode) => (
-                        <button key={`episode-${episode.position}`} 
+                    {isEpisodesLoading && <p>{t('misc.loading')}</p>}
+                    {episodesData.map((episode) => (
+                        <div key={`episode-${episode.position}`} className={styles['episode-row']}>
+                            <button type="button"
                                 className={styles['episode']}
-                                onClick={() => void selectEpisode(episode, true)}>
+                                onClick={() => void selectEpisode(episode, true).catch(error => console.error(error))}>
                                 <h3>{episode.name}</h3>
                                 <div className={styles['episode-meta']}>
                                     {episodeProgress[String(episode.position)] === -1 ? (
@@ -196,14 +238,14 @@ export default function DubSelectModal({ isOpen, onClose, releaseId, token, auto
                                             {t('dubSelect.watchedUntil')} {formatProgressTime(episodeProgress[String(episode.position)])}
                                         </span>
                                     ) : null}
-                                    {episode.is_watched && <button className={styles.seen}
-                                        onClick={event => {
-                                            event.stopPropagation()
-                                            setEpisodeToUnwatch(episode);
-                                           }}>
-                                        <img src={EyeIcon} alt={t('dubSelect.watched')} /></button>}
                                 </div>
-                        </button>
+                            </button>
+                            {episode.is_watched && <button type="button" className={styles.seen}
+                                aria-label={t('dubSelect.watched')}
+                                onClick={() => setEpisodeToUnwatch(episode)}>
+                                <img src={EyeIcon} alt="" />
+                            </button>}
+                        </div>
                     ))}
                 </div>
                 </>)}

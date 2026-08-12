@@ -173,6 +173,47 @@
 .number-input:disabled,
 .range-control input:disabled { opacity: .5; cursor: not-allowed; }
 
+.keybindings-setting {
+    padding: 22px 0 0;
+}
+
+.keybindings-heading,
+.keybinding-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.keybindings-heading > span { display: grid; gap: 5px; }
+.keybindings-heading strong { font-size: 18px; }
+.keybindings-heading small { color: var(--text-secondary); }
+.keybindings-heading > button,
+.keybinding-row > button {
+    min-width: 82px;
+    min-height: 34px;
+    padding: 4px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--text-color);
+    background: var(--background-color);
+    font: inherit;
+}
+
+.keybindings-list { display: grid; margin-top: 14px; border-top: 1px solid color-mix(in srgb, var(--text-color) 13%, transparent); }
+.keybinding-row { min-height: 48px; border-bottom: 1px solid color-mix(in srgb, var(--text-color) 13%, transparent); }
+.keybinding-row > span { color: var(--text-color); }
+.keybinding-row > button { min-width: 104px; font-weight: 600; }
+.keybinding-row > button:hover,
+.keybinding-capturing { border-color: var(--accent-color) !important; color: var(--accent-color) !important; }
+
+@media (max-width: 600px) {
+    .keybindings-heading { align-items: flex-start; flex-direction: column; }
+    .keybindings-heading > button { align-self: flex-end; }
+    .keybinding-row { align-items: flex-start; padding: 10px 0; }
+}
+
 .card-type-select {
     display: flex;
     justify-content: center;

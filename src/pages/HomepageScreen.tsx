@@ -82,11 +82,13 @@ export default function HomepageScreen() {
     const { t } = useTranslation();
     const triggerRef = useRef<HTMLDivElement | null>(null);
     const loadingRequestsRef = useRef(new Set<string>());
+    const latestRequestKeysRef = useRef(new Map<Page, string>());
     const [activePage, setActivePage] = useState<Page>(() => HOME_TAB_BY_SETTING[settings.content.defaultTabOnHome]);
     const [myFilters, setMyFilters] = useState<Filter>(getMyFilters);
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
     const [filterError, setFilterError] = useState<string | null>(null);
     const [retryVersion, setRetryVersion] = useState(0);
+    const [myFilterVersion, setMyFilterVersion] = useState(0);
     const [tabs, setTabs] = useState<Record<Page, TabData>>(createTabs);
 
     const activeTab = tabs[activePage];
@@ -100,10 +102,11 @@ export default function HomepageScreen() {
         if (isMyTabUnconfigured || !activeTab.hasMore || currentPageIsLoaded) return;
 
         const requestedPage = activeTab.page;
-        const requestKey = `${activePage}:${requestedPage}`;
+        const requestKey = `${activePage}:${requestedPage}:${JSON.stringify(activeFilter)}:${retryVersion}:${activePage === 'my' ? myFilterVersion : 0}`;
         if (loadingRequestsRef.current.has(requestKey)) return;
 
         loadingRequestsRef.current.add(requestKey);
+        latestRequestKeysRef.current.set(activePage, requestKey);
         setFilterError(null);
 
         setTabs(previousTabs => ({
@@ -116,6 +119,7 @@ export default function HomepageScreen() {
 
         GetReleasesByPage(requestedPage, userToken, activeFilter)
             .then(data => {
+                if (latestRequestKeysRef.current.get(activePage) !== requestKey) return;
                 if (data.code !== 0 || !Array.isArray(data.content)) {
                     throw new Error(`API вернул код ${data.code ?? 'неизвестный'}`);
                 }
@@ -138,6 +142,7 @@ export default function HomepageScreen() {
                 });
             })
             .catch(error => {
+                if (latestRequestKeysRef.current.get(activePage) !== requestKey) return;
                 console.error('Не удалось загрузить релизы:', error);
                 setFilterError(`Не удалось загрузить релизы: ${error instanceof Error ? error.message : 'неизвестная ошибка'}`);
                 setTabs(previousTabs => ({
@@ -151,7 +156,7 @@ export default function HomepageScreen() {
             .finally(() => {
                 loadingRequestsRef.current.delete(requestKey);
             });
-    }, [activeFilter, activePage, activeTab.hasMore, activeTab.page, currentPageIsLoaded, isMyTabUnconfigured, userToken, retryVersion]);
+    }, [activeFilter, activePage, activeTab.hasMore, activeTab.page, currentPageIsLoaded, isMyTabUnconfigured, myFilterVersion, userToken, retryVersion]);
 
     useEffect(() => {
         if (isMyTabUnconfigured || !currentPageIsLoaded || activeTab.isLoading || !activeTab.hasMore) return;
@@ -224,7 +229,9 @@ export default function HomepageScreen() {
                 onClose={() => setIsFilterModalOpen(false)}
                 filter={myFilters}
                 setFilter={filter => {
+                    latestRequestKeysRef.current.delete('my');
                     setMyFilters(filter);
+                    setMyFilterVersion(version => version + 1);
                     localStorage.setItem('my_filters', JSON.stringify(filter));
                     setTabs(previousTabs => ({ ...previousTabs, my: emptyTab() }));
                     setFilterError(null);

@@ -27,6 +27,15 @@ const STATUS_TO_LIST: Record<NotificationsPreferencesAPIResponse['profileStatusN
     STATUS_DROPPED: 'dropped',
 };
 
+const LIST_TO_STATUS: Record<string, number> = {
+    favorites: 0,
+    watching: 1,
+    planned: 2,
+    completed: 3,
+    hold_on: 4,
+    dropped: 5,
+};
+
 type NotificationMode = 'all' | 'selected_lists' | 'selected_releases';
 
 export default function NotificationSettingsScreen() {
@@ -38,6 +47,7 @@ export default function NotificationSettingsScreen() {
     const [draftDubs, setDraftDubs] = useState<Dub[]>(settings.notifications.selectedDubs ?? []);
     const [allDubs, setAllDubs] = useState<Dub[]>([]);
     const [savingToggle, setSavingToggle] = useState<string | null>(null);
+    const [saveError, setSaveError] = useState<string | null>(null);
 
     const updateNotifications = (notifications: Partial<typeof settings.notifications>) => {
         setSettings(previous => ({
@@ -82,7 +92,9 @@ export default function NotificationSettingsScreen() {
                     notifications: {
                         ...previous.notifications,
                         recieveNotifications: response.is_episode_notifications_enabled,
-                        notificationsType: selectedLists.length === PROFILE_LISTS.length ? 'all' : 'selected_lists',
+                        notificationsType: response.is_release_type_notifications_enabled
+                            ? 'selected_releases'
+                            : selectedLists.length === PROFILE_LISTS.length ? 'all' : 'selected_lists',
                         selectedLists,
                         selectedDubs,
                         getOnlyOneNotification: response.is_first_episode_notification_enabled,
@@ -97,6 +109,25 @@ export default function NotificationSettingsScreen() {
         return () => { cancelled = true; };
     }, [api, setSettings]);
 
+    const saveStatuses = async (mode: Exclude<NotificationMode, 'selected_releases'>, selectedLists: string[]) => {
+        const profileStatusNotificationPreferences = mode === 'all'
+            ? [0, 1, 2, 3, 4, 5]
+            : selectedLists.map(list => LIST_TO_STATUS[list]).filter((status): status is number => status !== undefined);
+
+        setSavingToggle('statuses');
+        setSaveError(null);
+        try {
+            await api.post<{ code: number }>('/profile/preference/notification/status/edit', { profileStatusNotificationPreferences });
+            updateNotifications({ notificationsType: mode, selectedLists });
+            return true;
+        } catch {
+            setSaveError('Не удалось сохранить выбор списков.');
+            return false;
+        } finally {
+            setSavingToggle(null);
+        }
+    };
+
     const chooseMode = (mode: NotificationMode) => {
         if (mode === 'selected_lists') {
             setDraftLists(settings.notifications.selectedLists ?? []);
@@ -104,15 +135,20 @@ export default function NotificationSettingsScreen() {
             return;
         }
 
-        updateNotifications({ notificationsType: mode });
+        if (mode === 'all') {
+            void saveStatuses('all', PROFILE_LISTS.map(list => list.id));
+            return;
+        }
+
+        setSavingToggle('statuses');
+        setSaveError(null);
+        void api.get<{ code: number }>('/profile/preference/notification/selected/releases/edit')
+            .then(() => updateNotifications({ notificationsType: 'selected_releases' }))
+            .catch(() => setSaveError('Не удалось включить уведомления по выбранным релизам.'))
+            .finally(() => setSavingToggle(null));
     };
 
-    const saveLists = () => {
-        updateNotifications({
-            notificationsType: 'selected_lists',
-            selectedLists: draftLists,
-        });
-    };
+    const saveLists = () => saveStatuses('selected_lists', draftLists);
 
     const saveDubs = async () => {
         const body = { profileTypeNotificationPreferences: draftDubs.map(dub => dub.id) };
@@ -144,6 +180,8 @@ export default function NotificationSettingsScreen() {
     return <PageLayout>
         <PageHeader title="Настройки уведомлений" description="Выберите, о каких событиях вы хотите узнавать." back />
 
+        {saveError && <p className={styles.saveError} role="alert">{saveError}</p>}
+
         <SettingsGroup title="Уведомления о сериях">
             <SettingToggle
                 title="Получать уведомления"
@@ -159,9 +197,9 @@ export default function NotificationSettingsScreen() {
 
             {settings.notifications.recieveNotifications && <>
                 <div className={styles.modes} aria-label="Режим подписки на серии">
-                    <ModeCard label="Из всех моих списков" mode="all" active={notificationMode === 'all'} onClick={() => chooseMode('all')} />
-                    <ModeCard label="Из выбранных списков" mode="selected_lists" active={notificationMode === 'selected_lists'} onClick={() => chooseMode('selected_lists')} />
-                    <ModeCard label="По выбранным релизам" mode="selected_releases" active={notificationMode === 'selected_releases'} onClick={() => chooseMode('selected_releases')} />
+                    <ModeCard label="Из всех моих списков" mode="all" active={notificationMode === 'all'} disabled={savingToggle === 'statuses'} onClick={() => chooseMode('all')} />
+                    <ModeCard label="Из выбранных списков" mode="selected_lists" active={notificationMode === 'selected_lists'} disabled={savingToggle === 'statuses'} onClick={() => chooseMode('selected_lists')} />
+                    <ModeCard label="По выбранным релизам" mode="selected_releases" active={notificationMode === 'selected_releases'} disabled={savingToggle === 'statuses'} onClick={() => chooseMode('selected_releases')} />
                 </div>
 
                 {notificationMode === 'selected_lists' && <button className={styles.summaryButton} type="button" onClick={() => chooseMode('selected_lists')}>
@@ -253,7 +291,7 @@ export default function NotificationSettingsScreen() {
                 </div>
                 <div className={styles.modalActions}>
                     <button type="button" onClick={close}>Отмена</button>
-                    <button className={styles.primaryAction} type="button" onClick={() => { saveLists(); close(); }}>Выбрать</button>
+                    <button className={styles.primaryAction} type="button" disabled={savingToggle === 'statuses'} onClick={() => void saveLists().then(saved => { if (saved) close(); })}>Выбрать</button>
                 </div>
             </>}
         </Modal>
@@ -307,8 +345,8 @@ function SettingToggle({ title, description, checked, disabled = false, onChange
     </div>;
 }
 
-function ModeCard({ label, mode, active, onClick }: { label: string; mode: NotificationMode; active: boolean; onClick: () => void }) {
-    return <button type="button" className={`${styles.modeCard} ${active ? styles.active : ''}`} onClick={onClick}>
+function ModeCard({ label, mode, active, disabled, onClick }: { label: string; mode: NotificationMode; active: boolean; disabled: boolean; onClick: () => void }) {
+    return <button type="button" className={`${styles.modeCard} ${active ? styles.active : ''}`} disabled={disabled} onClick={onClick}>
         <span className={`${styles.preview} ${styles[mode]}`} aria-hidden="true"><i /><i /><i /><i /></span>
         <span>{label}</span>
     </button>;

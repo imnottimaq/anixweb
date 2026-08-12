@@ -45,6 +45,7 @@ export interface Anime {
   dropped_count: number;
   is_favorite: boolean;
   my_vote: number;
+  your_vote?: number;
   comment_per_day_count: number;
   comment_count?: number;
   comments_count?: number;
@@ -99,7 +100,7 @@ export interface Profile {
   tt_page: string;
   discord_page: string;
   watched_episode_count: number;
-  watched_time: number; // В секундах
+  watched_time: number; // В минутах
   watching_count: number;
   plan_count: number;
   completed_count: number;
@@ -114,7 +115,7 @@ export interface Profile {
   is_verified: boolean;
   is_online: boolean;
   rating_score: number;
-  comments_preview: Comment;
+  comments_preview: Comment[];
   watch_dynamics: [{
     id: number;
     day: number;

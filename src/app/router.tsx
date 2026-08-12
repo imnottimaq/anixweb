@@ -5,7 +5,7 @@ import RootLayout from './RootLayout';
 import { HomepageScreen, OverviewScreen, FavoritesScreen, ReleaseScreen, PlayerScreen, FranchiseScreen,
     AccountScreen, EditAccountScreen, LoginScreen, RecoverScreen, NewAccountScreen, RandomAnime, SettingsScreen,
     NotificationsScreen, NotificationSettingsScreen, ReleaseNotificationSettingsScreen, WatchRoomScreen, FilterSearchScreen,
-    CollectionScreen
+    CollectionScreen, FriendsPage
  } from './components';
 import CollectionsScreen from '../pages/CollectionsScreen';
 
@@ -31,6 +31,8 @@ export const router = createBrowserRouter([
     { path: 'anime/:id/watch', element: lazyPage(<PlayerScreen />) },
     { path: 'franchise/:id', element: lazyPage(<FranchiseScreen />) },
     { path: 'account', element: lazyPage(<AccountScreen />) },
+    { path: 'friends', element: lazyPage(<FriendsPage />) },
+    { path: 'friends/:profileId', element: lazyPage(<FriendsPage />) },
     { path: 'account/edit', element: lazyPage(<EditAccountScreen />) },
     { path: 'account/:id', element: lazyPage(<AccountScreen />)  },
     { path: 'account/login', element: lazyPage(<LoginScreen />) },

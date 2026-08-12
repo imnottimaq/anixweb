@@ -14,6 +14,12 @@ type FilterModalProps = {
 const PROFILE_LISTS = [[0, 'nav.favorites'], [1, 'status.watching'], [2, 'status.planned'], [3, 'status.watched'], [4, 'status.hold_on'], [5, 'status.dropped']] as const;
 
 export default function FilterModal({ isOpen, onClose, filter = {}, setFilter }: FilterModalProps) {
+    if (!isOpen) return null;
+
+    return <FilterModalContent onClose={onClose} filter={filter} setFilter={setFilter} />;
+}
+
+function FilterModalContent({ onClose, filter, setFilter }: Omit<FilterModalProps, 'isOpen'> & { filter: Filter }) {
     const { t } = useTranslation();
     const [draft, setDraft] = useState<Filter>(filter);
     const update = <K extends keyof Filter>(key: K, value: Filter[K]) => setDraft(previous => ({ ...previous, [key]: value }));
@@ -28,7 +34,7 @@ export default function FilterModal({ isOpen, onClose, filter = {}, setFilter }:
         onClose();
     };
 
-    return <Modal isOpen={isOpen} onClose={onClose} title={t('filter.title')} size="large" contentClassName={styles.modal}>
+    return <Modal isOpen onClose={onClose} title={t('filter.title')} size="large" contentClassName={styles.modal}>
         <div className={styles.fields}>
             <Field label={t('filter.country')}><select value={draft.country ?? ''} onChange={event => update('country', (event.target.value || undefined) as Filter['country'])}><option value="">{t('misc.notImportant')}</option><option value="Япония">{t('country.japan')}</option><option value="Китай">{t('country.china')}</option><option value="Южная Корея">{t('country.southKorea')}</option></select></Field>
             <Field label={t('filter.category')}><select value={draft.category_id ?? ''} onChange={event => update('category_id', event.target.value === '' ? undefined : Number(event.target.value) as Filter['category_id'])}><option value="">{t('misc.notImportant')}</option><option value="1">{t('releaseType.series')}</option><option value="2">{t('releaseType.film')}</option><option value="3">OVA</option><option value="4">{t('releaseType.dorama')}</option></select></Field>

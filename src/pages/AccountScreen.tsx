@@ -1,8 +1,8 @@
-import { useNavigate, useParams } from "react-router-dom"
+import { Link, useNavigate, useParams } from "react-router-dom"
 import styles from './AccountScreen.module.css'
 import { useUser } from "../shared/contexts/userContext"
 import { useEffect, useState } from "react"
-import type { Profile } from "../shared/types/api"
+import type { Comment, PagedResponse, Profile } from "../shared/types/api"
 import WatchlistLine from "../components/WatchlistLine"
 import { useSearchScope } from '../shared/contexts/searchContext';
 import { useTranslation } from '../shared/useTranslation';
@@ -20,6 +20,8 @@ import PageState from '../components/PageState';
 import { useApi } from '../shared/apiClient';
 import { Modal } from '../modals/ModalTemplate';
 import { saveRoomIdentity } from '../shared/roomParticipant';
+import { useAsyncLoad } from '../shared/useAsyncLoad';
+import CommentComponent from '../components/Comment';
 
 interface ProfileAPIResponse{
     code: number;
@@ -41,8 +43,22 @@ export default function AccountScreen(){
     const [isFriendActionLoading, setIsFriendActionLoading] = useState(false);
     const [friendActionError, setFriendActionError] = useState<string | null>(null);
     const [isCancelRequestModalOpen, setIsCancelRequestModalOpen] = useState(false);
+    const [isProfileCommentsOpen, setIsProfileCommentsOpen] = useState(false);
+    const [commentsTab, setCommentsTab] = useState<'release' | 'collection'>('release');
+    const [commentsPage, setCommentsPage] = useState(0);
 
     const navigate = useNavigate()
+    const profileId = id ? Number(id) : userId;
+    const isValidProfileId = Number.isInteger(profileId) && profileId > 0;
+    const commentsPath = commentsTab === 'release'
+        ? `/release/comment/all/profile/${profileId}/${commentsPage}?sort=1`
+        : `/collection/comment/all/profile/${profileId}/${commentsPage}?sort=1`;
+    const { data: profileCommentsData, error: profileCommentsError, isLoading: isProfileCommentsLoading, reload: reloadProfileComments } = useAsyncLoad(
+        signal => api.get<PagedResponse<Comment>>(commentsPath, { signal }),
+        [api, commentsPath],
+        { enabled: isProfileCommentsOpen && isValidProfileId, initialData: { code: 0, content: [], total_count: 0, total_page_count: 0, current_page: 0 } },
+    );
+    const profileComments = profileCommentsData?.content ?? [];
     useEffect(() => {
         if (userToken === "") navigate('/account/login')
     }, [navigate, userToken])
@@ -55,15 +71,9 @@ export default function AccountScreen(){
     useEffect(() => {
         let isCancelled = false;
 
-        if (!userToken) {
-            setIsLoading(false);
-            return () => { isCancelled = true; };
-        }
+        if (!userToken) return () => { isCancelled = true; };
 
-        const profileId = id ? Number(id) : userId;
         if (!Number.isFinite(profileId) || profileId <= 0) {
-            setLoadError('Профиль не найден.');
-            setIsLoading(false);
             return () => { isCancelled = true; };
         }
 
@@ -90,10 +100,14 @@ export default function AccountScreen(){
         void loadProfile();
 
         return () => { isCancelled = true; };
-    }, [api, id, userId, userToken, loadAttempt])
+    }, [api, profileId, userId, userToken, loadAttempt])
 
     const watchDynamic = userObject?.watch_dynamics?.slice(-10) ?? [];
     const maxValue = Math.max(...watchDynamic.map(({ count }) => count), 1);
+    const vkUrl = getSocialUrl(userObject?.vk_page, 'vk');
+    const telegramUrl = getSocialUrl(userObject?.tg_page, 'telegram');
+    const instagramUrl = getSocialUrl(userObject?.inst_page, 'instagram');
+    const tiktokUrl = getSocialUrl(userObject?.tt_page, 'tiktok');
 
     const handleFriendAction = async () => {
         if (!userObject || isFriendActionLoading) return false;
@@ -129,6 +143,8 @@ export default function AccountScreen(){
         return 'Добавить в друзья';
     };
 
+    if (!userToken) return <PageLayout size="wide"><PageState status="loading" message="Переходим ко входу…" /></PageLayout>;
+    if (!isValidProfileId) return <PageLayout size="wide"><PageState status="error" message="Профиль не найден." /></PageLayout>;
     if (isLoading) return <PageLayout size="wide"><PageState status="loading" message="Загружаем профиль…" /></PageLayout>;
     if (loadError || !userObject) return <PageLayout size="wide">
         <PageState status="error" message={loadError ?? 'Профиль не найден.'} onRetry={() => setLoadAttempt(attempt => attempt + 1)} />
@@ -152,11 +168,11 @@ export default function AccountScreen(){
                                 </div>
                             </div>
                             <div className={styles['user-socials']}>
-                                {userObject.vk_page && <a className={styles.vk} href={"https://vk.com/" + userObject.vk_page} aria-label="Профиль ВКонтакте"><img className={styles['social-icon']} src={VkIcon} alt="" /></a>}
-                                {userObject.tg_page && <a className={styles.tg} href={"https://t.me/" + userObject.tg_page} aria-label="Профиль в Telegram"><img className={styles['social-icon']} src={TgIcon} alt="" /></a>}
+                                {vkUrl && <a className={styles.vk} href={vkUrl} aria-label="Профиль ВКонтакте"><img className={styles['social-icon']} src={VkIcon} alt="" /></a>}
+                                {telegramUrl && <a className={styles.tg} href={telegramUrl} aria-label="Профиль в Telegram"><img className={styles['social-icon']} src={TgIcon} alt="" /></a>}
                                 {userObject.discord_page && <span className={styles.discord} aria-label={`Discord: ${userObject.discord_page}`}><img className={styles['social-icon']} src={DiscordIcon} alt="" /></span>}
-                                {userObject.inst_page && <a className={styles.inst} href={"https://instagram.com/" + userObject.inst_page} aria-label="Профиль в Instagram"><img className={styles['social-icon']} src={InstIcon} alt="" /></a>}
-                                {userObject.tt_page && <a className={styles.tt} href={"https://tiktok.com/@" + userObject.tt_page} aria-label="Профиль в TikTok"><img className={styles['social-icon']} src={TtIcon} alt="" /></a>}
+                                {instagramUrl && <a className={styles.inst} href={instagramUrl} aria-label="Профиль в Instagram"><img className={styles['social-icon']} src={InstIcon} alt="" /></a>}
+                                {tiktokUrl && <a className={styles.tt} href={tiktokUrl} aria-label="Профиль в TikTok"><img className={styles['social-icon']} src={TtIcon} alt="" /></a>}
                             </div>
                             <div className={styles['user-roles']}>
                                 {userObject?.roles?.map(role => {
@@ -188,22 +204,30 @@ export default function AccountScreen(){
                     </div>
                     
                     <div className={styles['stat-number-div']}>
-                        <div className={styles['stat-number']}>
+                        <button type="button" className={`${styles['stat-number']} ${styles['comments-stat']}`} onClick={() => {
+                            setCommentsTab('release');
+                            setCommentsPage(0);
+                            setIsProfileCommentsOpen(true);
+                        }}>
                             <p>{userObject?.comment_count}</p>
                             <span>{t('account.comments')}</span>
-                        </div>
+                        </button>
                         <div className={styles['stat-number']}>
                             <p>{userObject?.video_count}</p>
                             <span>{t('account.videos')}</span>
                         </div>
-                        <div className={styles['stat-number']}>
+                        <button
+                            type="button"
+                            className={`${styles['stat-number']} ${styles['collections-stat']}`}
+                            onClick={() => navigate(isMyProfile ? '/collections?view=mine' : `/collections?profileId=${userObject.id}`)}
+                        >
                             <p>{userObject?.collection_count}</p>
                             <span>{t('account.collections')}</span>
-                        </div>
-                        <div className={styles['stat-number']}>
+                        </button>
+                        <button type="button" className={`${styles['stat-number']} ${styles['friends-stat']}`} onClick={() => navigate(isMyProfile ? '/friends' : `/friends/${userObject.id}`)}>
                             <p>{userObject?.friend_count}</p>
                             <span>{t('account.friends')}</span>
-                        </div>
+                        </button>
                     </div>
                 </div>
                 <div className={styles['statistics-card']}>
@@ -224,7 +248,7 @@ export default function AccountScreen(){
                         </div>
                         <div>
                             <span>{t('account.watchedTime')}</span>
-                            <strong>{formatSeconds(userObject?.watched_time || 0)}</strong>
+                            <strong>{formatMinutes(userObject?.watched_time || 0)}</strong>
                         </div>
                     </div>
                 </div>
@@ -284,20 +308,114 @@ export default function AccountScreen(){
                     </div>
                 </>}
             </Modal>
+            <Modal
+                isOpen={isProfileCommentsOpen}
+                onClose={() => setIsProfileCommentsOpen(false)}
+                title={`Комментарии ${userObject.login}`}
+                stickyHeader
+                contentClassName={styles['profile-comments-modal']}
+                contentStyle={{ width: 'min(1040px, calc(100vw - 32px))', maxHeight: '80vh' }}
+            >
+                <div className={styles['profile-comments-tabs']} role="tablist" aria-label="Тип комментариев">
+                    <button type="button" role="tab" aria-selected={commentsTab === 'release'} className={commentsTab === 'release' ? styles.active : ''} onClick={() => { setCommentsTab('release'); setCommentsPage(0); }}>Под релизами</button>
+                    <button type="button" role="tab" aria-selected={commentsTab === 'collection'} className={commentsTab === 'collection' ? styles.active : ''} onClick={() => { setCommentsTab('collection'); setCommentsPage(0); }}>Под коллекциями</button>
+                </div>
+                {isProfileCommentsLoading && <p className={styles['profile-comments-state']}>Загружаем комментарии…</p>}
+                {!isProfileCommentsLoading && Boolean(profileCommentsError) && <p className={styles['profile-comments-error']}>Не удалось загрузить комментарии. <button type="button" onClick={reloadProfileComments}>Повторить</button></p>}
+                {!isProfileCommentsLoading && !profileCommentsError && profileComments.length === 0 && <p className={styles['profile-comments-state']}>Комментариев пока нет.</p>}
+                {!isProfileCommentsLoading && !profileCommentsError && profileComments.map(comment => <div className={styles['profile-comment']} key={comment.id}>
+                    <ProfileCommentContextLink comment={comment} variant={commentsTab} />
+                    <CommentComponent
+                        comment={comment}
+                        variant={commentsTab === 'collection' ? 'collection' : 'release'}
+                        onDelete={reloadProfileComments}
+                    />
+                </div>)}
+                {!isProfileCommentsLoading && !profileCommentsError && (profileCommentsData?.total_page_count ?? 0) > 0 && <div className={styles['profile-comments-pagination']}>
+                    <button type="button" disabled={commentsPage <= 0} onClick={() => setCommentsPage(page => page - 1)}>Назад</button>
+                    <span>{commentsPage + 1} / {(profileCommentsData?.total_page_count ?? 0) + 1}</span>
+                    <button type="button" disabled={commentsPage >= (profileCommentsData?.total_page_count ?? 0)} onClick={() => setCommentsPage(page => page + 1)}>Далее</button>
+                </div>}
+            </Modal>
         </div>
         </PageLayout>
     )
 
 }
 
-function formatSeconds(totalSeconds:number) {
-  const days = Math.floor(totalSeconds / 1440);
-  const hours = Math.floor((totalSeconds % 1440) / 60);
+type CommentContextEntity = {
+    id?: number;
+    '@id'?: number;
+    title?: string;
+    title_ru?: string;
+};
+
+function ProfileCommentContextLink({ comment, variant }: { comment: Comment; variant: 'release' | 'collection' }) {
+    const contextualComment = comment as Comment & {
+        collection?: CommentContextEntity | number;
+        release_id?: number;
+        collection_id?: number;
+    };
+    const entity = variant === 'release' ? contextualComment.release : contextualComment.collection;
+    const entityObject = typeof entity === 'object' && entity !== null ? entity as CommentContextEntity : null;
+    const rawId = typeof entity === 'number'
+        ? entity
+        : entityObject?.id ?? entityObject?.['@id'] ?? (variant === 'release' ? contextualComment.release_id : contextualComment.collection_id);
+    const entityId = Number(rawId);
+    const title = entityObject?.title_ru ?? entityObject?.title;
+    const entityLabel = variant === 'release' ? 'релизу' : 'коллекции';
+    const route = variant === 'release' ? `/anime/${entityId}` : `/collection/${entityId}`;
+    const content = <>
+        <span>Комментарий к {entityLabel}</span>
+        <strong>{title || (variant === 'release' ? 'Открыть релиз' : 'Открыть коллекцию')}</strong>
+    </>;
+
+    return Number.isInteger(entityId) && entityId > 0
+        ? <Link className={styles['profile-comment-context']} to={route}>{content}</Link>
+        : <div className={styles['profile-comment-context']}>{content}</div>;
+}
+
+function formatMinutes(totalMinutes:number) {
+  const days = Math.floor(totalMinutes / 1_440);
+  const hours = Math.floor((totalMinutes % 1_440) / 60);
 
   return `~${days} дней ${hours} часов`;
 }
 
 function formatTimestamp(timestamp: number){
     const dateObj = new Date(timestamp * 1000)
-    return `${dateObj.getDate()}.${dateObj.getMonth()}`
+    return `${dateObj.getDate()}.${dateObj.getMonth() + 1}`
+}
+
+type SocialPlatform = 'vk' | 'telegram' | 'instagram' | 'tiktok';
+
+const SOCIAL_LINKS: Record<SocialPlatform, { baseUrl: string; hosts: string[]; requiresAt?: boolean }> = {
+    vk: { baseUrl: 'https://vk.com/', hosts: ['vk.com'] },
+    telegram: { baseUrl: 'https://t.me/', hosts: ['t.me', 'telegram.me'] },
+    instagram: { baseUrl: 'https://instagram.com/', hosts: ['instagram.com'] },
+    tiktok: { baseUrl: 'https://tiktok.com/@', hosts: ['tiktok.com'], requiresAt: true },
+};
+
+function getSocialUrl(value: string | null | undefined, platform: SocialPlatform): string | null {
+    const trimmed = value?.trim();
+    if (!trimmed) return null;
+
+    const config = SOCIAL_LINKS[platform];
+    if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith('//')) {
+        try {
+            const url = new URL(trimmed.startsWith('//') ? `https:${trimmed}` : trimmed);
+            const host = url.hostname.toLowerCase().replace(/^www\./, '');
+            if (!config.hosts.includes(host)) return null;
+            url.protocol = 'https:';
+            return url.toString();
+        } catch {
+            return null;
+        }
+    }
+
+    const knownHostPattern = new RegExp(`^(?:www\\.)?(?:${config.hosts.map(host => host.replace('.', '\\.')).join('|')})/`, 'i');
+    const username = trimmed.replace(knownHostPattern, '').replace(/^@/, '').split(/[/?#]/, 1)[0]?.trim();
+    if (!username || /\s/.test(username) || username.includes(':')) return null;
+
+    return `${config.baseUrl}${config.requiresAt ? username.replace(/^@/, '') : username}`;
 }

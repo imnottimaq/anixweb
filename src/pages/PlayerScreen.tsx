@@ -9,6 +9,7 @@ import Hls, {
 } from 'hls.js';
 import styles from './PlayerScreen.module.css';
 import { useSettings } from '../shared/contexts/settingsContext';
+import { defaultPlayerKeybindings } from '../shared/types/settings';
 import { useUser } from '../shared/contexts/userContext';
 import { clearPlayerSession, getPlayerSession, setPlayerSession, type PlayerSession } from '../shared/playerSession';
 import { getWatchProgress, saveWatchProgress } from '../shared/watchProgress';
@@ -87,13 +88,12 @@ class CorsFallbackFragmentLoader extends XhrLoader {
 export default function PlayerScreen() {
     const [playerSession, setCurrentPlayerSession] = useState(getPlayerSession);
     const [searchParams] = useSearchParams();
-
-    if (!playerSession) return <Navigate to="/" replace />;
-
-    const updateSession = (nextSession: PlayerSession) => {
+    const updateSession = useCallback((nextSession: PlayerSession) => {
         setPlayerSession(nextSession);
         setCurrentPlayerSession(nextSession);
-    };
+    }, []);
+
+    if (!playerSession) return <Navigate to="/" replace />;
 
     return <PlayerContent playerSession={playerSession} onSessionChange={updateSession} roomId={searchParams.get('room')} />;
 }
@@ -157,6 +157,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     const [webGpuStatus, setWebGpuStatus] = useState<'checking' | 'supported' | 'unsupported'>(() => (
         canUseAnime4KVideo() ? 'checking' : 'unsupported'
     ));
+    const keybindings = settings.player.keybindings ?? defaultPlayerKeybindings;
 
     const stream = sources[selectedQuality]?.[0];
 
@@ -295,8 +296,9 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     }, []);
 
     useEffect(() => {
-        showControls();
+        const frame = window.requestAnimationFrame(showControls);
         return () => {
+            window.cancelAnimationFrame(frame);
             if (controlsTimeoutRef.current !== null) window.clearTimeout(controlsTimeoutRef.current);
         };
     }, [showControls]);
@@ -339,13 +341,14 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
 
         const isHls = stream.type === HLS_MIME_TYPE || stream.src.includes('.m3u8') || stream.src.includes(':hls:');
         let hls: Hls | undefined;
-        let didEscalateError = false;
+        let isAbandoningStream = false;
+        let hasRecoveredMediaError = false;
         let lastBrokenFragment = '';
         let brokenFragmentAttempts = 0;
 
         const abandonBrokenStream = () => {
-            if (didEscalateError) return;
-            didEscalateError = true;
+            if (isAbandoningStream) return;
+            isAbandoningStream = true;
 
             if (!switchToLowerQuality()) {
                 setStreamError(t('player.streamUnavailable'));
@@ -381,9 +384,12 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                 if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
                     abandonBrokenStream();
                 } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                    if (didEscalateError) return;
-                    didEscalateError = true;
-                    hls?.recoverMediaError();
+                    if (!hasRecoveredMediaError) {
+                        hasRecoveredMediaError = true;
+                        hls?.recoverMediaError();
+                    } else {
+                        abandonBrokenStream();
+                    }
                 } else {
                     abandonBrokenStream();
                 }
@@ -454,7 +460,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
         };
     }, [settings.player.qualityUpgrade, settings.player.qualityUpgradeMode, stream, upscalerKey]);
 
-    const changeEpisode = async (targetEpisode: NonNullable<typeof previousEpisode>, shouldStartPlayback = true) => {
+    const changeEpisode = useCallback(async (targetEpisode: NonNullable<typeof previousEpisode>, shouldStartPlayback = true) => {
         if (isEpisodeChanging) return;
 
         setIsEpisodeChanging(true);
@@ -480,7 +486,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
         } finally {
             setIsEpisodeChanging(false);
         }
-    };
+    }, [animeId, api, isEpisodeChanging, onSessionChange, playerSession, userToken]);
 
     const startFrom = (time: number) => {
         const video = videoRef.current;
@@ -492,7 +498,72 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
         void video.play().catch(error => console.error('Не удалось запустить видео:', error));
     };
 
-    if (!stream) return null;
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+            const target = event.target;
+            if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"]')) return;
+
+            const action = Object.entries(keybindings).find(([, code]) => code === event.code)?.[0];
+            if (!action) return;
+
+            const video = videoRef.current;
+            if (!video) return;
+            const seek = (offset: number) => {
+                const nextTime = Math.max(0, Math.min(video.currentTime + offset, Number.isFinite(video.duration) ? video.duration : Infinity));
+                video.currentTime = nextTime;
+                setCurrentTime(nextTime);
+                sendRoomPlayback('seek', nextTime);
+            };
+
+            event.preventDefault();
+            showControls();
+            switch (action) {
+                case 'togglePlayback':
+                    if (video.paused) void video.play();
+                    else video.pause();
+                    break;
+                case 'seekBackward': seek(-5); break;
+                case 'seekForward': seek(5); break;
+                case 'volumeDown':
+                case 'volumeUp': {
+                    const nextVolume = Math.min(1, Math.max(0, video.volume + (action === 'volumeUp' ? .05 : -.05)));
+                    video.muted = false;
+                    video.volume = nextVolume;
+                    setVolume(nextVolume);
+                    setSettings(previous => ({ ...previous, player: { ...previous.player, volume: Math.round(nextVolume * 100) } }));
+                    break;
+                }
+                case 'toggleMute': video.muted = !video.muted; break;
+                case 'toggleFullscreen':
+                    if (document.fullscreenElement) void document.exitFullscreen();
+                    else void playerRef.current?.requestFullscreen();
+                    break;
+                case 'previousEpisode': if (previousEpisode) void changeEpisode(previousEpisode); break;
+                case 'nextEpisode': if (nextEpisode) void changeEpisode(nextEpisode); break;
+                case 'skipOpening':
+                    if (settings.player.showSkipOpeningButton) seek(settings.player.skipOpeningValue);
+                    break;
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [changeEpisode, keybindings, nextEpisode, previousEpisode, sendRoomPlayback, setSettings, settings.player.showSkipOpeningButton, settings.player.skipOpeningValue, showControls]);
+
+    if (!stream) return <div className={styles.overlay} role="dialog" aria-modal="true" aria-label={t('player.ariaLabel')}>
+        <div className={styles.player}>
+            <div className={styles['resume-prompt']}>
+                <div className={styles['resume-prompt-card']} role="alert">
+                    <h2>{t('player.streamUnavailable')}</h2>
+                    <p>Для выбранной серии не найдено доступных видеопотоков.</p>
+                    <div className={styles['resume-prompt-actions']}>
+                        <button type="button" className={styles['resume-primary-button']} onClick={closePlayer}>Вернуться к релизу</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>;
 
     return (
         <div className={styles.overlay} role="dialog" aria-modal="true" aria-label={t('player.ariaLabel')}>

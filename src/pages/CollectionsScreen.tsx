@@ -8,6 +8,7 @@ import { useSearchScope } from '../shared/contexts/searchContext';
 import { useUser } from '../shared/contexts/userContext';
 import { Modal } from '../modals/ModalTemplate';
 import SelectDropdown from '../components/SelectDropdown';
+import { useSearchParams } from 'react-router-dom';
 import styles from './CollectionsScreen.module.css';
 
 const COLLECTION_SORTS = [
@@ -23,9 +24,14 @@ type CollectionsView = 'all' | 'mine';
 type CreateCollectionResponse = { code: number; collection?: Collection; id?: number };
 type ReleaseSearchResponse = { code: number; releases?: Anime[]; content?: Anime[] };
 
+function isEmptyCollectionResponse(error: unknown) {
+    return error instanceof Error && error.message === 'API error: 1';
+}
+
 export default function CollectionsScreen() {
     const api = useApi();
     const { userId, userToken } = useUser();
+    const [searchParams] = useSearchParams();
     const { setSearchScope } = useSearchScope();
     const triggerRef = useRef<HTMLDivElement | null>(null);
     const [firstPagesCache, setFirstPagesCache] = useState(() => new Map<string, PagedResponse<Collection>>());
@@ -34,7 +40,7 @@ export default function CollectionsScreen() {
     const [extraPages, setExtraPages] = useState<Array<{ page: number; collections: Collection[] }>>([]);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
-    const [view, setView] = useState<CollectionsView>('all');
+    const [view, setView] = useState<CollectionsView>(() => searchParams.get('view') === 'mine' ? 'mine' : 'all');
     const [sort, setSort] = useState<(typeof COLLECTION_SORTS)[number]['value']>(5);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [newCollectionTitle, setNewCollectionTitle] = useState('');
@@ -46,21 +52,34 @@ export default function CollectionsScreen() {
     const [isReleaseSearchLoading, setIsReleaseSearchLoading] = useState(false);
     const [selectedReleases, setSelectedReleases] = useState<Anime[]>([]);
     const [createError, setCreateError] = useState<string | null>(null);
+    const [createNotice, setCreateNotice] = useState<string | null>(null);
     const [isCreating, setIsCreating] = useState(false);
+    const profileCollectionId = Number(searchParams.get('profileId'));
+    const isProfileView = Number.isInteger(profileCollectionId) && profileCollectionId > 0;
     const isMine = view === 'mine';
     const canShowMine = userId > 0;
-    const getCacheKey = useCallback((targetView: CollectionsView, targetSort: number) => `${targetView}:${targetSort}:${targetView === 'mine' ? userId : ''}`, [userId]);
+    const getCacheKey = useCallback((targetView: CollectionsView, targetSort: number) => `${isProfileView ? `profile:${profileCollectionId}` : targetView}:${targetSort}:${targetView === 'mine' ? userId : ''}`, [isProfileView, profileCollectionId, userId]);
     const cacheKey = getCacheKey(view, sort);
     const getPagePath = useCallback((page: number, previousPage: number) => {
-        const basePath = isMine ? `/collection/all/profile/${userId}/${page}` : `/collection/all/${page}`;
+        const basePath = isProfileView
+            ? `/collection/all/profile/${profileCollectionId}/${page}`
+            : isMine
+                ? `/collection/all/profile/${userId}/${page}`
+                : `/collection/all/${page}`;
         return `${basePath}?previous_page=${previousPage}&sort=${sort}`;
-    }, [isMine, sort, userId]);
+    }, [isMine, isProfileView, profileCollectionId, sort, userId]);
     const { data, error, isLoading, reload } = useAsyncLoad(
         signal => {
             const cached = firstPagesCache.get(cacheKey);
             if (cached) return Promise.resolve(cached);
 
             return api.get<PagedResponse<Collection>>(getPagePath(0, -1), { signal })
+                .catch(error => {
+                    if (isEmptyCollectionResponse(error)) {
+                        return { code: 0, content: [], total_count: 0, total_page_count: 0, current_page: 0 };
+                    }
+                    throw error;
+                })
                 .then(response => {
                     setFirstPagesCache(current => new Map(current).set(cacheKey, response));
                     return response;
@@ -68,7 +87,7 @@ export default function CollectionsScreen() {
         },
         [api, cacheKey, firstPagesCache, getPagePath],
         {
-            enabled: !isMine || canShowMine,
+            enabled: isProfileView || !isMine || canShowMine,
             initialData: { code: 0, content: [], total_count: 0, total_page_count: 0, current_page: 0 },
         },
     );
@@ -129,7 +148,13 @@ export default function CollectionsScreen() {
                 : [...cachedPages, { page, collections: response.content ?? [] }];
             extraPagesCacheRef.current.set(cacheKey, nextPages);
             if (activeCacheKeyRef.current === cacheKey) setExtraPages(nextPages);
-        } catch {
+        } catch (error) {
+            if (isEmptyCollectionResponse(error)) {
+                const nextPages = [...(extraPagesCacheRef.current.get(cacheKey) ?? []), { page, collections: [] }];
+                extraPagesCacheRef.current.set(cacheKey, nextPages);
+                if (activeCacheKeyRef.current === cacheKey) setExtraPages(nextPages);
+                return;
+            }
             setLoadMoreError('Не удалось загрузить следующую страницу.');
         } finally {
             setIsLoadingMore(false);
@@ -191,11 +216,21 @@ export default function CollectionsScreen() {
                 releases: selectedReleases.map(release => release.id),
             });
             const collectionId = created.collection?.id ?? created.id;
-            if (newCollectionCover && collectionId) {
-                const image = new FormData();
-                image.append('image', newCollectionCover, newCollectionCover.name);
-                image.append('name', 'image');
-                await api.postFormViaAgent(`/collectionMy/editImage/${collectionId}`, image);
+            let coverUploadFailed = false;
+            if (newCollectionCover) {
+                if (!collectionId) {
+                    coverUploadFailed = true;
+                } else {
+                    const image = new FormData();
+                    image.append('image', newCollectionCover, newCollectionCover.name);
+                    image.append('name', 'image');
+                    try {
+                        await api.postFormViaAgent(`/collectionMy/editImage/${collectionId}`, image);
+                    } catch (error) {
+                        coverUploadFailed = true;
+                        console.error('Коллекция создана, но обложку загрузить не удалось:', error);
+                    }
+                }
             }
             setNewCollectionTitle('');
             setNewCollectionDescription('');
@@ -205,6 +240,9 @@ export default function CollectionsScreen() {
             setReleaseResults([]);
             setSelectedReleases([]);
             setIsCreateModalOpen(false);
+            setCreateNotice(coverUploadFailed
+                ? 'Коллекция создана, но обложку загрузить не удалось. Её можно добавить позже при редактировании.'
+                : null);
             setFirstPagesCache(current => {
                 const next = new Map(current);
                 next.delete(getCacheKey('mine', sort));
@@ -236,17 +274,18 @@ export default function CollectionsScreen() {
     return <section className={styles.main}>
         <header className={styles.header}>
             <div>
-                <h1>Коллекции</h1>
-                <p>Подборки аниме от сообщества</p>
+                <h1>{isProfileView ? 'Коллекции пользователя' : 'Коллекции'}</h1>
+                <p>{isProfileView ? 'Подборки, созданные пользователем' : 'Подборки аниме от сообщества'}</p>
             </div>
             <div className={styles.toolbar}>
-                <button type="button" className={`${styles.toolbarButton} ${styles.createButton}`} onClick={() => setIsCreateModalOpen(true)}>Создать коллекцию</button>
-                <button type="button" className={`${styles.toolbarButton} ${isMine ? styles.toolbarButtonActive : ''}`} onClick={() => changeView(isMine ? 'all' : 'mine')}>{isMine ? 'Все коллекции' : 'Мои коллекции'}</button>
+                {!isProfileView && <><button type="button" className={`${styles.toolbarButton} ${styles.createButton}`} onClick={() => setIsCreateModalOpen(true)}>Создать коллекцию</button>
+                <button type="button" className={`${styles.toolbarButton} ${isMine ? styles.toolbarButtonActive : ''}`} onClick={() => changeView(isMine ? 'all' : 'mine')}>{isMine ? 'Все коллекции' : 'Мои коллекции'}</button></>}
                 <div className={styles.sortDropdown}>
                     <SelectDropdown value={sort} options={COLLECTION_SORTS} onChange={changeSort} ariaLabel="Сортировка коллекций" />
                 </div>
             </div>
         </header>
+        {createNotice && <p className={styles.message} role="status">{createNotice}</p>}
         {isCurrentViewLoading && <p className={styles.message}>Загружаем коллекции...</p>}
         {errorMessage && <p className={`${styles.message} ${styles.error}`}>{errorMessage}</p>}
         {!isCurrentViewLoading && !errorMessage && collections.length === 0 && <p className={styles.message}>Коллекций пока нет.</p>}

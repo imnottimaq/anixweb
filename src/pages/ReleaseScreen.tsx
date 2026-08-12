@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom"
 import styles from './ReleaseScreen.module.css'
-import { type Anime } from "../shared/types/api";
+import { type Anime, type Collection } from "../shared/types/api";
 import ReleaseCard from "../components/ReleaseCard";
 import { useUser } from "../shared/contexts/userContext";
 import { useSettings } from "../shared/contexts/settingsContext";
 import Comment from "../components/Comment";
 import { type Comment as CommentType } from "../shared/types/api";
 import DubSelectModal from "../modals/DubSelectModal";
+import type { Dub } from '../modals/DubSelectModal';
 import WatchlistLine from "../components/WatchlistLine";
 import RemoteImage from '../components/RemoteImage';
 import { useTranslation } from '../shared/useTranslation';
@@ -25,15 +26,18 @@ import sendIcon from '../assets/icons/send.svg'
 import leftArrowIcon from '../assets/icons/left-arrow.svg'
 import rightArrowIcon from '../assets/icons/right-arrow.svg'
 import commentsIcon from '../assets/icons/message-circle-dots.svg'
+import folderPlusIcon from '../assets/icons/folder-plus.svg'
+import bellIcon from '../assets/icons/bell.svg'
 
 import { setPlayerSession } from '../shared/playerSession'
 import RecommendedRelease from "../components/RecommendedRelease";
 import { useApi } from "../shared/apiClient";
 import type { PagedResponse } from '../shared/types/api';
+import PageState from '../components/PageState';
 
 export default function ReleaseScreen(){
     const {id} = useParams<{id: string}>();
-    const {userToken, setUserId} = useUser();
+    const {userToken, userId, setUserId} = useUser();
     const {settings} = useSettings();
     const { t } = useTranslation();
     const navigate = useNavigate();
@@ -55,8 +59,26 @@ export default function ReleaseScreen(){
     const [loadedPoster, setLoadedPoster] = useState<string | null>(null);
     const [loadedScreenshots, setLoadedScreenshots] = useState<Record<string, boolean>>({});
     const [isDubScreenOpen, setIsDubScreenOpen] = useState(false);
+    const [isCollectionPickerOpen, setIsCollectionPickerOpen] = useState(false);
+    const [isReleaseNotificationsOpen, setIsReleaseNotificationsOpen] = useState(false);
+    const [releaseNotificationMode, setReleaseNotificationMode] = useState<'none' | 'all_dubs' | 'selected_dubs'>('none');
+    const [notificationDubs, setNotificationDubs] = useState<Dub[]>([]);
+    const [selectedNotificationDubIds, setSelectedNotificationDubIds] = useState<number[]>([]);
+    const [isNotificationSettingsLoading, setIsNotificationSettingsLoading] = useState(false);
+    const [isNotificationSettingsSaving, setIsNotificationSettingsSaving] = useState(false);
+    const [notificationSettingsError, setNotificationSettingsError] = useState<string | null>(null);
+    const [isReleaseVoteLoading, setIsReleaseVoteLoading] = useState(false);
+    const [releaseVoteError, setReleaseVoteError] = useState<string | null>(null);
+    const [selectedReleaseVote, setSelectedReleaseVote] = useState<number | null>(null);
+    const [myCollections, setMyCollections] = useState<Collection[]>([]);
+    const [isCollectionsLoading, setIsCollectionsLoading] = useState(false);
+    const [collectionActionId, setCollectionActionId] = useState<number | null>(null);
+    const [collectionActionError, setCollectionActionError] = useState<string | null>(null);
+    const [collectionActionNotice, setCollectionActionNotice] = useState<string | null>(null);
     const requestKey = `${id ?? ''}:${userToken}`;
     const [loadedRequestKey, setLoadedRequestKey] = useState<string | null>(null);
+    const [releaseLoadError, setReleaseLoadError] = useState<{ key: string; message: string } | null>(null);
+    const [releaseLoadAttempt, setReleaseLoadAttempt] = useState(0);
     const [commentText, setCommentText] = useState('');
     const [commentSpoiler, setCommentSpoiler] = useState(false);
     const [isSendingComment, setIsSendingComment] = useState(false);
@@ -69,7 +91,8 @@ export default function ReleaseScreen(){
     const [shouldFocusCommentInput, setShouldFocusCommentInput] = useState(false);
     const commentInputRef = useRef<HTMLTextAreaElement>(null);
 
-    const isReleaseLoading = loadedRequestKey !== requestKey;
+    const releaseAttemptKey = `${requestKey}:${releaseLoadAttempt}`;
+    const isReleaseLoading = loadedRequestKey !== releaseAttemptKey;
     const isCommentTooShort = commentText.trim().length < 5;
     const releaseId = Number(id);
     const isValidReleaseId = Number.isInteger(releaseId) && releaseId > 0;
@@ -96,6 +119,164 @@ export default function ReleaseScreen(){
     const openCommentEditor = () => {
         setShouldFocusCommentInput(true);
         setIsCommentsOpen(true);
+    };
+
+    const openCollectionPicker = async () => {
+        if (!userToken || !userId) {
+            alert(t('release.loginToChangeStatus'));
+            return;
+        }
+
+        setIsCollectionPickerOpen(true);
+        setCollectionActionError(null);
+        setCollectionActionNotice(null);
+        setIsCollectionsLoading(true);
+        try {
+            const collections = await loadAllPagesOrEmpty(page => (
+                api.get<PagedResponse<Collection>>(`/collection/all/profile/${userId}/${page}?previous_page=${page - 1}&sort=5`)
+            ));
+            setMyCollections(collections);
+        } catch (error) {
+            setMyCollections([]);
+            setCollectionActionError(error instanceof Error ? error.message : 'Не удалось загрузить ваши коллекции.');
+        } finally {
+            setIsCollectionsLoading(false);
+        }
+    };
+
+    const addReleaseToCollection = async (collection: Collection) => {
+        if (collectionActionId !== null) return;
+
+        setCollectionActionId(collection.id);
+        setCollectionActionError(null);
+        setCollectionActionNotice(null);
+        try {
+            await api.getViaAgent<{ code: number }>(`/collectionMy/release/add/${collection.id}?release_id=${animeData.id}`);
+            setCollectionActionNotice(`Релиз добавлен в коллекцию «${collection.title}».`);
+        } catch (error) {
+            setCollectionActionError(error instanceof Error && error.message === 'API error: 5'
+                ? 'Этот релиз уже есть в коллекции.'
+                : error instanceof Error ? error.message : 'Не удалось добавить релиз в коллекцию.');
+        } finally {
+            setCollectionActionId(null);
+        }
+    };
+
+    const openReleaseNotifications = async () => {
+        if (!userToken) {
+            alert(t('release.loginToChangeStatus'));
+            return;
+        }
+
+        setIsReleaseNotificationsOpen(true);
+        setNotificationSettingsError(null);
+        setIsNotificationSettingsLoading(true);
+        try {
+            const [preferences, types] = await Promise.all([
+                api.get<{ code: number; profile_release_type_notification_preferences: Dub[] }>(`/profile/preference/notification/release/type/${animeData.id}`),
+                api.get<{ code: number; types: Dub[] }>('/type/all'),
+            ]);
+            const allTypes = types.types ?? [];
+            const selectedIds = (preferences.profile_release_type_notification_preferences ?? []).map(dub => dub.id);
+            const allTypeIds = new Set(allTypes.map(dub => dub.id));
+            const hasEveryDub = allTypeIds.size > 0 && selectedIds.length === allTypeIds.size && selectedIds.every(id => allTypeIds.has(id));
+
+            setNotificationDubs(allTypes);
+            setSelectedNotificationDubIds(selectedIds);
+            setReleaseNotificationMode(selectedIds.length === 0 ? 'none' : hasEveryDub ? 'all_dubs' : 'selected_dubs');
+        } catch (error) {
+            setNotificationSettingsError(error instanceof Error ? error.message : 'Не удалось загрузить настройки уведомлений.');
+        } finally {
+            setIsNotificationSettingsLoading(false);
+        }
+    };
+
+    const saveReleaseNotifications = async () => {
+        if (isNotificationSettingsSaving) return;
+
+        const profile_release_type_notification_preferences = releaseNotificationMode === 'none'
+            ? []
+            : releaseNotificationMode === 'all_dubs'
+                ? notificationDubs.map(dub => dub.id)
+                : selectedNotificationDubIds;
+
+        setIsNotificationSettingsSaving(true);
+        setNotificationSettingsError(null);
+        try {
+            await api.post<{ code: number }>('/profile/preference/notification/release/type/edit', {
+                profile_release_type_notification_preferences,
+                release_id: animeData.id,
+            });
+            setIsReleaseNotificationsOpen(false);
+        } catch (error) {
+            setNotificationSettingsError(error instanceof Error ? error.message : 'Не удалось сохранить настройки уведомлений.');
+        } finally {
+            setIsNotificationSettingsSaving(false);
+        }
+    };
+
+    const rateRelease = async (grade: number) => {
+        if (isReleaseVoteLoading) return;
+        if (!userToken) {
+            alert(t('release.loginToChangeStatus'));
+            return;
+        }
+
+        const ratedReleaseId = animeData.id;
+        const previousVote = selectedReleaseVote ?? animeData.your_vote ?? animeData.my_vote ?? 0;
+        if (grade === previousVote) return;
+
+        setSelectedReleaseVote(grade);
+        setIsReleaseVoteLoading(true);
+        setReleaseVoteError(null);
+        let removedPreviousVote = false;
+        try {
+            if (previousVote >= 1 && previousVote <= 5) {
+                await api.get<{ code: number }>(`/release/vote/delete/${ratedReleaseId}`, { cache: 'no-store' });
+                removedPreviousVote = true;
+            }
+            await api.get<{ code: number }>(`/release/vote/add/${ratedReleaseId}/${grade}`, { cache: 'no-store' });
+            setAnimeData(previous => {
+                if (previous.id !== ratedReleaseId) return previous;
+                const oldGrade = previous.your_vote ?? previous.my_vote ?? 0;
+                const counts = [0, previous.vote_1_count, previous.vote_2_count, previous.vote_3_count, previous.vote_4_count, previous.vote_5_count];
+                if (oldGrade >= 1 && oldGrade <= 5) counts[oldGrade] = Math.max(0, counts[oldGrade] - 1);
+                counts[grade] += 1;
+                const voteCount = counts.slice(1).reduce((sum, count) => sum + count, 0);
+                const total = counts.slice(1).reduce((sum, count, index) => sum + count * (index + 1), 0);
+
+                return {
+                    ...previous,
+                    my_vote: grade,
+                    your_vote: grade,
+                    vote_count: voteCount,
+                    grade: voteCount ? total / voteCount : 0,
+                    vote_1_count: counts[1],
+                    vote_2_count: counts[2],
+                    vote_3_count: counts[3],
+                    vote_4_count: counts[4],
+                    vote_5_count: counts[5],
+                };
+            });
+        } catch (error) {
+            let wasRestored = !removedPreviousVote;
+            if (removedPreviousVote && previousVote >= 1 && previousVote <= 5) {
+                try {
+                    await api.get<{ code: number }>(`/release/vote/add/${ratedReleaseId}/${previousVote}`, { cache: 'no-store' });
+                    wasRestored = true;
+                } catch (restoreError) {
+                    console.error('Не удалось восстановить предыдущую оценку релиза:', restoreError);
+                }
+            }
+            setSelectedReleaseVote(previousVote);
+            setReleaseVoteError(wasRestored
+                ? 'Не удалось изменить оценку. Предыдущая оценка сохранена.'
+                : 'Не удалось изменить и восстановить оценку. Данные будут загружены заново.');
+            if (!wasRestored) setReleaseLoadAttempt(attempt => attempt + 1);
+            console.error('Не удалось поставить оценку релизу:', error);
+        } finally {
+            setIsReleaseVoteLoading(false);
+        }
     };
 
     const startReply = (comment: CommentType) => {
@@ -171,19 +352,39 @@ export default function ReleaseScreen(){
     };
 
     useEffect(() => {
-        api.get<{code: number, release: Anime}>(`/release/${id}`)
+        const controller = new AbortController();
+        let isCurrent = true;
+        api.get<{code: number, release: Anime}>(`/release/${id}`, { signal: controller.signal })
             .then(data => {
+                if (!isCurrent) return;
                 const release = data.release;
                 setAnimeData(release);
+                setSelectedReleaseVote(release.your_vote ?? release.my_vote ?? 0);
                 setScreenshots(release.screenshot_images);
                 setActiveScreenshotIndex(0);
+                setReleaseLoadError(current => current?.key === releaseAttemptKey ? null : current);
             })
-            .catch(error => console.error('Не удалось загрузить релиз:', error))
-            .finally(() => setLoadedRequestKey(requestKey));
-    }, [api, id, requestKey, userToken]);
+            .catch(error => {
+                if (!isCurrent || controller.signal.aborted) return;
+                console.error('Не удалось загрузить релиз:', error);
+                setReleaseLoadError({ key: releaseAttemptKey, message: t('release.loadError') });
+            })
+            .finally(() => {
+                if (isCurrent) setLoadedRequestKey(releaseAttemptKey);
+            });
+
+        return () => {
+            isCurrent = false;
+            controller.abort();
+        };
+    }, [api, id, releaseAttemptKey, t]);
 
     if (isReleaseLoading) {
         return <div className={styles['loading-overlay']} aria-label={t('misc.loading')} />;
+    }
+
+    if (releaseLoadError?.key === releaseAttemptKey) {
+        return <div className={styles.body}><PageState status="error" message={releaseLoadError.message} onRetry={() => setReleaseLoadAttempt(attempt => attempt + 1)} /></div>;
     }
 
     if (!animeData) {
@@ -191,6 +392,7 @@ export default function ReleaseScreen(){
     }
 
     const isReleaseNotStarted = !animeData.episodes_released;
+    const currentVote = selectedReleaseVote ?? animeData.your_vote ?? animeData.my_vote ?? 0;
     const comingSoonText = getComingSoonText(animeData, settings.appearance.language, t('release.soon'));
     const visibleScreenshots = screenshots.length > 1
         ? [screenshots[activeScreenshotIndex], screenshots[(activeScreenshotIndex + 1) % screenshots.length]]
@@ -250,6 +452,22 @@ export default function ReleaseScreen(){
                                 }
                             }}
                     ><img src={favoriteIcon} className={`${styles['icon-smaller']} ${animeData.is_favorite ? styles['favorited'] : ''}`}></img>{animeData?.favorites_count || 0}</button>
+                    <div className={styles['release-quick-actions']}>
+                        <button
+                            type="button"
+                            className={styles['release-quick-action']}
+                            aria-label="Добавить в коллекцию"
+                            title="Добавить в коллекцию"
+                            onClick={() => void openCollectionPicker()}
+                        ><img src={folderPlusIcon} alt="" /></button>
+                        <button
+                            type="button"
+                            className={styles['release-quick-action']}
+                            aria-label="Настроить уведомления"
+                            title="Настроить уведомления"
+                            onClick={() => void openReleaseNotifications()}
+                        ><img src={bellIcon} alt="" /></button>
+                    </div>
                 </div>
                 <div className={styles['watch-actions']}>
                     {isReleaseNotStarted ? (
@@ -276,6 +494,23 @@ export default function ReleaseScreen(){
                     })}
                     </div>
                 </div>
+                <div className={styles['release-rating-control']} aria-label="Ваша оценка">
+                    <div>
+                        {[1, 2, 3, 4, 5].map(value => <button
+                            type="button"
+                            key={value}
+                            disabled={isReleaseVoteLoading}
+                            className={value <= currentVote ? styles['release-rating-selected'] : ''}
+                            onClick={() => void rateRelease(value)}
+                            aria-label={`Оценить на ${value}`}
+                            title={`${value} из 5`}
+                                >{value <= currentVote
+                                    ? <svg className={styles['release-rating-filled']} viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.86 5.8 6.4.93-4.63 4.51 1.09 6.37L12 17.4l-5.72 3.01 1.09-6.37L2.74 9.53l6.4-.93L12 2.8Z" /></svg>
+                                    : <svg className={styles['release-rating-outline']} viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.86 5.8 6.4.93-4.63 4.51 1.09 6.37L12 17.4l-5.72 3.01 1.09-6.37L2.74 9.53l6.4-.93L12 2.8Z" /></svg>
+                                }</button>)}
+                    </div>
+                </div>
+                {releaseVoteError && <p className={styles['collection-picker-error']} role="alert">{releaseVoteError}</p>}
                 <div className={styles['watchlist-info']}>
                     <WatchlistLine
                         watching_count={animeData.watching_count}
@@ -476,6 +711,72 @@ export default function ReleaseScreen(){
                     </Modal>
                 </div>
             </div>
+            <Modal
+                isOpen={isCollectionPickerOpen}
+                onClose={() => setIsCollectionPickerOpen(false)}
+                title="Добавить в коллекцию"
+                stickyHeader
+                contentClassName={styles['collection-picker-modal']}
+            >
+                <p className={styles['collection-picker-caption']}>Выберите одну из своих коллекций.</p>
+                {isCollectionsLoading && <p className={styles['collection-picker-state']}>{t('misc.loading')}</p>}
+                {!isCollectionsLoading && collectionActionError && <p className={styles['collection-picker-error']} role="alert">{collectionActionError}</p>}
+                {!isCollectionsLoading && !collectionActionError && myCollections.length === 0 && <p className={styles['collection-picker-state']}>У вас пока нет коллекций.</p>}
+                {!isCollectionsLoading && myCollections.length > 0 && <div className={styles['collection-picker-list']}>
+                    {myCollections.map(collection => <button
+                        key={collection.id}
+                        type="button"
+                        disabled={collectionActionId !== null}
+                        className={styles['collection-picker-item']}
+                        onClick={() => void addReleaseToCollection(collection)}
+                    >
+                        <RemoteImage src={collection.image} alt="" />
+                        <span><strong>{collection.title}</strong><small>{collection.description || 'Без описания'}</small></span>
+                        {collectionActionId === collection.id && <em>Добавляем…</em>}
+                    </button>)}
+                </div>}
+                {collectionActionNotice && <p className={styles['collection-picker-notice']} role="status">{collectionActionNotice}</p>}
+            </Modal>
+            <Modal
+                isOpen={isReleaseNotificationsOpen}
+                onClose={() => setIsReleaseNotificationsOpen(false)}
+                title="Уведомления о релизе"
+                contentClassName={styles['release-notifications-modal']}
+            >
+                <p className={styles['release-notifications-caption']}>Выберите, когда присылать уведомление о новой серии.</p>
+                {isNotificationSettingsLoading && <p className={styles['collection-picker-state']}>{t('misc.loading')}</p>}
+                {!isNotificationSettingsLoading && <div className={styles['release-notification-options']}>
+                    <button type="button" className={releaseNotificationMode === 'none' ? styles['release-notification-active'] : ''} onClick={() => setReleaseNotificationMode('none')}>
+                        <strong>Не получать</strong>
+                        <span>Уведомления для этого релиза отключены</span>
+                    </button>
+                    <button type="button" className={releaseNotificationMode === 'all_dubs' ? styles['release-notification-active'] : ''} onClick={() => setReleaseNotificationMode('all_dubs')}>
+                        <strong>От всех озвучек</strong>
+                        <span>При выходе серии в любой озвучке</span>
+                    </button>
+                    <button type="button" className={releaseNotificationMode === 'selected_dubs' ? styles['release-notification-active'] : ''} onClick={() => setReleaseNotificationMode('selected_dubs')}>
+                        <strong>От выбранных озвучек</strong>
+                        <span>Вы сможете отметить нужные варианты озвучки</span>
+                    </button>
+                </div>}
+                {!isNotificationSettingsLoading && releaseNotificationMode === 'selected_dubs' && <div className={styles['notification-dub-list']}>
+                    {notificationDubs.map(dub => <label key={dub.id}>
+                        <input
+                            type="checkbox"
+                            checked={selectedNotificationDubIds.includes(dub.id)}
+                            onChange={() => setSelectedNotificationDubIds(previous => previous.includes(dub.id)
+                                ? previous.filter(id => id !== dub.id)
+                                : [...previous, dub.id])}
+                        />
+                        <span>{dub.name}</span>
+                    </label>)}
+                </div>}
+                {notificationSettingsError && <p className={styles['collection-picker-error']} role="alert">{notificationSettingsError}</p>}
+                <div className={styles['release-notifications-actions']}>
+                    <button type="button" onClick={() => setIsReleaseNotificationsOpen(false)}>Отмена</button>
+                    <button type="button" disabled={isNotificationSettingsLoading || isNotificationSettingsSaving} onClick={() => void saveReleaseNotifications()}>{isNotificationSettingsSaving ? 'Сохраняем…' : 'Сохранить'}</button>
+                </div>
+            </Modal>
             {(isDubScreenOpen || roomAutoSelect) && <DubSelectModal 
                 isOpen={isDubScreenOpen || Boolean(roomAutoSelect)}
                 autoSelect={roomAutoSelect}
@@ -502,6 +803,25 @@ export default function ReleaseScreen(){
             />}
         </div>
     )
+}
+
+async function loadAllPages<T extends { id: number }>(loadPage: (page: number) => Promise<PagedResponse<T>>): Promise<T[]> {
+    const firstPage = await loadPage(0);
+    const lastPage = Math.max(0, firstPage.total_page_count ?? 0);
+    const remainingPages = lastPage > 0
+        ? await Promise.all(Array.from({ length: lastPage }, (_, index) => loadPage(index + 1)))
+        : [];
+    const items = [firstPage, ...remainingPages].flatMap(page => page.content ?? []);
+    return [...new Map(items.map(item => [item.id, item])).values()];
+}
+
+async function loadAllPagesOrEmpty<T extends { id: number }>(loadPage: (page: number) => Promise<PagedResponse<T>>): Promise<T[]> {
+    try {
+        return await loadAllPages(loadPage);
+    } catch (error) {
+        if (error instanceof Error && error.message === 'API error: 1') return [];
+        throw error;
+    }
 }
 
 function getComingSoonText(release: Anime, language: 'russian' | 'english', fallback: string) {

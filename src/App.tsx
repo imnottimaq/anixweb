@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState,} from 'react'
 import {  RouterProvider } from 'react-router-dom'
 import { router } from './app/router';
-import { type AppSettings, defaultAppSettings } from './shared/types/settings';
+import { type AppSettings, defaultAppSettings, defaultPlayerKeybindings } from './shared/types/settings';
 import { UserContext } from './shared/contexts/userContext';
 import { SettingsContext } from './shared/contexts/settingsContext';
 import { SearchContext, type SearchScope } from './shared/contexts/searchContext';
@@ -24,7 +24,11 @@ function App() {
       return {
         ...defaultAppSettings,
         ...parsed,
-        player: { ...defaultAppSettings.player, ...parsed.player },
+        player: {
+          ...defaultAppSettings.player,
+          ...parsed.player,
+          keybindings: { ...defaultPlayerKeybindings, ...parsed.player?.keybindings },
+        },
         content: { ...defaultAppSettings.content, ...parsed.content },
         appearance: { ...defaultAppSettings.appearance, ...parsed.appearance },
         notifications: { ...defaultAppSettings.notifications, ...parsed.notifications },
