@@ -142,6 +142,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     const [isPlayerSettingsOpen, setIsPlayerSettingsOpen] = useState(false);
     const [playbackRate, setPlaybackRate] = useState(1);
     const [aspectRatio, setAspectRatio] = useState<AspectRatio>('original');
+    const [nativeAspectRatio, setNativeAspectRatio] = useState<number | null>(null);
     const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
     const [upscalerReadyKey, setUpscalerReadyKey] = useState<string | null>(null);
     const [isEpisodeChanging, setIsEpisodeChanging] = useState(false);
@@ -173,9 +174,9 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     const currentEpisodeIndex = playerSession.episodes?.findIndex(episode => episode.position === episodeNumber) ?? -1;
     const previousEpisode = currentEpisodeIndex > 0 ? playerSession.episodes?.[currentEpisodeIndex - 1] : undefined;
     const nextEpisode = currentEpisodeIndex >= 0 ? playerSession.episodes?.[currentEpisodeIndex + 1] : undefined;
-    const ratioValue = ASPECT_RATIOS[aspectRatio];
     const upscalerKey = `${stream?.src ?? ''}:${settings.player.qualityUpgradeMode}`;
     const isUpscalerReady = settings.player.qualityUpgrade && upscalerReadyKey === upscalerKey;
+    const ratioValue = ASPECT_RATIOS[aspectRatio] ?? nativeAspectRatio;
     const videoFrameStyle = ratioValue
         ? {
             width: Math.min(viewport.width, viewport.height * ratioValue),
@@ -342,9 +343,18 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
         const isHls = stream.type === HLS_MIME_TYPE || stream.src.includes('.m3u8') || stream.src.includes(':hls:');
         let hls: Hls | undefined;
         let isAbandoningStream = false;
-        let hasRecoveredMediaError = false;
+        let mediaRecoveryAttempts = 0;
         let lastBrokenFragment = '';
         let brokenFragmentAttempts = 0;
+
+        const failBrokenStream = (errorData?: unknown) => {
+            if (isAbandoningStream) return;
+            isAbandoningStream = true;
+            if (errorData) console.error('Unrecoverable HLS stream error:', errorData);
+            setStreamError(t('player.streamUnavailable'));
+            setIsBuffering(false);
+            hls?.destroy();
+        };
 
         const abandonBrokenStream = () => {
             if (isAbandoningStream) return;
@@ -359,6 +369,9 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
 
         if (isHls && Hls.isSupported()) {
             hls = new Hls({
+                // Fail a persistently broken SourceBuffer quickly; the player
+                // then tries another quality instead of logging forever.
+                appendErrorMaxRetry: 1,
                 // XhrLoader is declared with the base context even though it
                 // works for Hls.js's specialised fragment loader context too.
                 fLoader: CorsFallbackFragmentLoader as unknown as FragmentLoaderConstructor,
@@ -378,19 +391,45 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                     return;
                 }
 
-                if (!data.fatal) return;
+                if (!data.fatal || isAbandoningStream) return;
 
-                console.error('Фатальная ошибка HLS.js:', data);
+                const isAudioSourceBufferFailure = data.sourceBufferName === 'audio' && (
+                    data.details === Hls.ErrorDetails.BUFFER_ADD_CODEC_ERROR ||
+                    data.details === Hls.ErrorDetails.BUFFER_APPEND_ERROR ||
+                    data.details === Hls.ErrorDetails.MEDIA_SOURCE_REQUIRES_RESET
+                );
+                if (isAudioSourceBufferFailure) {
+                    // This browser cannot create or retain the AAC SourceBuffer.
+                    // Reattaching the same manifest only repeats the same three
+                    // fatal events, so stop this Hls instance immediately.
+                    failBrokenStream(data);
+                    return;
+                }
+
+                const recoveryFlags = data.errorAction?.flags ?? 0;
+                const resetMediaSourceFlag = 16;
+                if (recoveryFlags & resetMediaSourceFlag) {
+                    // Hls.js 1.7 already calls recoverMediaError for this flag.
+                    return;
+                }
+
                 if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                    console.error('Fatal HLS network error:', data);
                     abandonBrokenStream();
                 } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                    if (!hasRecoveredMediaError) {
-                        hasRecoveredMediaError = true;
+                    mediaRecoveryAttempts += 1;
+
+                    console.error('Fatal HLS media error:', data);
+                    if (mediaRecoveryAttempts === 1) {
+                        hls?.recoverMediaError();
+                    } else if (mediaRecoveryAttempts === 2 && data.sourceBufferName === 'audio') {
+                        hls?.swapAudioCodec();
                         hls?.recoverMediaError();
                     } else {
                         abandonBrokenStream();
                     }
                 } else {
+                    console.error('Fatal HLS error:', data);
                     abandonBrokenStream();
                 }
             });
@@ -413,10 +452,24 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
         if (!video || !canvas) return;
 
         let isCancelled = false;
+        let setupStarted = false;
+        const nativeRequestVideoFrame = video.requestVideoFrameCallback.bind(video);
+        const nativeCancelVideoFrame = video.cancelVideoFrameCallback.bind(video);
+        const scheduledFrames = new Set<number>();
+        const requestVideoFrame: typeof video.requestVideoFrameCallback = callback => {
+            const id = nativeRequestVideoFrame((now, metadata) => {
+                scheduledFrames.delete(id);
+                if (!isCancelled) callback(now, metadata);
+            });
+            scheduledFrames.add(id);
+            return id;
+        };
+        video.requestVideoFrameCallback = requestVideoFrame;
 
         const setupUpscaler = async () => {
+            if (setupStarted || !video.videoWidth || !video.videoHeight) return;
+            setupStarted = true;
             try {
-                if (!video.videoWidth || !video.videoHeight) return;
                 // Mode B/C allocate many intermediate textures. Native size keeps
                 // memory usage reasonable; CSS scales the enhanced canvas to the player.
                 canvas.width = video.videoWidth;
@@ -455,8 +508,10 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
         return () => {
             isCancelled = true;
             video.removeEventListener('loadeddata', onLoadedData);
-            canvas.width = 0;
-            canvas.height = 0;
+            video.requestVideoFrameCallback = nativeRequestVideoFrame;
+            scheduledFrames.forEach(id => nativeCancelVideoFrame(id));
+            scheduledFrames.clear();
+            setUpscalerReadyKey(current => current === upscalerKey ? null : current);
         };
     }, [settings.player.qualityUpgrade, settings.player.qualityUpgradeMode, stream, upscalerKey]);
 
@@ -789,6 +844,9 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                     onLoadedMetadata={event => {
                         const video = event.currentTarget;
                         setDuration(video.duration);
+                        setNativeAspectRatio(video.videoWidth > 0 && video.videoHeight > 0
+                            ? video.videoWidth / video.videoHeight
+                            : null);
                         video.playbackRate = playbackRate;
 
                         const fallbackPosition = fallbackPositionRef.current;
