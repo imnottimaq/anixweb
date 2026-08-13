@@ -33,7 +33,8 @@ export default function RandomAnime() {
             })
             .catch((requestError: unknown) => {
                 if (!isCurrentRequest) return;
-                setError(hasTimedOut ? t('random.timeout') : requestError instanceof Error ? requestError.message : t('random.loadError'));
+                console.error(requestError);
+                setError(hasTimedOut ? t('random.timeout') : t('random.loadError'));
             })
             .finally(() => window.clearTimeout(timeoutId));
 
@@ -50,8 +51,8 @@ export default function RandomAnime() {
             {error && <>
                 <p role="alert">{error}</p>
                 <div className={styles.actions}>
-                    <button type="button" onClick={retry}>Попробовать снова</button>
-                    <button type="button" onClick={() => navigate(-1)}>Назад</button>
+                    <button type="button" onClick={retry}>{t('page.retry')}</button>
+                    <button type="button" onClick={() => navigate(-1)}>{t('page.back')}</button>
                 </div>
             </>}
         </section>

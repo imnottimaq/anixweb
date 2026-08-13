@@ -9,6 +9,7 @@ import { getStoredUserToken, setStoredUserToken } from './shared/authToken';
 import { getRoomParticipant, saveRoomIdentity } from './shared/roomParticipant';
 import { RoomContext } from './shared/contexts/roomContext';
 import { WatchRoomSocket } from './shared/watchRoom';
+import { htmlLanguageByLanguage, isLanguage } from './shared/locale';
 
 function App() {
   const [userToken, setUserTokenState] = useState<string>(getStoredUserToken);
@@ -21,6 +22,9 @@ function App() {
     try {
       const parsed = JSON.parse(saved);
 
+      const appearance = { ...defaultAppSettings.appearance, ...parsed.appearance };
+      if (!isLanguage(appearance.language)) appearance.language = defaultAppSettings.appearance.language;
+
       return {
         ...defaultAppSettings,
         ...parsed,
@@ -30,7 +34,7 @@ function App() {
           keybindings: { ...defaultPlayerKeybindings, ...parsed.player?.keybindings },
         },
         content: { ...defaultAppSettings.content, ...parsed.content },
-        appearance: { ...defaultAppSettings.appearance, ...parsed.appearance },
+        appearance,
         notifications: { ...defaultAppSettings.notifications, ...parsed.notifications },
       };
     } catch {
@@ -49,6 +53,7 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem('app_settings', JSON.stringify(settings));
+    document.documentElement.lang = htmlLanguageByLanguage[settings.appearance.language];
   }, [settings]);
 
   useEffect(() => {

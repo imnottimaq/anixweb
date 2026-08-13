@@ -16,8 +16,8 @@ import { useApi } from '../shared/apiClient';
 type ProfilePage = 'collections' | 'favorites' | 'history' | 'watching' | 'planned' | 'completed' | 'onHold' | 'dropped';
 type ReleasePage = Exclude<ProfilePage, 'collections'>;
 
-const PAGE_ITEMS: { page: ProfilePage; buttonText: 'nav.favorites' | 'home.history' | 'status.watching' | 'status.planned' | 'status.watched' | 'status.hold_on' | 'status.dropped'; label?: string }[] = [
-    { page: 'collections', buttonText: 'nav.favorites', label: 'Коллекции' }, { page: 'favorites', buttonText: 'nav.favorites' }, { page: 'history', buttonText: 'home.history' }, { page: 'watching', buttonText: 'status.watching' }, { page: 'planned', buttonText: 'status.planned' }, { page: 'completed', buttonText: 'status.watched' }, { page: 'onHold', buttonText: 'status.hold_on' }, { page: 'dropped', buttonText: 'status.dropped' },
+const PAGE_ITEMS: { page: ProfilePage; buttonText: 'nav.collections' | 'nav.favorites' | 'home.history' | 'status.watching' | 'status.planned' | 'status.watched' | 'status.hold_on' | 'status.dropped'; label?: string }[] = [
+    { page: 'collections', buttonText: 'nav.collections' }, { page: 'favorites', buttonText: 'nav.favorites' }, { page: 'history', buttonText: 'home.history' }, { page: 'watching', buttonText: 'status.watching' }, { page: 'planned', buttonText: 'status.planned' }, { page: 'completed', buttonText: 'status.watched' }, { page: 'onHold', buttonText: 'status.hold_on' }, { page: 'dropped', buttonText: 'status.dropped' },
 ];
 
 const PROFILE_LIST_IDS: Record<Exclude<ProfilePage, 'collections' | 'history'>, number> = {
@@ -160,7 +160,7 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
             .catch(error => {
                 if (sortVersion !== sortVersionRef.current) return;
                 console.error('Не удалось загрузить список:', error);
-                setLoadError('Не удалось загрузить список. Проверьте соединение и попробуйте снова.');
+                setLoadError(t('favorites.loadError'));
                 setTabs(previousTabs => ({
                     ...previousTabs,
                     [activePage]: {
@@ -170,7 +170,7 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
                 }));
             })
             .finally(() => loadingRequestsRef.current.delete(requestKey));
-    }, [activePage, activeTab.hasMore, activeTab.page, currentPageIsLoaded, sort, userToken, api, hasValidProfileId, isCollectionsPage, isProfileFavorites, selectedProfileId, retryVersion]);
+    }, [activePage, activeTab.hasMore, activeTab.page, currentPageIsLoaded, sort, userToken, api, hasValidProfileId, isCollectionsPage, isProfileFavorites, selectedProfileId, retryVersion, t]);
 
     useEffect(() => {
         if ((!userToken && !isProfileFavorites) || !isCollectionsPage || !activeTab.hasMore || currentPageIsLoaded) return;
@@ -209,14 +209,14 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
             })
             .catch(error => {
                 console.error('Не удалось загрузить коллекции:', error);
-                setLoadError('Не удалось загрузить коллекции. Проверьте соединение и попробуйте снова.');
+                setLoadError(t('favorites.collectionsLoadError'));
                 setTabs(previousTabs => ({
                     ...previousTabs,
                     collections: { ...previousTabs.collections, isLoading: false },
                 }));
             })
             .finally(() => loadingRequestsRef.current.delete(requestKey));
-    }, [activeTab.hasMore, activeTab.page, api, currentPageIsLoaded, isCollectionsPage, isProfileFavorites, selectedProfileId, userToken, retryVersion]);
+    }, [activeTab.hasMore, activeTab.page, api, currentPageIsLoaded, isCollectionsPage, isProfileFavorites, selectedProfileId, userToken, retryVersion, t]);
 
     useEffect(() => {
         if (!currentPageIsLoaded || activeTab.isLoading || !activeTab.hasMore) return;
@@ -245,8 +245,8 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
 
     return (
         <div className={styles.body}>
-            <div className={styles['side-panel']} role="tablist" aria-label="Разделы профиля">
-                {(isProfileFavorites ? EXTERNAL_PROFILE_PAGE_ITEMS : PAGE_ITEMS).map(({ page, buttonText, label }) => (
+            <div className={styles['side-panel']} role="tablist" aria-label={t('favorites.sectionsAria')}>
+                {(isProfileFavorites ? EXTERNAL_PROFILE_PAGE_ITEMS : PAGE_ITEMS).map(({ page, buttonText }) => (
                     <button
                         key={page}
                         role="tab"
@@ -254,18 +254,18 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
                         className={activePage === page ? styles.active : ''}
                         onClick={() => setActivePage(page)}
                     >
-                        {label ?? t(buttonText)}
+                        {t(buttonText)}
                     </button>
                 ))}
             </div>
 
             <div className={styles.content}>
-                {isProfileFavorites && <h1>Списки пользователя</h1>}
+                {isProfileFavorites && <h1>{t('favorites.userLists')}</h1>}
                 {!isCollectionsPage && <div className={styles['sort-toolbar']}>
                     <SortSelect value={sort} onChange={handleSortChange} />
                 </div>}
-                {loadError && <div className={styles.error} role="alert"><span>{loadError}</span><button type="button" onClick={() => { setLoadError(null); setRetryVersion(version => version + 1); }}>Попробовать снова</button></div>}
-                {!loadError && !isInitialLoading && activeItemsCount === 0 && <p className={styles.empty}>Здесь пока ничего нет.</p>}
+                {loadError && <div className={styles.error} role="alert"><span>{loadError}</span><button type="button" onClick={() => { setLoadError(null); setRetryVersion(version => version + 1); }}>{t('page.retry')}</button></div>}
+                {!loadError && !isInitialLoading && activeItemsCount === 0 && <p className={styles.empty}>{t('page.empty')}</p>}
                 {isCollectionsPage ? <div className={styles.collectionsGrid}>
                     {tabs.collections.collections.map(collection => <CollectionCard key={collection.id} collection={collection} />)}
                     <div ref={triggerRef} style={{ height: '20px', background: 'transparent' }} />

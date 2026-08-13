@@ -197,7 +197,7 @@ export default function DubSelectModal({ isOpen, onClose, releaseId, token, auto
                             loadSources(releaseId, dubId)
                         }}>
                             {dubsData.map((dub) => {
-                                return <option key={`dub-${dub.id}`} value={dub.id}>{dub.name} {dub.episodes_count} сер. | {dub.view_count} прос.</option>
+                                return <option key={`dub-${dub.id}`} value={dub.id}>{dub.name} {t('dubSelect.optionMeta', { episodes: dub.episodes_count, views: dub.view_count })}</option>
                             })}
                         </select>
                         {(sourcesData.length > 0 || isSourcesLoading) && (

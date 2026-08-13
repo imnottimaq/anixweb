@@ -493,8 +493,7 @@ a.profile-comment-context:focus-visible { outline: var(--focus-ring); outline-of
   animation: loader-spin 780ms linear infinite;
 }
 
-.loading-overlay::after {
-  content: 'Загрузка';
+.loading-overlay > [role='status'] {
   position: absolute;
   top: calc(50% + 33px);
   color: var(--text-color);
@@ -567,7 +566,7 @@ a.profile-comment-context:focus-visible { outline: var(--focus-ring); outline-of
   .user-socials a,
   .loading-overlay,
   .loading-overlay::before,
-  .loading-overlay::after {
+  .loading-overlay > [role='status'] {
     animation: none;
     transition: none;
   }

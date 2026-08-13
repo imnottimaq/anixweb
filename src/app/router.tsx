@@ -1,6 +1,7 @@
 import { Suspense, type ReactNode } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 import RootLayout from './RootLayout';
+import RouteLoader from '../components/RouteLoader';
 
 import { HomepageScreen, OverviewScreen, FavoritesScreen, ReleaseScreen, PlayerScreen, FranchiseScreen,
     AccountScreen, EditAccountScreen, LoginScreen, RecoverScreen, NewAccountScreen, RandomAnime, SettingsScreen,
@@ -10,7 +11,7 @@ import { HomepageScreen, OverviewScreen, FavoritesScreen, ReleaseScreen, PlayerS
 import CollectionsScreen from '../pages/CollectionsScreen';
 
 function lazyPage(page: ReactNode) {
-    return <Suspense fallback={<div className="route-loader" role="status">Загрузка…</div>}>{page}</Suspense>;
+    return <Suspense fallback={<RouteLoader />}>{page}</Suspense>;
 }
 
 const basename = import.meta.env.BASE_URL === '/'

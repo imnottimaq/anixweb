@@ -147,7 +147,7 @@ export default function SearchButton(){
 
     const isProfileSearch = searchScope.type === 'profiles';
     const isCollectionSearch = searchScope.type === 'collections';
-    const searchLabel = isProfileSearch ? t('search.users') : isCollectionSearch ? 'Коллекции' : t('search.anime');
+    const searchLabel = isProfileSearch ? t('search.users') : isCollectionSearch ? t('nav.collections') : t('search.anime');
     const profileResults = searchResults && 'profiles' in searchResults ? searchResults.profiles : [];
     const collectionResults = searchResults && 'collections' in searchResults ? searchResults.collections : [];
     const releaseResults = searchResults && 'releases' in searchResults ? searchResults : undefined;
@@ -247,7 +247,7 @@ export default function SearchButton(){
                                     <RemoteImage src={collection.creator.avatar} alt="" />
                                     <span>{collection.creator.login}</span>
                                 </span>
-                                <span className={styles['collection-stats']}>{collection.comment_count} комм. · {collection.favorites_count} сохранений</span>
+                                <span className={styles['collection-stats']}>{t('search.collectionStats', { comments: collection.comment_count, favorites: collection.favorites_count })}</span>
                             </span>
                         </button>)}
                     </div>}

@@ -4,19 +4,20 @@ import { PageHeader, PageLayout } from '../components/PageLayout';
 import Toggle from '../components/Toggle';
 import { Modal } from '../modals/ModalTemplate';
 import { useApi } from '../shared/apiClient';
+import { useTranslation } from '../shared/useTranslation';
 import { useSettings } from '../shared/contexts/settingsContext';
 import type { Dub } from '../modals/DubSelectModal';
 import type { NotificationsPreferencesAPIResponse } from '../shared/types/api';
 import styles from './NotificationSettingsScreen.module.css';
 
 const PROFILE_LISTS = [
-    { id: 'favorites', label: 'Избранное' },
-    { id: 'watching', label: 'Смотрю' },
-    { id: 'planned', label: 'В планах' },
-    { id: 'completed', label: 'Просмотрено' },
-    { id: 'hold_on', label: 'Отложено' },
-    { id: 'dropped', label: 'Брошено' },
-];
+    { id: 'favorites' },
+    { id: 'watching' },
+    { id: 'planned' },
+    { id: 'completed' },
+    { id: 'hold_on' },
+    { id: 'dropped' },
+] as const;
 
 const STATUS_TO_LIST: Record<NotificationsPreferencesAPIResponse['profileStatusNotificationPreferences'][number]['status'], string> = {
     FAVORITE_STATUS: 'favorites',
@@ -40,6 +41,7 @@ type NotificationMode = 'all' | 'selected_lists' | 'selected_releases';
 
 export default function NotificationSettingsScreen() {
     const api = useApi();
+    const { t } = useTranslation();
     const { settings, setSettings } = useSettings();
     const [isListsModalOpen, setIsListsModalOpen] = useState(false);
     const [isDubsModalOpen, setIsDubsModalOpen] = useState(false);
@@ -59,13 +61,13 @@ export default function NotificationSettingsScreen() {
     const notificationMode = settings.notifications.notificationsType;
     const selectedListsText = useMemo(() => {
         const selected = settings.notifications.selectedLists ?? [];
-        if (selected.length === 0) return 'Списки не выбраны';
-        return PROFILE_LISTS.filter(list => selected.includes(list.id)).map(list => list.label).join(', ');
-    }, [settings.notifications.selectedLists]);
+        if (selected.length === 0) return t('notificationSettings.noLists');
+        return PROFILE_LISTS.filter(list => selected.includes(list.id)).map(list => t(`notificationSettings.list.${list.id}` as const)).join(', ');
+    }, [settings.notifications.selectedLists, t]);
 
     const selectedDubsText = settings.notifications.selectedDubs?.length
         ? settings.notifications.selectedDubs.map(dub => dub.name).join(', ')
-        : 'Все варианты озвучки';
+        : t('notificationSettings.allDubs');
 
     useEffect(() => {
         if (!isDubsModalOpen || allDubs.length > 0) return;
@@ -121,7 +123,7 @@ export default function NotificationSettingsScreen() {
             updateNotifications({ notificationsType: mode, selectedLists });
             return true;
         } catch {
-            setSaveError('Не удалось сохранить выбор списков.');
+            setSaveError(t('notificationSettings.saveError'));
             return false;
         } finally {
             setSavingToggle(null);
@@ -144,7 +146,7 @@ export default function NotificationSettingsScreen() {
         setSaveError(null);
         void api.get<{ code: number }>('/profile/preference/notification/selected/releases/edit')
             .then(() => updateNotifications({ notificationsType: 'selected_releases' }))
-            .catch(() => setSaveError('Не удалось включить уведомления по выбранным релизам.'))
+            .catch(() => setSaveError(t('notificationSettings.saveError')))
             .finally(() => setSavingToggle(null));
     };
 
@@ -165,10 +167,13 @@ export default function NotificationSettingsScreen() {
 
     const toggleRemoteSetting = async (key: string, endpoint: string, update: () => void) => {
         setSavingToggle(key);
+        setSaveError(null);
 
         try {
             await api.get<{ code: number }>(endpoint);
-        } catch {
+        } catch (error) {
+            console.error('Failed to save notification setting', error);
+            setSaveError(t('notificationSettings.saveError'));
             return;
         } finally {
             setSavingToggle(null);
@@ -178,14 +183,14 @@ export default function NotificationSettingsScreen() {
     };
 
     return <PageLayout>
-        <PageHeader title="Настройки уведомлений" description="Выберите, о каких событиях вы хотите узнавать." back />
+        <PageHeader title={t('notificationSettings.title')} description={t('notificationSettings.description')} back />
 
         {saveError && <p className={styles.saveError} role="alert">{saveError}</p>}
 
-        <SettingsGroup title="Уведомления о сериях">
+        <SettingsGroup title={t('notificationSettings.episodes')}>
             <SettingToggle
-                title="Получать уведомления"
-                description="О выходе новых серий"
+                title={t('notificationSettings.receive')}
+                description={t('notificationSettings.newEpisodes')}
                 checked={settings.notifications.recieveNotifications}
                 disabled={savingToggle === 'episodes'}
                 onChange={recieveNotifications => void toggleRemoteSetting(
@@ -196,30 +201,30 @@ export default function NotificationSettingsScreen() {
             />
 
             {settings.notifications.recieveNotifications && <>
-                <div className={styles.modes} aria-label="Режим подписки на серии">
-                    <ModeCard label="Из всех моих списков" mode="all" active={notificationMode === 'all'} disabled={savingToggle === 'statuses'} onClick={() => chooseMode('all')} />
-                    <ModeCard label="Из выбранных списков" mode="selected_lists" active={notificationMode === 'selected_lists'} disabled={savingToggle === 'statuses'} onClick={() => chooseMode('selected_lists')} />
-                    <ModeCard label="По выбранным релизам" mode="selected_releases" active={notificationMode === 'selected_releases'} disabled={savingToggle === 'statuses'} onClick={() => chooseMode('selected_releases')} />
+                <div className={styles.modes} aria-label={t('notificationSettings.modeAria')}>
+                    <ModeCard label={t('notificationSettings.modeAll')} mode="all" active={notificationMode === 'all'} disabled={savingToggle === 'statuses'} onClick={() => chooseMode('all')} />
+                    <ModeCard label={t('notificationSettings.modeLists')} mode="selected_lists" active={notificationMode === 'selected_lists'} disabled={savingToggle === 'statuses'} onClick={() => chooseMode('selected_lists')} />
+                    <ModeCard label={t('notificationSettings.modeReleases')} mode="selected_releases" active={notificationMode === 'selected_releases'} disabled={savingToggle === 'statuses'} onClick={() => chooseMode('selected_releases')} />
                 </div>
 
                 {notificationMode === 'selected_lists' && <button className={styles.summaryButton} type="button" onClick={() => chooseMode('selected_lists')}>
-                    <strong>Уведомления из списков</strong>
+                    <strong>{t('notificationSettings.listsSummary')}</strong>
                     <span>{selectedListsText}</span>
                 </button>}
                 {notificationMode === 'selected_releases' && <Link className={styles.summaryButton} to="/notifications/releases">
-                    <strong>Настроить уведомления по отдельным релизам</strong>
+                    <strong>{t('notificationSettings.configureReleases')}</strong>
                 </Link>}
 
                 <button className={styles.summaryButton} type="button" onClick={() => {
                     setDraftDubs(settings.notifications.selectedDubs ?? []);
                     setIsDubsModalOpen(true);
                 }}>
-                    <strong>Уведомления от озвучек</strong>
+                    <strong>{t('notificationSettings.dubs')}</strong>
                     <span>{selectedDubsText}</span>
                 </button>
                 <SettingToggle
-                    title="Получать только одно уведомление"
-                    description="Только от одной из выбранных озвучек, которая выпустит новую серию первой"
+                    title={t('notificationSettings.onlyOne')}
+                    description={t('notificationSettings.onlyOneDescription')}
                     checked={settings.notifications.getOnlyOneNotification}
                     disabled={savingToggle === 'first-episode'}
                     onChange={getOnlyOneNotification => void toggleRemoteSetting(
@@ -231,10 +236,10 @@ export default function NotificationSettingsScreen() {
             </>}
         </SettingsGroup>
 
-        <SettingsGroup title="Уведомления о новых релизах">
+        <SettingsGroup title={t('notificationSettings.related')}>
             <SettingToggle
-                title="Получать уведомления"
-                description="Если в приложении будет добавлен связанный релиз, который находится у вас в закладках"
+                title={t('notificationSettings.receive')}
+                description={t('notificationSettings.relatedDescription')}
                 checked={settings.notifications.notificationOnRelatedRelease}
                 disabled={savingToggle === 'related-release'}
                 onChange={notificationOnRelatedRelease => void toggleRemoteSetting(
@@ -245,10 +250,10 @@ export default function NotificationSettingsScreen() {
             />
         </SettingsGroup>
 
-        <SettingsGroup title="Уведомления о комментариях">
+        <SettingsGroup title={t('notificationSettings.comments')}>
             <SettingToggle
-                title="Уведомления об ответах"
-                description="Если кто-то отвечает на ваши комментарии"
+                title={t('notificationSettings.replies')}
+                description={t('notificationSettings.repliesDescription')}
                 checked={settings.notifications.repliesNotifications}
                 disabled={savingToggle === 'comments'}
                 onChange={repliesNotifications => void toggleRemoteSetting(
@@ -258,8 +263,8 @@ export default function NotificationSettingsScreen() {
                 )}
             />
             <SettingToggle
-                title="Уведомления о комментариях своих коллекций"
-                description="Если кто-то комментирует ваши коллекции"
+                title={t('notificationSettings.collectionComments')}
+                description={t('notificationSettings.collectionCommentsDescription')}
                 checked={settings.notifications.commentsOnCollectionNotification}
                 disabled={savingToggle === 'collection-comments'}
                 onChange={commentsOnCollectionNotification => void toggleRemoteSetting(
@@ -273,7 +278,7 @@ export default function NotificationSettingsScreen() {
         <Modal
             isOpen={isListsModalOpen}
             onClose={() => setIsListsModalOpen(false)}
-            title="Выберите списки"
+            title={t('notificationSettings.selectLists')}
             stickyHeader
         >
             {close => <>
@@ -286,12 +291,12 @@ export default function NotificationSettingsScreen() {
                                 ? previous.filter(id => id !== list.id)
                                 : [...previous, list.id])}
                         />
-                        <span>{list.label}</span>
+                        <span>{t(`notificationSettings.list.${list.id}` as const)}</span>
                     </label>)}
                 </div>
                 <div className={styles.modalActions}>
-                    <button type="button" onClick={close}>Отмена</button>
-                    <button className={styles.primaryAction} type="button" disabled={savingToggle === 'statuses'} onClick={() => void saveLists().then(saved => { if (saved) close(); })}>Выбрать</button>
+                    <button type="button" onClick={close}>{t('notificationSettings.cancel')}</button>
+                    <button className={styles.primaryAction} type="button" disabled={savingToggle === 'statuses'} onClick={() => void saveLists().then(saved => { if (saved) close(); })}>{t('notificationSettings.select')}</button>
                 </div>
             </>}
         </Modal>
@@ -299,7 +304,7 @@ export default function NotificationSettingsScreen() {
         <Modal
             isOpen={isDubsModalOpen}
             onClose={() => setIsDubsModalOpen(false)}
-            title="Выберите озвучки"
+            title={t('notificationSettings.selectDubs')}
             stickyHeader
         >
             {close => <>
@@ -314,11 +319,11 @@ export default function NotificationSettingsScreen() {
                         />
                         <span>{dub.name}</span>
                     </label>)}
-                    {allDubs.length === 0 && <p className={styles.empty}>Не удалось загрузить варианты озвучки.</p>}
+                    {allDubs.length === 0 && <p className={styles.empty}>{t('notificationSettings.dubsError')}</p>}
                 </div>
                 <div className={styles.modalActions}>
-                    <button type="button" onClick={close}>Отмена</button>
-                    <button className={styles.primaryAction} type="button" onClick={() => void saveDubs().then(saved => { if (saved) close(); })}>Выбрать</button>
+                    <button type="button" onClick={close}>{t('notificationSettings.cancel')}</button>
+                    <button className={styles.primaryAction} type="button" onClick={() => void saveDubs().then(saved => { if (saved) close(); })}>{t('notificationSettings.select')}</button>
                 </div>
             </>}
         </Modal>

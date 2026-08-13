@@ -33,8 +33,7 @@
     animation: loader-spin 780ms linear infinite;
 }
 
-.loading-overlay::after {
-    content: 'Загрузка';
+.loading-overlay > span {
     position: absolute;
     top: calc(50% + 33px);
     color: var(--text-color);

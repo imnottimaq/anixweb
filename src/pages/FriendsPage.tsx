@@ -9,23 +9,21 @@ import { useUser } from '../shared/contexts/userContext';
 import type { PagedResponse, Profile } from '../shared/types/api';
 import { useAsyncLoad } from '../shared/useAsyncLoad';
 import styles from './FriendsPage.module.css';
+import { useTranslation } from '../shared/useTranslation';
 
 type FriendsTab = 'friends' | 'incoming' | 'outgoing';
 type ConfirmAction = 'removeFriend' | 'cancelRequest' | 'declineRequest';
 
 type FriendsData = Record<FriendsTab, PagedResponse<Profile>>;
 
-const tabs: Array<{ value: FriendsTab; label: string }> = [
-    { value: 'friends', label: 'Друзья' },
-    { value: 'incoming', label: 'Входящие' },
-    { value: 'outgoing', label: 'Отправленные' },
-];
+const tabKeys: Record<FriendsTab, 'friends.tab.friends' | 'friends.tab.incoming' | 'friends.tab.outgoing'> = { friends: 'friends.tab.friends', incoming: 'friends.tab.incoming', outgoing: 'friends.tab.outgoing' };
 
 const emptyPage: PagedResponse<Profile> = { code: 0, content: [], total_count: 0, total_page_count: 0, current_page: 0 };
 const emptyData: FriendsData = { friends: emptyPage, incoming: emptyPage, outgoing: emptyPage };
 
 export default function FriendsPage() {
     const api = useApi();
+    const { t, formatNumber, selectPlural } = useTranslation();
     const { userId, userToken } = useUser();
     const { profileId: profileIdParam } = useParams<{ profileId: string }>();
     const navigate = useNavigate();
@@ -59,7 +57,8 @@ export default function FriendsPage() {
 
     const currentPage = data[activeTab];
     const profiles = currentPage.content ?? [];
-    const currentTabLabel = useMemo(() => tabs.find(tab => tab.value === activeTab)?.label.toLowerCase() ?? '', [activeTab]);
+    const tabs = useMemo(() => (Object.keys(tabKeys) as FriendsTab[]).map(value => ({ value, label: t(tabKeys[value]) })), [t]);
+    const currentTabLabel = t(tabKeys[activeTab]).toLocaleLowerCase();
 
     const runAction = async (profile: Profile, action: ConfirmAction | 'acceptRequest') => {
         if (pendingProfileId !== null) return;
@@ -78,7 +77,8 @@ export default function FriendsPage() {
             setActionProfile(null);
             reload();
         } catch (requestError) {
-            setActionError(requestError instanceof Error ? requestError.message : 'Не удалось обновить список друзей.');
+            console.error('Friend action failed:', requestError);
+            setActionError(t('friends.actionError'));
         } finally {
             setPendingProfileId(null);
         }
@@ -92,29 +92,29 @@ export default function FriendsPage() {
 
     if (!userToken || !userId) {
         return <PageLayout>
-            <PageHeader title="Друзья" back />
-            <PageState status="empty" message="Войдите в аккаунт, чтобы увидеть друзей и заявки." />
-            <button type="button" className={styles.loginButton} onClick={() => navigate('/account/login')}>Войти</button>
+            <PageHeader title={t('friends.title')} back />
+            <PageState status="empty" message={t('friends.signInRequired')} />
+            <button type="button" className={styles.loginButton} onClick={() => navigate('/account/login')}>{t('auth.login')}</button>
         </PageLayout>;
     }
 
     if (!isValidProfileId) {
         return <PageLayout>
-            <PageHeader title="Друзья" back />
-            <PageState status="error" message="Профиль не найден." />
+            <PageHeader title={t('friends.title')} back />
+            <PageState status="error" message={t('account.notFound')} />
         </PageLayout>;
     }
 
-    if (isLoading && !loadedData) return <PageLayout><PageHeader title="Друзья" back /><PageState status="loading" message="Загружаем друзей…" /></PageLayout>;
-    if (error && !loadedData) return <PageLayout><PageHeader title="Друзья" back /><PageState status="error" message="Не удалось загрузить друзей." onRetry={reload} /></PageLayout>;
+    if (isLoading && !loadedData) return <PageLayout><PageHeader title={t('friends.title')} back /><PageState status="loading" message={t('friends.loading')} /></PageLayout>;
+    if (error && !loadedData) return <PageLayout><PageHeader title={t('friends.title')} back /><PageState status="error" message={t('friends.loadError')} onRetry={reload} /></PageLayout>;
 
     return <PageLayout className={styles.page}>
         <PageHeader
-            title={isOwnProfile ? 'Друзья' : 'Друзья пользователя'}
-            description={isOwnProfile ? 'Ваши друзья и заявки в друзья' : 'Публичный список друзей профиля'}
+            title={isOwnProfile ? t('friends.title') : t('friends.userTitle')}
+            description={isOwnProfile ? t('friends.description') : t('friends.userDescription')}
             back
             actions={<>
-                {isOwnProfile && <div className={styles.tabs} role="tablist" aria-label="Список друзей">
+                {isOwnProfile && <div className={styles.tabs} role="tablist" aria-label={t('friends.listAria')}>
                     {tabs.map(tab => <button
                         type="button"
                         role="tab"
@@ -127,20 +127,21 @@ export default function FriendsPage() {
                         {tab.value !== 'friends' && data[tab.value].total_count > 0 && <span>{data[tab.value].total_count}</span>}
                     </button>)}
                 </div>}
-                <span className={styles.total}>{data.friends.total_count} {pluralFriends(data.friends.total_count)}</span>
+                <span className={styles.total}>{t(`friends.count.${selectPlural(data.friends.total_count)}` as 'friends.count.one', { count: formatNumber(data.friends.total_count) })}</span>
             </>}
         />
 
-        {Boolean(error) && <div className={styles.inlineError} role="alert">Не удалось обновить часть списка. <button type="button" onClick={reload}>Повторить</button></div>}
+        {Boolean(error) && <div className={styles.inlineError} role="alert">{t('friends.partialError')} <button type="button" onClick={reload}>{t('page.retry')}</button></div>}
         {actionError && <div className={styles.inlineError} role="alert">{actionError}</div>}
 
         {profiles.length === 0 ? <PageState
             status="empty"
             message={activeTab === 'friends'
-                ? isOwnProfile ? 'У вас пока нет друзей.' : 'У пользователя пока нет друзей.'
-                : `Заявок во вкладке «${currentTabLabel}» нет.`}
+                ? isOwnProfile ? t('friends.emptyOwn') : t('friends.emptyUser')
+                : t('friends.emptyTab', { tab: currentTabLabel })}
             /> : <div className={styles.list}>
             {profiles.map(profile => <FriendCard
+                t={t}
                 key={profile.id}
                 profile={profile}
                 tab={activeTab}
@@ -150,40 +151,40 @@ export default function FriendsPage() {
             />)}
         </div>}
 
-        {currentPage.total_page_count > 0 && <div className={styles.pagination} aria-label="Навигация по страницам">
+        {currentPage.total_page_count > 0 && <div className={styles.pagination} aria-label={t('friends.paginationAria')}>
             <button
                 type="button"
                 disabled={isLoading || currentPage.current_page <= 0}
                 onClick={() => setPages(previous => ({ ...previous, [activeTab]: Math.max(0, currentPage.current_page - 1) }))}
-            >Назад</button>
+            >{t('page.back')}</button>
             <span>{currentPage.current_page + 1} / {currentPage.total_page_count + 1}</span>
             <button
                 type="button"
                 disabled={isLoading || currentPage.current_page >= currentPage.total_page_count}
                 onClick={() => setPages(previous => ({ ...previous, [activeTab]: currentPage.current_page + 1 }))}
-            >Далее</button>
+            >{t('friends.next')}</button>
         </div>}
 
         <Modal
             isOpen={Boolean(actionProfile && confirmAction)}
             onClose={() => { setActionProfile(null); setConfirmAction(null); }}
-            title={confirmAction === 'removeFriend' ? 'Удалить из друзей?' : confirmAction === 'cancelRequest' ? 'Отменить заявку?' : 'Отклонить заявку?'}
+            title={t(confirmAction === 'removeFriend' ? 'friends.removeTitle' : confirmAction === 'cancelRequest' ? 'friends.cancelTitle' : 'friends.declineTitle')}
         >
             {close => <div className={styles.confirmContent}>
                 <p>{confirmAction === 'removeFriend'
-                    ? `${actionProfile?.login} будет удалён(а) из списка друзей.`
+                    ? t('friends.removeConfirm', { login: actionProfile?.login })
                     : confirmAction === 'cancelRequest'
-                        ? `Пользователь ${actionProfile?.login} больше не увидит вашу заявку.`
-                        : `Заявка от ${actionProfile?.login} будет отклонена.`}</p>
+                        ? t('friends.cancelConfirm', { login: actionProfile?.login })
+                        : t('friends.declineConfirm', { login: actionProfile?.login })}</p>
                 <div className={styles.confirmActions}>
-                    <button type="button" onClick={close}>Назад</button>
+                    <button type="button" onClick={close}>{t('page.back')}</button>
                     <button
                         type="button"
                         className={styles.dangerButton}
                         disabled={!actionProfile || pendingProfileId !== null}
                         onClick={() => actionProfile && confirmAction && void runAction(actionProfile, confirmAction)}
                     >
-                        {pendingProfileId !== null ? 'Загрузка…' : confirmAction === 'removeFriend' ? 'Удалить' : confirmAction === 'cancelRequest' ? 'Отменить заявку' : 'Отклонить'}
+                        {pendingProfileId !== null ? t('page.loading') : t(confirmAction === 'removeFriend' ? 'misc.remove' : confirmAction === 'cancelRequest' ? 'friends.cancelRequest' : 'friends.decline')}
                     </button>
                 </div>
             </div>}
@@ -196,38 +197,30 @@ type FriendCardProps = {
     tab: FriendsTab;
     isPending: boolean;
     onAccept?: () => void;
+    t: ReturnType<typeof useTranslation>['t'];
     onConfirm?: (profile: Profile, action: ConfirmAction) => void;
 };
 
-function FriendCard({ profile, tab, isPending, onAccept, onConfirm }: FriendCardProps) {
+function FriendCard({ profile, tab, isPending, onAccept, onConfirm, t }: FriendCardProps) {
     return <article className={styles.card}>
         <Link to={`/account/${profile.id}`} className={styles.profileLink}>
             <div className={styles.avatar}>
                 <RemoteImage src={profile.avatar} alt="" />
-                {profile.is_online && <span className={styles.online} title="В сети" />}
+                {profile.is_online && <span className={styles.online} title={t('friends.online')} />}
             </div>
             <div className={styles.profileInfo}>
                 <strong>{profile.login}</strong>
                 {profile.status && <span>{profile.status}</span>}
-                {profile.is_online && <small>В сети</small>}
+                {profile.is_online && <small>{t('friends.online')}</small>}
             </div>
         </Link>
         <div className={styles.cardActions}>
-            {tab === 'friends' && onConfirm && <button type="button" disabled={isPending} onClick={() => onConfirm(profile, 'removeFriend')}>Удалить</button>}
-            {tab === 'outgoing' && onConfirm && <button type="button" disabled={isPending} onClick={() => onConfirm(profile, 'cancelRequest')}>Отменить заявку</button>}
+            {tab === 'friends' && onConfirm && <button type="button" disabled={isPending} onClick={() => onConfirm(profile, 'removeFriend')}>{t('misc.remove')}</button>}
+            {tab === 'outgoing' && onConfirm && <button type="button" disabled={isPending} onClick={() => onConfirm(profile, 'cancelRequest')}>{t('friends.cancelRequest')}</button>}
             {tab === 'incoming' && onAccept && onConfirm && <>
-                <button type="button" className={styles.acceptButton} disabled={isPending} onClick={onAccept}>{isPending ? 'Загрузка…' : 'Принять'}</button>
-                <button type="button" disabled={isPending} onClick={() => onConfirm(profile, 'declineRequest')}>Отклонить</button>
+                <button type="button" className={styles.acceptButton} disabled={isPending} onClick={onAccept}>{isPending ? t('page.loading') : t('friends.accept')}</button>
+                <button type="button" disabled={isPending} onClick={() => onConfirm(profile, 'declineRequest')}>{t('friends.decline')}</button>
             </>}
         </div>
     </article>;
-}
-
-function pluralFriends(count: number) {
-    const remainder = count % 100;
-    if (remainder >= 11 && remainder <= 14) return 'друзей';
-    const last = count % 10;
-    if (last === 1) return 'друг';
-    if (last >= 2 && last <= 4) return 'друга';
-    return 'друзей';
 }

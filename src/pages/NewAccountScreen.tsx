@@ -27,7 +27,7 @@ export default function NewAccountScreen() {
             <h2>{t('auth.registerTitle')}</h2>
             <div className={styles['form-container']}>
                 
-                {errorMsg && <p className={styles.error}>{errorMsg}</p>}
+                {errorMsg && <p className={styles.error} role="alert">{errorMsg}</p>}
                 <div className={styles['form-fields']}>
                         <input 
                             type="text"
@@ -82,7 +82,8 @@ export default function NewAccountScreen() {
                                 email,
                                 password,
                                 setHash, 
-                                setErrorMsg
+                                setErrorMsg,
+                                t('auth.codeRequestError')
                             )} 
                             disabled={isCodeRequestDisabled}
                         >
@@ -100,7 +101,9 @@ export default function NewAccountScreen() {
                                 code,
                                 setUserToken,
                                 setUserId,
-                                setErrorMsg
+                                setErrorMsg,
+                                t('auth.registrationError'),
+                                t('auth.registrationSuccess')
                             )}
                             disabled={!hash || !code}
                         >
@@ -118,7 +121,8 @@ async function handleCreateFirstStage(
     email: string,
     password: string, 
     setHash: (hash: string) => void,
-    setErrorMsg: (msg: string) => void
+    setErrorMsg: (msg: string) => void,
+    errorMessage: string
 ) {
     setErrorMsg("");
     try {
@@ -131,7 +135,7 @@ async function handleCreateFirstStage(
         const rawText = await response.text();
 
         if (!rawText) {
-            setErrorMsg("Сервер прислал пустой ответ");
+            setErrorMsg(errorMessage);
             return;
         }
 
@@ -142,7 +146,7 @@ async function handleCreateFirstStage(
     } catch (err: unknown) {
         if (err instanceof Error){
             console.error(err);
-            setErrorMsg(err.message || "Не удалось отправить код");
+            setErrorMsg(errorMessage);
         } else {
             console.error("An unexpected error happened: ", String(err))
         }
@@ -157,7 +161,9 @@ async function handleCreateSecondStage(
     code: string, 
     setUserToken: (token: string) => void,
     setUserId: (id: number) => void,
-    setErrorMsg: (msg: string) => void
+    setErrorMsg: (msg: string) => void,
+    errorMessage: string,
+    successMessage: string
 ) {
     setErrorMsg("");
     try {
@@ -174,12 +180,12 @@ async function handleCreateSecondStage(
             setUserToken(data.profileToken.token);
             const profileId = await resolveAndStoreProfileIdentity(username);
             setUserId(profileId ?? data.profileToken.id);
-            alert("Аккаунт успешно создан! Вы вошли в аккаунт.");
+            alert(successMessage);
         }
     } catch (err: unknown) {
         if (err instanceof Error){
             console.error(err);
-            setErrorMsg(err.message || "Не удалось отправить код");
+            setErrorMsg(errorMessage);
         } else {
             console.error("An unexpected error happened: ", String(err))
         }

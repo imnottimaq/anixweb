@@ -63,7 +63,7 @@ export default function RootLayout() {
           ref={menuButtonRef}
           type="button"
           className={styles['menu-toggle']}
-          aria-label="Меню"
+          aria-label={t('nav.menu')}
           aria-expanded={isMenuOpen}
           aria-controls="primary-navigation"
           onClick={() => setIsMenuOpen(open => !open)}
@@ -72,21 +72,21 @@ export default function RootLayout() {
           <span aria-hidden="true" />
           <span aria-hidden="true" />
         </button>
-        <nav id="primary-navigation" className={`${styles.navigation} ${isMenuOpen ? styles.open : ''}`} aria-label="Основная навигация" onClick={() => setIsMenuOpen(false)}>
+        <nav id="primary-navigation" className={`${styles.navigation} ${isMenuOpen ? styles.open : ''}`} aria-label={t('nav.primary')} onClick={() => setIsMenuOpen(false)}>
           <NavLink to="/" end className={navClassName}>{t('nav.home')}</NavLink>
           <NavLink to="/overview" className={navClassName}>{t('nav.overview')}</NavLink>
           <NavLink to="/favorites" className={navClassName}>{t('nav.favorites')}</NavLink>
           <NavLink to="/account" className={navClassName}>{t('nav.account')}</NavLink>
-          <NavLink to="/collections" className={navClassName}>Коллекции</NavLink>
-          <NavLink to="/together" className={navClassName}>Смотреть вместе</NavLink>
+          <NavLink to="/collections" className={navClassName}>{t('nav.collections')}</NavLink>
+          <NavLink to="/together" className={navClassName}>{t('nav.watchTogether')}</NavLink>
         </nav>
         <SearchBar />
         {activeRoomId && <Link
           to={`/together/${activeRoomId}`}
           className={styles['room-indicator']}
-          title="Вы в комнате — вернуться"
-          aria-label="Вы в комнате — вернуться"
-        ><span className={styles['room-status']} /><img src={UsersIcon} alt="" /><span className={styles['room-label']}>В комнате</span></Link>}
+          title={t('room.return')}
+          aria-label={t('room.return')}
+        ><span className={styles['room-status']} /><img src={UsersIcon} alt="" /><span className={styles['room-label']}>{t('room.inRoom')}</span></Link>}
         <NavLink
           to="/settings"
           className={({ isActive }) => `${styles['theme-toggle']} ${styles['settings-link']} ${isActive ? styles.active : ''}`}
@@ -98,8 +98,8 @@ export default function RootLayout() {
         <NavLink
           to="/notifications"
           className={({ isActive }) => `${styles['theme-toggle']} ${styles['notifications-link']} ${isActive ? styles.active : ''}`}
-          aria-label="Уведомления"
-          title="Уведомления"
+          aria-label={t('nav.notifications')}
+          title={t('nav.notifications')}
         >
           <img src={NotificationsIcon} alt="" />
         </NavLink>
@@ -115,7 +115,7 @@ export default function RootLayout() {
         text={t('modal.unofficialClientNotice')}
         actions={[
           {
-            label: 'Change language to English',
+            label: t('modal.changeLanguage'),
             variant: 'secondary',
             onClick: changeLanguageToEnglish
           },

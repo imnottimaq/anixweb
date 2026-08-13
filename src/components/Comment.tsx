@@ -25,7 +25,7 @@ export interface CommentProps {
 }
 
 export default function CommentComponent({ comment, releaseId, onReply, onEdit, variant = 'release', newReply, editedComment, onDelete }: CommentProps) {
-    const { t } = useTranslation();
+    const { t, formatDate, selectPlural } = useTranslation();
     const api = useApi();
     const navigate = useNavigate();
     const [isRepliesShown, setIsRepliesShown] = useState(false);
@@ -140,7 +140,7 @@ export default function CommentComponent({ comment, releaseId, onReply, onEdit, 
                     <div className={styles['author-line']}>
                         <strong onClick={() => navigate(`/account/${comment.profile.id}`)}>{comment.profile.login}</strong>
                         {comment.profile.is_verified && <img src={verifiedBadge} className={styles['verified-badge']} alt="" />}
-                        <time>{formatCustomDate(comment.timestamp)}</time>
+                        <time>{formatCommentDate(comment.timestamp, formatDate, t('date.invalid'))}</time>
                     </div>
                     <button type="button" className={styles['reply-button']} onClick={() => onReply?.(comment)}>
                         <img src={replyIcon} className={styles['arrow']} alt="" />
@@ -202,7 +202,7 @@ export default function CommentComponent({ comment, releaseId, onReply, onEdit, 
                         {isLoading ? t('misc.loading') : (
                             <>
                                 {isRepliesShown ? `${t('comments.hideReplies')} ` : `${t('comments.showReplies')} `}
-                                {replyCount} {getPluralReplies(replyCount)}
+                                {replyCount} {t(`comments.showReplies${selectPlural(replyCount) === 'one' ? '1' : selectPlural(replyCount) === 'few' ? '2' : '5'}`)}
                             </>
                         )}
                     </p>
@@ -248,35 +248,14 @@ export default function CommentComponent({ comment, releaseId, onReply, onEdit, 
     )
 }
 
-function getPluralReplies(count: number): string {
-    const absCount = Math.abs(count) % 100;
-    const lastDigit = absCount % 10;
 
-    if (absCount > 10 && absCount < 20) return 'ответов';
-    if (lastDigit > 1 && lastDigit < 5) return 'ответа';
-    if (lastDigit === 1) return 'ответ';
-    return 'ответов';
-}
-
-function formatCustomDate(dateInput: Date | string | number): string {
-    let date: Date;
-
-    if (typeof dateInput === 'number') {
-        const isSeconds = dateInput.toString().length <= 10;
-        date = new Date(isSeconds ? dateInput * 1000 : dateInput);
-    } else date = new Date(dateInput);
-
-    if (isNaN(date.getTime())) return 'Некорректная дата';
-
-    const currentYear = new Date().getFullYear();
-    const options: Intl.DateTimeFormatOptions = { 
-        month: 'long', 
-        day: 'numeric' 
-    };
-    
-    if (date.getFullYear() !== currentYear) options.year = 'numeric';
-    
-    return new Intl.DateTimeFormat('ru-RU', options).format(date);
+function formatCommentDate(dateInput: Date | string | number, formatDate: (value: Date | number | string, options?: Intl.DateTimeFormatOptions) => string, invalidLabel: string): string {
+    const isSeconds = typeof dateInput === 'number' && dateInput.toString().length <= 10;
+    const date = new Date(isSeconds ? dateInput * 1000 : dateInput);
+    if (Number.isNaN(date.getTime())) return invalidLabel;
+    const options: Intl.DateTimeFormatOptions = { month: 'long', day: 'numeric' };
+    if (date.getFullYear() !== new Date().getFullYear()) options.year = 'numeric';
+    return formatDate(date, options);
 }
 
 function getVoteScore(vote: number): number {

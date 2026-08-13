@@ -10,6 +10,7 @@ import { useSettings } from '../shared/contexts/settingsContext';
 import type { Anime, Filter } from '../shared/types/api';
 import { useAsyncLoad } from '../shared/useAsyncLoad';
 import styles from './FilterSearchScreen.module.css';
+import { useTranslation } from '../shared/useTranslation';
 
 const FILTER_STORAGE_KEY = 'release_search_filters';
 
@@ -50,6 +51,7 @@ function readSavedFilter(): Filter {
 
 export default function FilterSearchScreen() {
     const api = useApi();
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
     const { settings } = useSettings();
@@ -74,15 +76,15 @@ export default function FilterSearchScreen() {
 
     return <PageLayout className={styles.page} size="wide">
         <PageHeader
-            title="Поиск по фильтрам"
-            description="Подберите релизы по жанру, году, статусу и другим параметрам."
-            actions={<button type="button" className={styles.changeButton} onClick={() => setIsFilterModalOpen(true)}>Изменить фильтры</button>}
+            title={t('filterSearch.title')}
+            description={t('filterSearch.description')}
+            actions={<button type="button" className={styles.changeButton} onClick={() => setIsFilterModalOpen(true)}>{t('filterSearch.change')}</button>}
         />
 
-        {!hasSearched && <PageState status="empty" message="Настройте фильтры, чтобы начать поиск." />}
-        {isLoading && <PageState status="loading" message="Ищем релизы…" />}
-        {!isLoading && Boolean(error) && <PageState status="error" message={`Не удалось загрузить релизы: ${error instanceof Error ? error.message : 'неизвестная ошибка'}`} onRetry={reload} />}
-        {hasSearched && !isLoading && !error && results.length === 0 && <PageState status="empty" message="По выбранным фильтрам ничего не найдено." />}
+        {!hasSearched && <PageState status="empty" message={t('filterSearch.setup')} />}
+        {isLoading && <PageState status="loading" message={t('filterSearch.loading')} />}
+        {!isLoading && Boolean(error) && <PageState status="error" message={t('filterSearch.error')} onRetry={reload} />}
+        {hasSearched && !isLoading && !error && results.length === 0 && <PageState status="empty" message={t('filterSearch.empty')} />}
         {!isLoading && results.length > 0 && <div className={`${styles.grid} ${settings.appearance.defaultCardType === 'horizontal' ? styles.horizontal : ''}`}>
             {results.map(anime => settings.appearance.defaultCardType === 'horizontal'
                 ? <AnimeCardHorizontal key={anime.id} anime={anime} />

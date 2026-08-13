@@ -203,7 +203,7 @@ export type EpisodeNotification = NotificationBase<'episode'> & {
   episode: {
     name: string;
     position: number;
-    release: { id: number; title_ru: string; image: string | null };
+    release: { id: number; title_ru: string; title_original?: string | null; image: string | null };
     source: { id: number; name: string; type: { name: string } | null };
   };
 };
@@ -231,7 +231,7 @@ export type NotificationComment = {
 };
 
 export type ReleaseNotificationComment = NotificationComment & {
-  release: { id: number; title_ru: string; image: string | null };
+  release: { id: number; title_ru: string; title_original?: string | null; image: string | null };
 };
 
 export type ReleaseCommentNotification = NotificationBase<'releaseComment'> & {

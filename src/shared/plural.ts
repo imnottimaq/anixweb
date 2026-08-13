@@ -1,9 +1,19 @@
-export function plural(value: number, one: string, few: string, many: string) {
-    const lastTwoDigits = Math.abs(value) % 100;
-    const lastDigit = lastTwoDigits % 10;
+import { getLocale, type AppLocale, type Language } from './locale';
 
-    if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return many;
-    if (lastDigit === 1) return one;
-    if (lastDigit >= 2 && lastDigit <= 4) return few;
+/** Selects a localized form while preserving the existing one/few/many API. */
+export function plural(
+    value: number,
+    one: string,
+    few: string,
+    many: string,
+    languageOrLocale: Language | AppLocale = 'russian',
+) {
+    const locale = languageOrLocale === 'russian' || languageOrLocale === 'english'
+        ? getLocale(languageOrLocale)
+        : languageOrLocale;
+    const category = new Intl.PluralRules(locale).select(value);
+
+    if (category === 'one') return one;
+    if (category === 'few') return few;
     return many;
 }

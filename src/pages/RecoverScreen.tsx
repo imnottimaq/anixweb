@@ -27,7 +27,7 @@ export default function RecoverScreen() {
             <h2>{t('auth.restoreTitle')}</h2>
             <div className={styles['form-container']}>
                 
-                {errorMsg && <p className={styles.error}>{errorMsg}</p>}
+                {errorMsg && <p className={styles.error} role="alert">{errorMsg}</p>}
                 <div className={styles['form-fields']}>
                         <input 
                             type="text"
@@ -71,7 +71,8 @@ export default function RecoverScreen() {
                             onClick={() => handleRecoverFirstStage(
                                 username, 
                                 setHash, 
-                                setErrorMsg
+                                setErrorMsg,
+                                t('auth.codeRequestError')
                             )} 
                             disabled={isCodeRequestDisabled}
                         >
@@ -88,7 +89,9 @@ export default function RecoverScreen() {
                                 code,
                                 setUserToken,
                                 setUserId,
-                                setErrorMsg
+                                setErrorMsg,
+                                t('auth.recoveryError'),
+                                t('auth.recoverySuccess')
                             )}
                             disabled={!hash || !code}
                         >
@@ -104,7 +107,8 @@ export default function RecoverScreen() {
 async function handleRecoverFirstStage(
     username: string, 
     setHash: (hash: string) => void,
-    setErrorMsg: (msg: string) => void
+    setErrorMsg: (msg: string) => void,
+    errorMessage: string
 ) {
     setErrorMsg("");
     try {
@@ -117,7 +121,7 @@ async function handleRecoverFirstStage(
         const rawText = await response.text();
 
         if (!rawText) {
-            setErrorMsg("Сервер прислал пустой ответ");
+            setErrorMsg(errorMessage);
             return;
         }
 
@@ -125,9 +129,9 @@ async function handleRecoverFirstStage(
         if (data.code !== 0) throw new Error(data.message || "Ошибка восстановления");
 
         setHash(data.hash);
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error(err);
-        setErrorMsg(err.message || "Не удалось отправить код");
+        setErrorMsg(errorMessage);
     }
 }
 
@@ -138,7 +142,9 @@ async function handleRecoverSecondStage(
     code: string, 
     setUserToken: (token: string) => void,
     setUserId: (id: number) => void,
-    setErrorMsg: (msg: string) => void
+    setErrorMsg: (msg: string) => void,
+    errorMessage: string,
+    successMessage: string
 ) {
     setErrorMsg("");
     try {
@@ -155,10 +161,10 @@ async function handleRecoverSecondStage(
             setUserToken(data.profileToken.token);
             const profileId = await resolveAndStoreProfileIdentity(username);
             setUserId(profileId ?? data.profileToken.id);
-            alert("Пароль успешно изменен! Вы вошли в аккаунт.");
+            alert(successMessage);
         }
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error(err);
-        setErrorMsg(err.message || "Ошибка при вводе кода");
+        setErrorMsg(errorMessage);
     }
 }

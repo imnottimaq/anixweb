@@ -1,5 +1,6 @@
 import type { ChangeEventHandler } from 'react';
 import styles from './Toggle.module.css';
+import { useTranslation } from '../shared/useTranslation';
 
 interface ToggleProps {
     checked: boolean;
@@ -9,10 +10,12 @@ interface ToggleProps {
     className?: string;
 }
 
-export default function Toggle({ checked, disabled = false, onChange, label = 'Переключатель', className = '' }: ToggleProps) {
+export default function Toggle({ checked, disabled = false, onChange, label, className = '' }: ToggleProps) {
+    const { t } = useTranslation();
+    const accessibleLabel = label ?? t('toggle.label');
     const handleChange: ChangeEventHandler<HTMLInputElement> = event => onChange(event.target.checked);
     return <label className={`${styles.toggle} ${className}`}>
-        <span className={styles.visuallyHidden}>{label}</span>
+        <span className={styles.visuallyHidden}>{accessibleLabel}</span>
         <input type="checkbox" checked={checked} disabled={disabled} onChange={handleChange} />
         <span className={styles.track} aria-hidden="true" />
     </label>;

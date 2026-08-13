@@ -6,6 +6,7 @@ import type { Comment, PagedResponse, Profile } from "../shared/types/api"
 import WatchlistLine from "../components/WatchlistLine"
 import { useSearchScope } from '../shared/contexts/searchContext';
 import { useTranslation } from '../shared/useTranslation';
+import { plural } from '../shared/plural';
 
 //Icons
 import TgIcon from '../assets/icons/telegram.svg'
@@ -34,7 +35,7 @@ export default function AccountScreen(){
     const {userToken, userId} = useUser()
     const api = useApi();
     const { setSearchScope } = useSearchScope();
-    const { t } = useTranslation();
+    const { t, language, formatDate, formatNumber } = useTranslation();
     const [userObject, setUserObject] = useState<Profile | null>(null);
     const [isMyProfile, setIsMyProfile] = useState<boolean | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -84,14 +85,14 @@ export default function AccountScreen(){
                 const data = await api.get<ProfileAPIResponse>(`/profile/${profileId}`);
                 const profile = data.profile;
                 setIsMyProfile(data.is_my_profile)
-                if (!profile) throw new Error('Сервер вернул профиль без данных');
+                if (!profile) throw new Error('Invalid profile response');
                 if (!isCancelled && (data.is_my_profile || profile.id === userId)) {
                     saveRoomIdentity({ id: profile.id, login: profile.login, avatar: profile.avatar ?? null });
                 }
                 if (!isCancelled) setUserObject(profile);
             } catch (error) {
                 console.error('Не удалось загрузить профиль:', error);
-                if (!isCancelled) setLoadError(error instanceof Error ? error.message : 'Не удалось загрузить профиль.');
+                if (!isCancelled) setLoadError(t('account.loadError'));
             } finally {
                 if (!isCancelled) setIsLoading(false);
             }
@@ -100,7 +101,7 @@ export default function AccountScreen(){
         void loadProfile();
 
         return () => { isCancelled = true; };
-    }, [api, profileId, userId, userToken, loadAttempt])
+    }, [api, profileId, userId, userToken, loadAttempt, t])
 
     const watchDynamic = userObject?.watch_dynamics?.slice(-10) ?? [];
     const maxValue = Math.max(...watchDynamic.map(({ count }) => count), 1);
@@ -125,7 +126,7 @@ export default function AccountScreen(){
         try {
             await api.get<{ code: number }>(endpoint);
         } catch {
-            setFriendActionError('Не удалось обновить заявку в друзья');
+            setFriendActionError(t('account.friendActionError'));
             setIsFriendActionLoading(false);
             return false;
         }
@@ -136,18 +137,18 @@ export default function AccountScreen(){
     };
 
     const getFriendActionLabel = () => {
-        if (isFriendActionLoading) return 'Загрузка…';
-        if (userObject?.friend_status === 0) return 'Отменить заявку';
-        if (userObject?.friend_status === 1) return 'Добавить в друзья';
-        if (userObject?.friend_status === 2) return 'Друзья';
-        return 'Добавить в друзья';
+        if (isFriendActionLoading) return t('page.loading');
+        if (userObject?.friend_status === 0) return t('friends.cancelRequest');
+        if (userObject?.friend_status === 1) return t('account.addFriend');
+        if (userObject?.friend_status === 2) return t('friends.title');
+        return t('account.addFriend');
     };
 
-    if (!userToken) return <PageLayout size="wide"><PageState status="loading" message="Переходим ко входу…" /></PageLayout>;
-    if (!isValidProfileId) return <PageLayout size="wide"><PageState status="error" message="Профиль не найден." /></PageLayout>;
-    if (isLoading) return <PageLayout size="wide"><PageState status="loading" message="Загружаем профиль…" /></PageLayout>;
+    if (!userToken) return <PageLayout size="wide"><PageState status="loading" message={t('account.redirecting')} /></PageLayout>;
+    if (!isValidProfileId) return <PageLayout size="wide"><PageState status="error" message={t('account.notFound')} /></PageLayout>;
+    if (isLoading) return <PageLayout size="wide"><PageState status="loading" message={t('account.loading')} /></PageLayout>;
     if (loadError || !userObject) return <PageLayout size="wide">
-        <PageState status="error" message={loadError ?? 'Профиль не найден.'} onRetry={() => setLoadAttempt(attempt => attempt + 1)} />
+        <PageState status="error" message={loadError ?? t('account.notFound')} onRetry={() => setLoadAttempt(attempt => attempt + 1)} />
     </PageLayout>;
 
     return (
@@ -162,17 +163,17 @@ export default function AccountScreen(){
                                 <div className={styles['user-info']}>
                                     <div className={styles['user-name-row']}>
                                         <p>{userObject?.login}</p>
-                                        <span className={styles['rating']} aria-label={`Рейтинг: ${userObject.rating_score}`}>{userObject.rating_score}</span>
+                                        <span className={styles['rating']} aria-label={t('account.ratingAria', { rating: formatNumber(userObject.rating_score) })}>{userObject.rating_score}</span>
                                     </div>
                                     <p>{userObject?.status}</p>
                                 </div>
                             </div>
                             <div className={styles['user-socials']}>
-                                {vkUrl && <a className={styles.vk} href={vkUrl} aria-label="Профиль ВКонтакте"><img className={styles['social-icon']} src={VkIcon} alt="" /></a>}
-                                {telegramUrl && <a className={styles.tg} href={telegramUrl} aria-label="Профиль в Telegram"><img className={styles['social-icon']} src={TgIcon} alt="" /></a>}
-                                {userObject.discord_page && <span className={styles.discord} aria-label={`Discord: ${userObject.discord_page}`}><img className={styles['social-icon']} src={DiscordIcon} alt="" /></span>}
-                                {instagramUrl && <a className={styles.inst} href={instagramUrl} aria-label="Профиль в Instagram"><img className={styles['social-icon']} src={InstIcon} alt="" /></a>}
-                                {tiktokUrl && <a className={styles.tt} href={tiktokUrl} aria-label="Профиль в TikTok"><img className={styles['social-icon']} src={TtIcon} alt="" /></a>}
+                                {vkUrl && <a className={styles.vk} href={vkUrl} aria-label={t('account.socialProfile', { network: 'VK' })}><img className={styles['social-icon']} src={VkIcon} alt="" /></a>}
+                                {telegramUrl && <a className={styles.tg} href={telegramUrl} aria-label={t('account.socialProfile', { network: 'Telegram' })}><img className={styles['social-icon']} src={TgIcon} alt="" /></a>}
+                                {userObject.discord_page && <span className={styles.discord} aria-label={t('account.socialProfileValue', { network: 'Discord', value: userObject.discord_page })}><img className={styles['social-icon']} src={DiscordIcon} alt="" /></span>}
+                                {instagramUrl && <a className={styles.inst} href={instagramUrl} aria-label={t('account.socialProfile', { network: 'Instagram' })}><img className={styles['social-icon']} src={InstIcon} alt="" /></a>}
+                                {tiktokUrl && <a className={styles.tt} href={tiktokUrl} aria-label={t('account.socialProfile', { network: 'TikTok' })}><img className={styles['social-icon']} src={TtIcon} alt="" /></a>}
                             </div>
                             <div className={styles['user-roles']}>
                                 {userObject?.roles?.map(role => {
@@ -185,7 +186,7 @@ export default function AccountScreen(){
                             </div>
                         </div>
 
-                        {isMyProfile && <button type="button" className={styles['edit-button']} onClick={() => navigate('/account/edit')}>Редактировать</button>}
+                        {isMyProfile && <button type="button" className={styles['edit-button']} onClick={() => navigate('/account/edit')}>{t('account.edit')}</button>}
                         {!isMyProfile && <div className={styles['friend-action']}>
                             <button
                                 type="button"
@@ -198,7 +199,7 @@ export default function AccountScreen(){
                             >
                                 {getFriendActionLabel()}
                             </button>
-                            {userObject?.friend_status === 1 && <span className={styles['friend-request-notice']}>Отправил(а) вам заявку в друзья</span>}
+                            {userObject?.friend_status === 1 && <span className={styles['friend-request-notice']}>{t('account.incomingRequest')}</span>}
                             {friendActionError && <span>{friendActionError}</span>}
                         </div>}
                     </div>
@@ -209,11 +210,11 @@ export default function AccountScreen(){
                             setCommentsPage(0);
                             setIsProfileCommentsOpen(true);
                         }}>
-                            <p>{userObject?.comment_count}</p>
+                            <p>{formatNumber(userObject?.comment_count ?? 0)}</p>
                             <span>{t('account.comments')}</span>
                         </button>
                         <div className={styles['stat-number']}>
-                            <p>{userObject?.video_count}</p>
+                            <p>{formatNumber(userObject?.video_count ?? 0)}</p>
                             <span>{t('account.videos')}</span>
                         </div>
                         <button
@@ -221,11 +222,11 @@ export default function AccountScreen(){
                             className={`${styles['stat-number']} ${styles['collections-stat']}`}
                             onClick={() => navigate(isMyProfile ? '/collections?view=mine' : `/collections?profileId=${userObject.id}`)}
                         >
-                            <p>{userObject?.collection_count}</p>
+                            <p>{formatNumber(userObject?.collection_count ?? 0)}</p>
                             <span>{t('account.collections')}</span>
                         </button>
                         <button type="button" className={`${styles['stat-number']} ${styles['friends-stat']}`} onClick={() => navigate(isMyProfile ? '/friends' : `/friends/${userObject.id}`)}>
-                            <p>{userObject?.friend_count}</p>
+                            <p>{formatNumber(userObject?.friend_count ?? 0)}</p>
                             <span>{t('account.friends')}</span>
                         </button>
                     </div>
@@ -244,11 +245,11 @@ export default function AccountScreen(){
                     <div className={styles['statistics-summary']}>
                         <div>
                             <span>{t('account.watchedEpisodes')}</span>
-                            <strong>{userObject?.watched_episode_count || 0}</strong>
+                            <strong>{formatNumber(userObject?.watched_episode_count || 0)}</strong>
                         </div>
                         <div>
                             <span>{t('account.watchedTime')}</span>
-                            <strong>{formatMinutes(userObject?.watched_time || 0)}</strong>
+                            <strong>{formatMinutes(userObject?.watched_time || 0, language, formatNumber, t)}</strong>
                         </div>
                     </div>
                 </div>
@@ -257,9 +258,9 @@ export default function AccountScreen(){
                     <div className={styles['chart']}>
                         {watchDynamic.map((item) => (
                             <div className={styles['column']} key={`${item.timestamp}-${item.count}`}>
-                                <span>{item.count}</span>
+                                <span>{formatNumber(item.count)}</span>
                                 <div className={styles['bar']} style={{height:`${Math.max(10, (item.count / maxValue) * 180)}px`}}/>
-                                <span className={styles['date']}>{formatTimestamp(item.timestamp)}</span>
+                                <span className={styles['date']}>{formatDate(item.timestamp * 1000, { day: 'numeric', month: 'short' })}</span>
                             </div>
                         ))}
                     </div>
@@ -269,7 +270,7 @@ export default function AccountScreen(){
                 <div>
                     <h2>{t('account.releaseRating')}</h2>
                         {userObject?.votes.map(item => 
-                        <ReleaseCard key={item.id} variant="rated" id={item.id} name={item.title_ru} 
+                        <ReleaseCard key={item.id} variant="rated" id={item.id} name={item.title_ru || item.title_original}
                             poster={item.image} 
                             grade={item.my_vote} 
                             timestamp={item.voted_at}/>
@@ -278,7 +279,7 @@ export default function AccountScreen(){
                 <div>
                     <h2>{t('account.watchedRecently')}</h2>
                         {userObject?.history.map(item => 
-                        <ReleaseCard key={item.id} variant="history" id={item.id} name={item.title_ru}
+                        <ReleaseCard key={item.id} variant="history" id={item.id} name={item.title_ru || item.title_original}
                             poster={item.image}
                             grade={item.last_view_episode?.position ?? 0}
                             timestamp={item.last_view_timestamp}
@@ -289,21 +290,21 @@ export default function AccountScreen(){
             <Modal
                 isOpen={isCancelRequestModalOpen}
                 onClose={() => setIsCancelRequestModalOpen(false)}
-                title={userObject?.friend_status === 2 ? 'Удалить из друзей?' : 'Отменить заявку в друзья?'}
+                title={userObject?.friend_status === 2 ? t('friends.removeTitle') : t('friends.cancelTitle')}
             >
                 {close => <>
                     <p className={styles['confirm-text']}>{userObject?.friend_status === 2
-                        ? 'Пользователь будет удалён из списка ваших друзей.'
-                        : 'Пользователь больше не увидит вашу заявку в друзья.'}</p>
+                        ? t('account.removeFriendConfirm')
+                        : t('account.cancelFriendConfirm')}</p>
                     <div className={styles['confirm-actions']}>
-                        <button type="button" onClick={close}>Назад</button>
+                        <button type="button" onClick={close}>{t('page.back')}</button>
                         <button
                             type="button"
                             className={styles['confirm-danger']}
                             disabled={isFriendActionLoading}
                             onClick={() => void handleFriendAction().then(isSuccess => { if (isSuccess) close(); })}
                         >
-                            {userObject?.friend_status === 2 ? 'Удалить из друзей' : 'Отменить заявку'}
+                            {userObject?.friend_status === 2 ? t('account.removeFriend') : t('friends.cancelRequest')}
                         </button>
                     </div>
                 </>}
@@ -311,20 +312,20 @@ export default function AccountScreen(){
             <Modal
                 isOpen={isProfileCommentsOpen}
                 onClose={() => setIsProfileCommentsOpen(false)}
-                title={`Комментарии ${userObject.login}`}
+                title={t('account.commentsTitle', { login: userObject.login })}
                 stickyHeader
                 contentClassName={styles['profile-comments-modal']}
                 contentStyle={{ width: 'min(1040px, calc(100vw - 32px))', maxHeight: '80vh' }}
             >
-                <div className={styles['profile-comments-tabs']} role="tablist" aria-label="Тип комментариев">
-                    <button type="button" role="tab" aria-selected={commentsTab === 'release'} className={commentsTab === 'release' ? styles.active : ''} onClick={() => { setCommentsTab('release'); setCommentsPage(0); }}>Под релизами</button>
-                    <button type="button" role="tab" aria-selected={commentsTab === 'collection'} className={commentsTab === 'collection' ? styles.active : ''} onClick={() => { setCommentsTab('collection'); setCommentsPage(0); }}>Под коллекциями</button>
+                <div className={styles['profile-comments-tabs']} role="tablist" aria-label={t('account.commentTypeAria')}>
+                    <button type="button" role="tab" aria-selected={commentsTab === 'release'} className={commentsTab === 'release' ? styles.active : ''} onClick={() => { setCommentsTab('release'); setCommentsPage(0); }}>{t('account.releaseComments')}</button>
+                    <button type="button" role="tab" aria-selected={commentsTab === 'collection'} className={commentsTab === 'collection' ? styles.active : ''} onClick={() => { setCommentsTab('collection'); setCommentsPage(0); }}>{t('account.collectionComments')}</button>
                 </div>
-                {isProfileCommentsLoading && <p className={styles['profile-comments-state']}>Загружаем комментарии…</p>}
-                {!isProfileCommentsLoading && Boolean(profileCommentsError) && <p className={styles['profile-comments-error']}>Не удалось загрузить комментарии. <button type="button" onClick={reloadProfileComments}>Повторить</button></p>}
-                {!isProfileCommentsLoading && !profileCommentsError && profileComments.length === 0 && <p className={styles['profile-comments-state']}>Комментариев пока нет.</p>}
+                {isProfileCommentsLoading && <p className={styles['profile-comments-state']}>{t('account.commentsLoading')}</p>}
+                {!isProfileCommentsLoading && Boolean(profileCommentsError) && <p className={styles['profile-comments-error']}>{t('account.commentsLoadError')} <button type="button" onClick={reloadProfileComments}>{t('page.retry')}</button></p>}
+                {!isProfileCommentsLoading && !profileCommentsError && profileComments.length === 0 && <p className={styles['profile-comments-state']}>{t('account.commentsEmpty')}</p>}
                 {!isProfileCommentsLoading && !profileCommentsError && profileComments.map(comment => <div className={styles['profile-comment']} key={comment.id}>
-                    <ProfileCommentContextLink comment={comment} variant={commentsTab} />
+                    <ProfileCommentContextLink comment={comment} variant={commentsTab} t={t} />
                     <CommentComponent
                         comment={comment}
                         variant={commentsTab === 'collection' ? 'collection' : 'release'}
@@ -332,9 +333,9 @@ export default function AccountScreen(){
                     />
                 </div>)}
                 {!isProfileCommentsLoading && !profileCommentsError && (profileCommentsData?.total_page_count ?? 0) > 0 && <div className={styles['profile-comments-pagination']}>
-                    <button type="button" disabled={commentsPage <= 0} onClick={() => setCommentsPage(page => page - 1)}>Назад</button>
+                    <button type="button" disabled={commentsPage <= 0} onClick={() => setCommentsPage(page => page - 1)}>{t('page.back')}</button>
                     <span>{commentsPage + 1} / {(profileCommentsData?.total_page_count ?? 0) + 1}</span>
-                    <button type="button" disabled={commentsPage >= (profileCommentsData?.total_page_count ?? 0)} onClick={() => setCommentsPage(page => page + 1)}>Далее</button>
+                    <button type="button" disabled={commentsPage >= (profileCommentsData?.total_page_count ?? 0)} onClick={() => setCommentsPage(page => page + 1)}>{t('friends.next')}</button>
                 </div>}
             </Modal>
         </div>
@@ -348,9 +349,10 @@ type CommentContextEntity = {
     '@id'?: number;
     title?: string;
     title_ru?: string;
+    title_original?: string;
 };
 
-function ProfileCommentContextLink({ comment, variant }: { comment: Comment; variant: 'release' | 'collection' }) {
+function ProfileCommentContextLink({ comment, variant, t }: { comment: Comment; variant: 'release' | 'collection'; t: ReturnType<typeof useTranslation>['t'] }) {
     const contextualComment = comment as Comment & {
         collection?: CommentContextEntity | number;
         release_id?: number;
@@ -362,12 +364,12 @@ function ProfileCommentContextLink({ comment, variant }: { comment: Comment; var
         ? entity
         : entityObject?.id ?? entityObject?.['@id'] ?? (variant === 'release' ? contextualComment.release_id : contextualComment.collection_id);
     const entityId = Number(rawId);
-    const title = entityObject?.title_ru ?? entityObject?.title;
-    const entityLabel = variant === 'release' ? 'релизу' : 'коллекции';
+    const title = entityObject?.title_ru || entityObject?.title_original || entityObject?.title;
+    const entityLabel = variant === 'release' ? t('account.releaseDative') : t('account.collectionDative');
     const route = variant === 'release' ? `/anime/${entityId}` : `/collection/${entityId}`;
     const content = <>
-        <span>Комментарий к {entityLabel}</span>
-        <strong>{title || (variant === 'release' ? 'Открыть релиз' : 'Открыть коллекцию')}</strong>
+        <span>{t('account.commentTo', { entity: entityLabel })}</span>
+        <strong>{title || (variant === 'release' ? t('account.openRelease') : t('account.openCollection'))}</strong>
     </>;
 
     return Number.isInteger(entityId) && entityId > 0
@@ -375,16 +377,12 @@ function ProfileCommentContextLink({ comment, variant }: { comment: Comment; var
         : <div className={styles['profile-comment-context']}>{content}</div>;
 }
 
-function formatMinutes(totalMinutes:number) {
+function formatMinutes(totalMinutes: number, language: 'russian' | 'english', formatNumber: (value: number) => string, t: ReturnType<typeof useTranslation>['t']) {
   const days = Math.floor(totalMinutes / 1_440);
   const hours = Math.floor((totalMinutes % 1_440) / 60);
-
-  return `~${days} дней ${hours} часов`;
-}
-
-function formatTimestamp(timestamp: number){
-    const dateObj = new Date(timestamp * 1000)
-    return `${dateObj.getDate()}.${dateObj.getMonth() + 1}`
+  const dayLabel = plural(days, t('account.day.one'), t('account.day.few'), t('account.day.many'), language);
+  const hourLabel = plural(hours, t('account.hour.one'), t('account.hour.few'), t('account.hour.many'), language);
+  return t('account.approximateTime', { days: formatNumber(days), dayLabel, hours: formatNumber(hours), hourLabel });
 }
 
 type SocialPlatform = 'vk' | 'telegram' | 'instagram' | 'tiktok';

@@ -138,7 +138,8 @@ export default function ReleaseScreen(){
             setMyCollections(collections);
         } catch (error) {
             setMyCollections([]);
-            setCollectionActionError(error instanceof Error ? error.message : 'Не удалось загрузить ваши коллекции.');
+            console.error('Failed to load collections:', error);
+            setCollectionActionError(t('release.collectionsLoadError'));
         } finally {
             setIsCollectionsLoading(false);
         }
@@ -152,11 +153,12 @@ export default function ReleaseScreen(){
         setCollectionActionNotice(null);
         try {
             await api.getViaAgent<{ code: number }>(`/collectionMy/release/add/${collection.id}?release_id=${animeData.id}`);
-            setCollectionActionNotice(`Релиз добавлен в коллекцию «${collection.title}».`);
+            setCollectionActionNotice(t('release.collectionAdded', { title: collection.title }));
         } catch (error) {
+            console.error('Failed to add release to collection:', error);
             setCollectionActionError(error instanceof Error && error.message === 'API error: 5'
-                ? 'Этот релиз уже есть в коллекции.'
-                : error instanceof Error ? error.message : 'Не удалось добавить релиз в коллекцию.');
+                ? t('release.alreadyInCollection')
+                : t('release.collectionAddError'));
         } finally {
             setCollectionActionId(null);
         }
@@ -185,7 +187,8 @@ export default function ReleaseScreen(){
             setSelectedNotificationDubIds(selectedIds);
             setReleaseNotificationMode(selectedIds.length === 0 ? 'none' : hasEveryDub ? 'all_dubs' : 'selected_dubs');
         } catch (error) {
-            setNotificationSettingsError(error instanceof Error ? error.message : 'Не удалось загрузить настройки уведомлений.');
+            console.error('Failed to load release notification settings:', error);
+            setNotificationSettingsError(t('release.notificationsLoadError'));
         } finally {
             setIsNotificationSettingsLoading(false);
         }
@@ -209,7 +212,8 @@ export default function ReleaseScreen(){
             });
             setIsReleaseNotificationsOpen(false);
         } catch (error) {
-            setNotificationSettingsError(error instanceof Error ? error.message : 'Не удалось сохранить настройки уведомлений.');
+            console.error('Failed to save release notification settings:', error);
+            setNotificationSettingsError(t('release.notificationsSaveError'));
         } finally {
             setIsNotificationSettingsSaving(false);
         }
@@ -270,8 +274,8 @@ export default function ReleaseScreen(){
             }
             setSelectedReleaseVote(previousVote);
             setReleaseVoteError(wasRestored
-                ? 'Не удалось изменить оценку. Предыдущая оценка сохранена.'
-                : 'Не удалось изменить и восстановить оценку. Данные будут загружены заново.');
+                ? t('release.ratingChangeError')
+                : t('release.ratingRestoreError'));
             if (!wasRestored) setReleaseLoadAttempt(attempt => attempt + 1);
             console.error('Не удалось поставить оценку релизу:', error);
         } finally {
@@ -380,7 +384,7 @@ export default function ReleaseScreen(){
     }, [api, id, releaseAttemptKey, t]);
 
     if (isReleaseLoading) {
-        return <div className={styles['loading-overlay']} aria-label={t('misc.loading')} />;
+        return <div className={styles['loading-overlay']} role="status" aria-live="polite" aria-busy="true"><span>{t('misc.loading')}</span></div>;
     }
 
     if (releaseLoadError?.key === releaseAttemptKey) {
@@ -456,15 +460,15 @@ export default function ReleaseScreen(){
                         <button
                             type="button"
                             className={styles['release-quick-action']}
-                            aria-label="Добавить в коллекцию"
-                            title="Добавить в коллекцию"
+                            aria-label={t('release.addCollection')}
+                            title={t('release.addCollection')}
                             onClick={() => void openCollectionPicker()}
                         ><img src={folderPlusIcon} alt="" /></button>
                         <button
                             type="button"
                             className={styles['release-quick-action']}
-                            aria-label="Настроить уведомления"
-                            title="Настроить уведомления"
+                            aria-label={t('release.configureNotifications')}
+                            title={t('release.configureNotifications')}
                             onClick={() => void openReleaseNotifications()}
                         ><img src={bellIcon} alt="" /></button>
                     </div>
@@ -494,7 +498,7 @@ export default function ReleaseScreen(){
                     })}
                     </div>
                 </div>
-                <div className={styles['release-rating-control']} aria-label="Ваша оценка">
+                <div className={styles['release-rating-control']} aria-label={t('release.yourRating')}>
                     <div>
                         {[1, 2, 3, 4, 5].map(value => <button
                             type="button"
@@ -502,8 +506,8 @@ export default function ReleaseScreen(){
                             disabled={isReleaseVoteLoading}
                             className={value <= currentVote ? styles['release-rating-selected'] : ''}
                             onClick={() => void rateRelease(value)}
-                            aria-label={`Оценить на ${value}`}
-                            title={`${value} из 5`}
+                            aria-label={t('release.rateValue', { value })}
+                            title={t('release.ratingOutOfFive', { value })}
                                 >{value <= currentVote
                                     ? <svg className={styles['release-rating-filled']} viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.86 5.8 6.4.93-4.63 4.51 1.09 6.37L12 17.4l-5.72 3.01 1.09-6.37L2.74 9.53l6.4-.93L12 2.8Z" /></svg>
                                     : <svg className={styles['release-rating-outline']} viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.86 5.8 6.4.93-4.63 4.51 1.09 6.37L12 17.4l-5.72 3.01 1.09-6.37L2.74 9.53l6.4-.93L12 2.8Z" /></svg>
@@ -546,7 +550,7 @@ export default function ReleaseScreen(){
                     <div className={`${styles['release-details']} ${screenshots.length === 0 ? styles['release-details-no-screenshots'] : ''}`}>
                         <div className={styles['release-media']}>
                             {screenshots.length > 0 && (
-                                <div className={styles['screenshot-gallery']} aria-label="Галерея кадров">
+                                <div className={styles['screenshot-gallery']} aria-label={t('release.gallery')}>
                                     <div className={styles['screenshot-track']}>
                                         {visibleScreenshots.map((url, offset) => {
                                             const index = (activeScreenshotIndex + offset) % screenshots.length;
@@ -554,7 +558,7 @@ export default function ReleaseScreen(){
                                             return <div key={url} className={`${styles['screenshot-wrapper']} ${loadedScreenshots[url] ? styles['media-loaded'] : styles['media-loading']}`}>
                                                 <RemoteImage
                                                     src={url}
-                                                    alt={`Скриншот ${index + 1}`}
+                                                    alt={t('release.screenshotAlt', { number: index + 1 })}
                                                     className={styles['screenshot-img']}
                                                     onLoad={() => setLoadedScreenshots(previous => ({ ...previous, [url]: true }))}
                                                     onError={() => setLoadedScreenshots(previous => ({ ...previous, [url]: true }))}
@@ -563,10 +567,10 @@ export default function ReleaseScreen(){
                                         })}
                                     </div>
                                     {screenshots.length > 1 && <>
-                                        <button type="button" className={`${styles['screenshot-arrow']} ${styles['screenshot-arrow-prev']}`} aria-label="Предыдущий кадр" onClick={() => setActiveScreenshotIndex(index => (index - 1 + screenshots.length) % screenshots.length)}><img src={leftArrowIcon} alt="" /></button>
-                                        <button type="button" className={`${styles['screenshot-arrow']} ${styles['screenshot-arrow-next']}`} aria-label="Следующий кадр" onClick={() => setActiveScreenshotIndex(index => (index + 1) % screenshots.length)}><img src={rightArrowIcon} alt="" /></button>
+                                        <button type="button" className={`${styles['screenshot-arrow']} ${styles['screenshot-arrow-prev']}`} aria-label={t('release.previousScreenshot')} onClick={() => setActiveScreenshotIndex(index => (index - 1 + screenshots.length) % screenshots.length)}><img src={leftArrowIcon} alt="" /></button>
+                                        <button type="button" className={`${styles['screenshot-arrow']} ${styles['screenshot-arrow-next']}`} aria-label={t('release.nextScreenshot')} onClick={() => setActiveScreenshotIndex(index => (index + 1) % screenshots.length)}><img src={rightArrowIcon} alt="" /></button>
                                         <div className={styles['screenshot-pagination']}>
-                                            {screenshots.map((url, index) => <button key={url} type="button" className={`${styles['screenshot-dot']} ${index === activeScreenshotIndex ? styles['screenshot-dot-active'] : ''}`} aria-label={`Показать кадр ${index + 1}`} onClick={() => setActiveScreenshotIndex(index)} />)}
+                                            {screenshots.map((url, index) => <button key={url} type="button" className={`${styles['screenshot-dot']} ${index === activeScreenshotIndex ? styles['screenshot-dot-active'] : ''}`} aria-label={t('release.showScreenshot', { number: index + 1 })} onClick={() => setActiveScreenshotIndex(index)} />)}
                                         </div>
                                     </>}
                                 </div>
@@ -714,14 +718,14 @@ export default function ReleaseScreen(){
             <Modal
                 isOpen={isCollectionPickerOpen}
                 onClose={() => setIsCollectionPickerOpen(false)}
-                title="Добавить в коллекцию"
+                title={t('release.addCollection')}
                 stickyHeader
                 contentClassName={styles['collection-picker-modal']}
             >
-                <p className={styles['collection-picker-caption']}>Выберите одну из своих коллекций.</p>
+                <p className={styles['collection-picker-caption']}>{t('release.selectCollection')}</p>
                 {isCollectionsLoading && <p className={styles['collection-picker-state']}>{t('misc.loading')}</p>}
                 {!isCollectionsLoading && collectionActionError && <p className={styles['collection-picker-error']} role="alert">{collectionActionError}</p>}
-                {!isCollectionsLoading && !collectionActionError && myCollections.length === 0 && <p className={styles['collection-picker-state']}>У вас пока нет коллекций.</p>}
+                {!isCollectionsLoading && !collectionActionError && myCollections.length === 0 && <p className={styles['collection-picker-state']}>{t('release.noCollections')}</p>}
                 {!isCollectionsLoading && myCollections.length > 0 && <div className={styles['collection-picker-list']}>
                     {myCollections.map(collection => <button
                         key={collection.id}
@@ -731,8 +735,8 @@ export default function ReleaseScreen(){
                         onClick={() => void addReleaseToCollection(collection)}
                     >
                         <RemoteImage src={collection.image} alt="" />
-                        <span><strong>{collection.title}</strong><small>{collection.description || 'Без описания'}</small></span>
-                        {collectionActionId === collection.id && <em>Добавляем…</em>}
+                        <span><strong>{collection.title}</strong><small>{collection.description || t('release.noDescription')}</small></span>
+                        {collectionActionId === collection.id && <em>{t('release.addingCollection')}</em>}
                     </button>)}
                 </div>}
                 {collectionActionNotice && <p className={styles['collection-picker-notice']} role="status">{collectionActionNotice}</p>}
@@ -740,23 +744,23 @@ export default function ReleaseScreen(){
             <Modal
                 isOpen={isReleaseNotificationsOpen}
                 onClose={() => setIsReleaseNotificationsOpen(false)}
-                title="Уведомления о релизе"
+                title={t('release.notificationsTitle')}
                 contentClassName={styles['release-notifications-modal']}
             >
-                <p className={styles['release-notifications-caption']}>Выберите, когда присылать уведомление о новой серии.</p>
+                <p className={styles['release-notifications-caption']}>{t('release.notificationsCaption')}</p>
                 {isNotificationSettingsLoading && <p className={styles['collection-picker-state']}>{t('misc.loading')}</p>}
                 {!isNotificationSettingsLoading && <div className={styles['release-notification-options']}>
                     <button type="button" className={releaseNotificationMode === 'none' ? styles['release-notification-active'] : ''} onClick={() => setReleaseNotificationMode('none')}>
-                        <strong>Не получать</strong>
-                        <span>Уведомления для этого релиза отключены</span>
+                        <strong>{t('release.notificationsNone')}</strong>
+                        <span>{t('release.notificationsNoneDescription')}</span>
                     </button>
                     <button type="button" className={releaseNotificationMode === 'all_dubs' ? styles['release-notification-active'] : ''} onClick={() => setReleaseNotificationMode('all_dubs')}>
-                        <strong>От всех озвучек</strong>
-                        <span>При выходе серии в любой озвучке</span>
+                        <strong>{t('release.notificationsAll')}</strong>
+                        <span>{t('release.notificationsAllDescription')}</span>
                     </button>
                     <button type="button" className={releaseNotificationMode === 'selected_dubs' ? styles['release-notification-active'] : ''} onClick={() => setReleaseNotificationMode('selected_dubs')}>
-                        <strong>От выбранных озвучек</strong>
-                        <span>Вы сможете отметить нужные варианты озвучки</span>
+                        <strong>{t('release.notificationsSelected')}</strong>
+                        <span>{t('release.notificationsSelectedDescription')}</span>
                     </button>
                 </div>}
                 {!isNotificationSettingsLoading && releaseNotificationMode === 'selected_dubs' && <div className={styles['notification-dub-list']}>
@@ -773,8 +777,8 @@ export default function ReleaseScreen(){
                 </div>}
                 {notificationSettingsError && <p className={styles['collection-picker-error']} role="alert">{notificationSettingsError}</p>}
                 <div className={styles['release-notifications-actions']}>
-                    <button type="button" onClick={() => setIsReleaseNotificationsOpen(false)}>Отмена</button>
-                    <button type="button" disabled={isNotificationSettingsLoading || isNotificationSettingsSaving} onClick={() => void saveReleaseNotifications()}>{isNotificationSettingsSaving ? 'Сохраняем…' : 'Сохранить'}</button>
+                    <button type="button" onClick={() => setIsReleaseNotificationsOpen(false)}>{t('misc.cancel')}</button>
+                    <button type="button" disabled={isNotificationSettingsLoading || isNotificationSettingsSaving} onClick={() => void saveReleaseNotifications()}>{isNotificationSettingsSaving ? t('collection.saving') : t('collection.saveChanges')}</button>
                 </div>
             </Modal>
             {(isDubScreenOpen || roomAutoSelect) && <DubSelectModal 

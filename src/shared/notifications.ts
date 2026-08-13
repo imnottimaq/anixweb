@@ -11,6 +11,18 @@ import type {
     ReleaseNotificationsPreferencesAPIResponse,
 } from "./types/api"
 
+export type NotificationsErrorCode = 'invalid-page' | 'request-failed' | 'api-error'
+
+export class NotificationsError extends Error {
+    readonly code: NotificationsErrorCode
+
+    constructor(code: NotificationsErrorCode) {
+        super(code)
+        this.code = code
+        this.name = 'NotificationsError'
+    }
+}
+
 export async function GetAllSubscribedReleases(page: number, token: string) {
     const response = await fetch(`https://api-s.anixsekai.com/profile/preference/notification/release/all/${page}?token=${token}`)
     const data: ReleaseNotificationsPreferencesAPIResponse = await response.json()
@@ -68,19 +80,19 @@ export async function GetCollectionCommentsNotifications(page: number, token: st
 
 export async function MarkNotificationsAsRead(token: string): Promise<void> {
     const response = await fetch(`https://api-s.anixsekai.com/notification/read?token=${token}`)
-    if (!response.ok) throw new Error(`Не удалось отметить уведомления прочитанными: ${response.status}`)
+    if (!response.ok) throw new NotificationsError('request-failed')
 
     const data = await response.json() as { code: number }
-    if (data.code !== 0) throw new Error(`Не удалось отметить уведомления прочитанными: ${data.code}`)
+    if (data.code !== 0) throw new NotificationsError('api-error')
 }
 
 async function getNotifications<TResponse extends { code: number }>(type: string, page: number, token: string): Promise<TResponse> {
-    if (!Number.isInteger(page) || page < 0) throw new Error('Некорректный номер страницы уведомлений')
+    if (!Number.isInteger(page) || page < 0) throw new NotificationsError('invalid-page')
 
     const response = await fetch(`https://api-s.anixsekai.com/notification/${type}/${page}?token=${token}`)
-    if (!response.ok) throw new Error(`Не удалось загрузить уведомления: ${response.status}`)
+    if (!response.ok) throw new NotificationsError('request-failed')
 
     const data = await response.json() as TResponse
-    if (data.code !== 0) throw new Error(`Не удалось загрузить уведомления: ${data.code}`)
+    if (data.code !== 0) throw new NotificationsError('api-error')
     return data
 }

@@ -113,11 +113,11 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
 
     useEffect(() => {
         const previousTitle = document.title;
-        const episodeTitle = episodeName || `Серия ${episodeNumber}`;
+        const episodeTitle = episodeName || t('player.episodeTitle', { number: episodeNumber });
         document.title = `${animeName} · ${episodeTitle} — Anixart`;
 
         return () => { document.title = previousTitle; };
-    }, [animeName, episodeName, episodeNumber]);
+    }, [animeName, episodeName, episodeNumber, t]);
     const qualities = useMemo(
         () => Object.keys(sources).sort((a, b) => (Number(b) || 0) - (Number(a) || 0)),
         [sources]
@@ -241,10 +241,10 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                 dubId: playerSession.dubId,
                 sourceId: playerSession.sourceId,
                 episode: episodeNumber,
-                episodeName: episodeName ?? `Серия ${episodeNumber}`,
+                episodeName: episodeName ?? t('player.episodeTitle', { number: episodeNumber }),
             },
         });
-    }, [animeId, animeName, episodeName, episodeNumber, playerSession.dubId, playerSession.sourceId, roomId, userId, watchRoom]);
+    }, [animeId, animeName, episodeName, episodeNumber, playerSession.dubId, playerSession.sourceId, roomId, t, userId, watchRoom]);
 
     const switchToLowerQuality = useCallback(() => {
         const currentIndex = qualities.indexOf(selectedQuality);
@@ -556,9 +556,9 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
             <div className={styles['resume-prompt']}>
                 <div className={styles['resume-prompt-card']} role="alert">
                     <h2>{t('player.streamUnavailable')}</h2>
-                    <p>Для выбранной серии не найдено доступных видеопотоков.</p>
+                    <p>{t('player.noStreams')}</p>
                     <div className={styles['resume-prompt-actions']}>
-                        <button type="button" className={styles['resume-primary-button']} onClick={closePlayer}>Вернуться к релизу</button>
+                        <button type="button" className={styles['resume-primary-button']} onClick={closePlayer}>{t('player.backToRelease')}</button>
                     </div>
                 </div>
             </div>
@@ -583,7 +583,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                                 type="button"
                                 className={styles['play-button']}
                                 disabled={isBuffering}
-                                aria-label={isBuffering ? 'Видео загружается' : isPlaying ? 'Пауза' : 'Воспроизвести'}
+                                aria-label={isBuffering ? t('player.loading') : isPlaying ? t('player.pause') : t('player.play')}
                                 onClick={() => {
                                     if (videoRef.current?.paused) void videoRef.current.play();
                                     else videoRef.current?.pause();

@@ -1,6 +1,7 @@
 import type { HTMLAttributes, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styles from './PageLayout.module.css';
+import { useTranslation } from '../shared/useTranslation';
 
 interface PageLayoutProps extends HTMLAttributes<HTMLElement> {
     children: ReactNode;
@@ -36,9 +37,11 @@ export function PageHeader({ title, description, actions, back = false }: PageHe
     </header>;
 }
 
-export function BackButton({ label = 'Назад', onClick }: BackButtonProps) {
+export function BackButton({ label, onClick }: BackButtonProps) {
     const navigate = useNavigate();
-    return <button type="button" className={styles.backButton} aria-label={label} onClick={onClick ?? (() => navigate(-1))}>
+    const { t } = useTranslation();
+    const accessibleLabel = label ?? t('page.back');
+    return <button type="button" className={styles.backButton} aria-label={accessibleLabel} onClick={onClick ?? (() => navigate(-1))}>
         <span aria-hidden="true" />
     </button>;
 }

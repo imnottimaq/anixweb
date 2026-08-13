@@ -8,6 +8,7 @@ import { PageHeader, PageLayout } from '../components/PageLayout';
 import PageState from '../components/PageState';
 import { Modal } from '../modals/ModalTemplate';
 import styles from './EditAccountScreen.module.css';
+import { useTranslation } from '../shared/useTranslation';
 
 type ProfileResponse = {
     code: number;
@@ -102,7 +103,7 @@ async function postAnonymousForm(path: string, values: Record<string, string>): 
             body: new URLSearchParams(values),
         });
         const data = await response.json() as CodeResponse;
-        if (!response.ok || data.code !== 0) throw new Error(data.message || `API error: ${response.status}`);
+        if (!response.ok || data.code !== 0) throw new Error('Request failed');
         return data;
     };
 
@@ -116,6 +117,7 @@ async function postAnonymousForm(path: string, values: Record<string, string>): 
 export default function EditAccountScreen() {
     const navigate = useNavigate();
     const api = useApi();
+    const { t } = useTranslation();
     const { userId, userToken, setUserToken } = useUser();
     const [profile, setProfile] = useState<Profile | null>(null);
     const [draft, setDraft] = useState<ProfileDraft>(emptyDraft);
@@ -225,9 +227,9 @@ export default function EditAccountScreen() {
                 }),
             ]);
             setProfile(current => current ? { ...current, ...draft } : current);
-            setSaveMessage('Изменения сохранены.');
+            setSaveMessage(t('editAccount.saved'));
         } catch {
-            setSaveMessage('Не удалось сохранить изменения.');
+            setSaveMessage(t('editAccount.saveError'));
         } finally {
             setIsSaving(false);
         }
@@ -243,9 +245,9 @@ export default function EditAccountScreen() {
             await getRequest<{ code: number }>(`/profile/preference/login/change?login=${encodeURIComponent(newLogin)}`);
             setProfile(current => current ? { ...current, login: newLogin } : current);
             setIsLoginChangeAvailable(false);
-            setSaveMessage('Никнейм изменён. Следующая смена будет доступна позже.');
+            setSaveMessage(t('editAccount.loginSaved'));
         } catch {
-            setSaveMessage('Не удалось изменить никнейм. Возможно, он занят или пока недоступен для смены.');
+            setSaveMessage(t('editAccount.loginError'));
         } finally {
             setIsLoginSaving(false);
         }
@@ -265,7 +267,7 @@ export default function EditAccountScreen() {
             await postRequest(endpoints[key], { permission });
             setPrivacy(current => ({ ...current, [key]: permission }));
         } catch {
-            setSaveMessage('Не удалось изменить настройку приватности.');
+            setSaveMessage(t('editAccount.privacyError'));
         } finally {
             setIsPrivacySaving(null);
         }
@@ -281,8 +283,8 @@ export default function EditAccountScreen() {
             const response = await postAnonymousForm('/auth/restore', { data: profileLogin });
             if (!response.hash) throw new Error('Сервер не вернул код восстановления.');
             setPasswordHash(response.hash);
-        } catch (error) {
-            setPasswordError(error instanceof Error ? error.message : 'Не удалось отправить код.');
+        } catch {
+            setPasswordError(t('editAccount.passwordCodeError'));
         } finally {
             setIsPasswordRequesting(false);
         }
@@ -306,10 +308,10 @@ export default function EditAccountScreen() {
             setConfirmNewPassword('');
             setPasswordCode('');
             setPasswordHash('');
-            setSaveMessage('Пароль изменён.');
+            setSaveMessage(t('editAccount.passwordSaved'));
             close();
-        } catch (error) {
-            setPasswordError(error instanceof Error ? error.message : 'Не удалось изменить пароль.');
+        } catch {
+            setPasswordError(t('editAccount.passwordError'));
         } finally {
             setIsPasswordSaving(false);
         }
@@ -329,10 +331,10 @@ export default function EditAccountScreen() {
             setCurrentEmail('');
             setNewEmail('');
             setEmailPassword('');
-            setSaveMessage('Email изменён.');
+            setSaveMessage(t('editAccount.emailSaved'));
             close();
         } catch {
-            setEmailError('Не удалось изменить email. Проверьте текущий email и пароль.');
+            setEmailError(t('editAccount.emailError'));
         } finally {
             setIsEmailSaving(false);
         }
@@ -341,12 +343,12 @@ export default function EditAccountScreen() {
     const handleAvatarSelect = async (file: File | undefined) => {
         if (!file) return;
         if (!file.type.startsWith('image/')) {
-            setSaveMessage('Для аватара выберите изображение.');
+            setSaveMessage(t('editAccount.avatarTypeError'));
             return;
         }
 
         if (file.size > 8 * 1024 * 1024) {
-            setSaveMessage('Изображение для аватара должно быть не больше 8 МБ.');
+            setSaveMessage(t('editAccount.avatarSizeError'));
             return;
         }
 
@@ -355,13 +357,13 @@ export default function EditAccountScreen() {
             if (avatarPreview) URL.revokeObjectURL(avatarPreview);
             setAvatarPreview(URL.createObjectURL(jpegFile));
             setIsAvatarUploading(true);
-            setSaveMessage('Загружаем новый аватар…');
+            setSaveMessage(t('editAccount.avatarUploading'));
 
             const response = await uploadAvatar(jpegFile);
             setProfile(current => current ? { ...current, avatar: response.avatar } : current);
-            setSaveMessage('Аватар обновлён.');
+            setSaveMessage(t('editAccount.avatarSaved'));
         } catch {
-            setSaveMessage('Не удалось обновить аватар.');
+            setSaveMessage(t('editAccount.avatarError'));
         } finally {
             setIsAvatarUploading(false);
         }
@@ -392,49 +394,49 @@ export default function EditAccountScreen() {
         if (avatarPreview) URL.revokeObjectURL(avatarPreview);
     }, [avatarPreview]);
 
-    if (isLoading) return <PageLayout><PageState status="loading" message="Загружаем профиль…" /></PageLayout>;
+    if (isLoading) return <PageLayout><PageState status="loading" message={t('account.loading')} /></PageLayout>;
 
     return (
         <PageLayout>
-            <PageHeader title="Редактирование профиля" description="Настройте информацию, которая отображается в вашем профиле." back />
+            <PageHeader title={t('editAccount.title')} description={t('editAccount.description')} back />
 
             <section className={styles.section}>
-                <h2>Основное</h2>
+                <h2>{t('editAccount.general')}</h2>
                 <div className={styles.avatarSetting}>
-                    <span>Аватар <small>Выберите изображение для предпросмотра.</small></span>
+                    <span>{t('editAccount.avatar')} <small>{t('editAccount.avatarHint')}</small></span>
                     <div className={styles.avatarControl}>
                         {avatarPreview
-                            ? <img src={avatarPreview} alt="Предпросмотр нового аватара" />
-                            : <RemoteImage src={profile?.avatar} alt="Текущий аватар" />}
+                            ? <img src={avatarPreview} alt={t('editAccount.avatarPreviewAlt')} />
+                            : <RemoteImage src={profile?.avatar} alt={t('editAccount.avatarCurrentAlt')} />}
                         <input ref={avatarInputRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={event => {
                             const file = event.target.files?.[0];
                             event.target.value = '';
                             void handleAvatarSelect(file);
                         }} />
-                        <button type="button" disabled={isAvatarUploading} onClick={() => avatarInputRef.current?.click()}>{isAvatarUploading ? 'Загружаем…' : 'Изменить аватар'}</button>
+                        <button type="button" disabled={isAvatarUploading} onClick={() => avatarInputRef.current?.click()}>{isAvatarUploading ? t('editAccount.uploading') : t('editAccount.changeAvatar')}</button>
                     </div>
                 </div>
                 <label className={styles.field}>
-                    <span>Никнейм <small>Изменить можно раз в 30 дней.</small></span>
+                    <span>{t('editAccount.nickname')} <small>{t('editAccount.nicknameHint')}</small></span>
                     <div className={styles.loginControl}>
                         <input value={login} disabled={!isLoginChangeAvailable || isLoginSaving} placeholder={profile?.login ?? 'username'} onChange={event => { setLogin(event.target.value); setSaveMessage(null); }} />
-                        <button type="button" disabled={!isLoginChangeAvailable || isLoginSaving || login.trim() === profile?.login} onClick={() => void changeLogin()}>{isLoginSaving ? 'Изменение…' : 'Изменить'}</button>
+                        <button type="button" disabled={!isLoginChangeAvailable || isLoginSaving || login.trim() === profile?.login} onClick={() => void changeLogin()}>{isLoginSaving ? t('editAccount.changing') : t('editAccount.change')}</button>
                     </div>
-                    {!isLoginChangeAvailable && <small className={styles.fieldHint}>Смена никнейма пока недоступна: её можно выполнять раз в 30 дней.</small>}
+                    {!isLoginChangeAvailable && <small className={styles.fieldHint}>{t('editAccount.nicknameUnavailable')}</small>}
                 </label>
                 <label className={styles.field}>
-                    <span>Статус <small>Короткая подпись под вашим никнеймом.</small></span>
-                    <textarea value={draft.status} maxLength={240} placeholder="Расскажите что-нибудь о себе" onChange={event => updateDraft('status', event.target.value)} />
+                    <span>{t('editAccount.status')} <small>{t('editAccount.statusHint')}</small></span>
+                    <textarea value={draft.status} maxLength={240} placeholder={t('editAccount.statusPlaceholder')} onChange={event => updateDraft('status', event.target.value)} />
                 </label>
                 <div className={styles.accountActions}>
-                    <button type="button" onClick={() => { setPasswordError(null); setIsPasswordModalOpen(true); }}>Восстановить пароль</button>
-                    <button type="button" onClick={() => { setEmailError(null); setIsEmailModalOpen(true); }}>Изменить email</button>
+                    <button type="button" onClick={() => { setPasswordError(null); setIsPasswordModalOpen(true); }}>{t('editAccount.restorePassword')}</button>
+                    <button type="button" onClick={() => { setEmailError(null); setIsEmailModalOpen(true); }}>{t('editAccount.changeEmail')}</button>
                 </div>
             </section>
 
             <section className={styles.section}>
-                <h2>Социальные сети</h2>
-                <p className={styles.sectionDescription}>Можно вставить как полный адрес страницы, так и свой никнейм.</p>
+                <h2>{t('editAccount.social')}</h2>
+                <p className={styles.sectionDescription}>{t('editAccount.socialDescription')}</p>
                 <div className={styles.fieldsGrid}>
                     <label className={styles.field}><span>ВКонтакте</span><input value={draft.vk_page} placeholder="vk.com/username" onChange={event => updateDraft('vk_page', event.target.value)} /></label>
                     <label className={styles.field}><span>Telegram</span><input value={draft.tg_page} placeholder="t.me/username" onChange={event => updateDraft('tg_page', event.target.value)} /></label>
@@ -445,45 +447,45 @@ export default function EditAccountScreen() {
             </section>
 
             <section className={styles.section}>
-                <h2>Приватность</h2>
-                <p className={styles.sectionDescription}>Выберите, кому будет доступна информация в вашем профиле.</p>
+                <h2>{t('editAccount.privacy')}</h2>
+                <p className={styles.sectionDescription}>{t('editAccount.privacyDescription')}</p>
                 <div className={styles.privacyGrid}>
-                    <label className={styles.selectField}><span>Статистика, оценки и история</span><select value={privacy.privacy_stats} disabled={isPrivacySaving === 'privacy_stats'} onChange={event => void changePrivacy('privacy_stats', Number(event.target.value))}><option value={0}>Видно всем</option><option value={1}>Только друзьям</option><option value={2}>Никому</option></select></label>
-                    <label className={styles.selectField}><span>Комментарии, коллекции и друзья</span><select value={privacy.privacy_counts} disabled={isPrivacySaving === 'privacy_counts'} onChange={event => void changePrivacy('privacy_counts', Number(event.target.value))}><option value={0}>Видно всем</option><option value={1}>Только друзьям</option><option value={2}>Никому</option></select></label>
-                    <label className={styles.selectField}><span>Социальные сети</span><select value={privacy.privacy_social} disabled={isPrivacySaving === 'privacy_social'} onChange={event => void changePrivacy('privacy_social', Number(event.target.value))}><option value={0}>Видно всем</option><option value={1}>Только друзьям</option><option value={2}>Никому</option></select></label>
-                    <label className={styles.selectField}><span>Заявки в друзья</span><select value={privacy.privacy_friend_requests} disabled={isPrivacySaving === 'privacy_friend_requests'} onChange={event => void changePrivacy('privacy_friend_requests', Number(event.target.value))}><option value={0}>От всех</option><option value={1}>Ни от кого</option></select></label>
+                    <label className={styles.selectField}><span>{t('editAccount.privacyStats')}</span><select value={privacy.privacy_stats} disabled={isPrivacySaving === 'privacy_stats'} onChange={event => void changePrivacy('privacy_stats', Number(event.target.value))}><option value={0}>{t('editAccount.everyone')}</option><option value={1}>{t('editAccount.friendsOnly')}</option><option value={2}>{t('editAccount.nobody')}</option></select></label>
+                    <label className={styles.selectField}><span>{t('editAccount.privacyCounts')}</span><select value={privacy.privacy_counts} disabled={isPrivacySaving === 'privacy_counts'} onChange={event => void changePrivacy('privacy_counts', Number(event.target.value))}><option value={0}>{t('editAccount.everyone')}</option><option value={1}>{t('editAccount.friendsOnly')}</option><option value={2}>{t('editAccount.nobody')}</option></select></label>
+                    <label className={styles.selectField}><span>{t('editAccount.social')}</span><select value={privacy.privacy_social} disabled={isPrivacySaving === 'privacy_social'} onChange={event => void changePrivacy('privacy_social', Number(event.target.value))}><option value={0}>{t('editAccount.everyone')}</option><option value={1}>{t('editAccount.friendsOnly')}</option><option value={2}>{t('editAccount.nobody')}</option></select></label>
+                    <label className={styles.selectField}><span>{t('editAccount.friendRequests')}</span><select value={privacy.privacy_friend_requests} disabled={isPrivacySaving === 'privacy_friend_requests'} onChange={event => void changePrivacy('privacy_friend_requests', Number(event.target.value))}><option value={0}>{t('editAccount.fromEveryone')}</option><option value={1}>{t('editAccount.fromNobody')}</option></select></label>
                 </div>
             </section>
 
             <footer className={styles.footer}>
-                {saveMessage && <span className={saveMessage === 'Изменения сохранены.' ? styles.success : styles.error}>{saveMessage}</span>}
-                <button type="button" className={styles.saveButton} disabled={isSaving} onClick={() => void saveProfile()}>{isSaving ? 'Сохранение…' : 'Сохранить изменения'}</button>
+                {saveMessage && <span className={saveMessage === t('editAccount.saved') ? styles.success : styles.error}>{saveMessage}</span>}
+                <button type="button" className={styles.saveButton} disabled={isSaving} onClick={() => void saveProfile()}>{isSaving ? t('editAccount.saving') : t('editAccount.save')}</button>
             </footer>
 
-            <Modal isOpen={isPasswordModalOpen} onClose={() => setIsPasswordModalOpen(false)} title="Восстановление пароля" size="small">
+            <Modal isOpen={isPasswordModalOpen} onClose={() => setIsPasswordModalOpen(false)} title={t('editAccount.passwordTitle')} size="small">
                 {close => <div className={styles.modalForm}>
-                    <p>Код будет отправлен на привязанный email.</p>
-                    <label><span>Новый пароль</span><input type="password" autoComplete="new-password" value={newPassword} onChange={event => { setNewPassword(event.target.value); setPasswordError(null); }} /></label>
-                    <label><span>Повторите пароль</span><input type="password" autoComplete="new-password" value={confirmNewPassword} onChange={event => { setConfirmNewPassword(event.target.value); setPasswordError(null); }} /></label>
+                    <p>{t('editAccount.passwordDescription')}</p>
+                    <label><span>{t('editAccount.newPassword')}</span><input type="password" autoComplete="new-password" value={newPassword} onChange={event => { setNewPassword(event.target.value); setPasswordError(null); }} /></label>
+                    <label><span>{t('editAccount.repeatPassword')}</span><input type="password" autoComplete="new-password" value={confirmNewPassword} onChange={event => { setConfirmNewPassword(event.target.value); setPasswordError(null); }} /></label>
                     <div className={styles.codeRow}>
-                        <input inputMode="numeric" placeholder="Код из email" value={passwordCode} onChange={event => setPasswordCode(event.target.value)} />
-                        <button type="button" disabled={!newPassword || newPassword !== confirmNewPassword || isPasswordRequesting} onClick={() => void requestPasswordCode()}>{isPasswordRequesting ? 'Отправляем…' : passwordHash ? 'Отправить ещё раз' : 'Отправить код'}</button>
+                        <input inputMode="numeric" placeholder={t('editAccount.emailCode')} value={passwordCode} onChange={event => setPasswordCode(event.target.value)} />
+                        <button type="button" disabled={!newPassword || newPassword !== confirmNewPassword || isPasswordRequesting} onClick={() => void requestPasswordCode()}>{isPasswordRequesting ? t('editAccount.sending') : passwordHash ? t('editAccount.resendCode') : t('auth.sendCode')}</button>
                     </div>
-                    {passwordHash && <small>Введите код из письма, затем подтвердите смену пароля.</small>}
+                    {passwordHash && <small>{t('editAccount.codeHint')}</small>}
                     {passwordError && <p className={styles.modalError}>{passwordError}</p>}
-                    <div className={styles.modalActions}><button type="button" onClick={close}>Отмена</button><button type="button" disabled={!passwordHash || !passwordCode || isPasswordSaving} onClick={() => void restorePassword(close)}>{isPasswordSaving ? 'Меняем…' : 'Изменить пароль'}</button></div>
+                    <div className={styles.modalActions}><button type="button" onClick={close}>{t('misc.cancel')}</button><button type="button" disabled={!passwordHash || !passwordCode || isPasswordSaving} onClick={() => void restorePassword(close)}>{isPasswordSaving ? t('editAccount.changing') : t('editAccount.changePassword')}</button></div>
                 </div>}
             </Modal>
 
-            <Modal isOpen={isEmailModalOpen} onClose={() => setIsEmailModalOpen(false)} title="Изменение email" size="small">
+            <Modal isOpen={isEmailModalOpen} onClose={() => setIsEmailModalOpen(false)} title={t('editAccount.emailTitle')} size="small">
                 {close => <div className={styles.modalForm}>
-                    <p>Для подтверждения укажите текущие email и пароль.</p>
-                    {emailHint && <small>Подсказка: {emailHint}</small>}
-                    <label><span>Текущий email</span><input type="email" autoComplete="email" value={currentEmail} onChange={event => { setCurrentEmail(event.target.value); setEmailError(null); }} /></label>
-                    <label><span>Новый email</span><input type="email" autoComplete="email" value={newEmail} onChange={event => { setNewEmail(event.target.value); setEmailError(null); }} /></label>
-                    <label><span>Текущий пароль</span><input type="password" autoComplete="current-password" value={emailPassword} onChange={event => { setEmailPassword(event.target.value); setEmailError(null); }} /></label>
+                    <p>{t('editAccount.emailDescription')}</p>
+                    {emailHint && <small>{t('editAccount.emailHint', { hint: emailHint })}</small>}
+                    <label><span>{t('editAccount.currentEmail')}</span><input type="email" autoComplete="email" value={currentEmail} onChange={event => { setCurrentEmail(event.target.value); setEmailError(null); }} /></label>
+                    <label><span>{t('editAccount.newEmail')}</span><input type="email" autoComplete="email" value={newEmail} onChange={event => { setNewEmail(event.target.value); setEmailError(null); }} /></label>
+                    <label><span>{t('editAccount.currentPassword')}</span><input type="password" autoComplete="current-password" value={emailPassword} onChange={event => { setEmailPassword(event.target.value); setEmailError(null); }} /></label>
                     {emailError && <p className={styles.modalError}>{emailError}</p>}
-                    <div className={styles.modalActions}><button type="button" onClick={close}>Отмена</button><button type="button" disabled={!currentEmail || !newEmail || !emailPassword || isEmailSaving} onClick={() => void changeEmail(close)}>{isEmailSaving ? 'Меняем…' : 'Изменить email'}</button></div>
+                    <div className={styles.modalActions}><button type="button" onClick={close}>{t('misc.cancel')}</button><button type="button" disabled={!currentEmail || !newEmail || !emailPassword || isEmailSaving} onClick={() => void changeEmail(close)}>{isEmailSaving ? t('editAccount.changing') : t('editAccount.changeEmail')}</button></div>
                 </div>}
             </Modal>
         </PageLayout>

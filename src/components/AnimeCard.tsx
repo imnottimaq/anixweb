@@ -6,11 +6,13 @@ import { profileListStatus } from "../shared/profileListStatus"
 import starIcon from '../assets/icons/star.svg'
 import RemoteImage from './RemoteImage';
 import { useSettings } from '../shared/contexts/settingsContext';
+import { useTranslation } from '../shared/useTranslation';
 
 export interface AnimeCardProps { anime: Anime; }
 
 export default function AnimeCard({ anime }: AnimeCardProps) {
   const { settings } = useSettings();
+  const { t } = useTranslation();
   const listStatus = profileListStatus[anime.profile_list_status as 0 | 1 | 2 | 3 | 4 | 5];
   const [loadedImage, setLoadedImage] = useState<string | null>(null);
   const isImageLoaded = loadedImage === anime.image;
@@ -28,11 +30,11 @@ export default function AnimeCard({ anime }: AnimeCardProps) {
           onLoad={() => setLoadedImage(anime.image)}
           onError={() => setLoadedImage(anime.image)}
         />
-        {listStatus && <span className={`${styles['list-status']} ${styles[`status-${listStatus.color}`]}`}>{listStatus.label}</span>}
+        {listStatus && <span className={`${styles['list-status']} ${styles[`status-${listStatus.color}`]}`}>{t(listStatus.labelKey)}</span>}
       </div>
       <p className={styles['anime-title']}>{title.length > 50 ? title.slice(0,49)+"..." : title}</p>
       <p className={styles['anime-meta']}>
-        {anime.episodes_released || "?"} из {anime.episodes_total || "?"} эп.
+        {anime.episodes_released || "?"} {t('misc.outOf')} {anime.episodes_total || "?"} {t('misc.episodes')}
         {anime.grade !== 0 && <span className={styles['anime-rating']}><img src={starIcon} alt="" />{anime.grade.toFixed(2)}</span>}
       </p>
       {anime.description && <p className={styles['anime-description']}>{anime.description}</p>}

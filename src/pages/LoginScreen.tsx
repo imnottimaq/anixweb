@@ -24,14 +24,14 @@ export default function LoginScreen() {
                 setIsLoading(true);
                 setError('');
                 try { await handleLogin(username, password, setUserToken, setUserId); }
-                catch (requestError) { setError(requestError instanceof Error ? requestError.message : 'Не удалось войти'); }
+                catch (requestError) { console.error(requestError); setError(t('auth.loginError')); }
                 finally { setIsLoading(false); }
             }}>
                 <label className={styles.field}><span>{t('auth.username')}</span><input type="text" name="username" autoComplete="username" required value={username} onChange={e => setUsername(e.target.value)} /></label>
                 <label className={styles.field}><span>{t('auth.password')}</span><input type="password" name="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} /></label>
                 {error && <p className={styles.error} role="alert">{error}</p>}
                 <div className={styles.actions}><Link to="/account/recover">{t('auth.forgotPassword')}</Link><Link to="/account/create">{t('auth.register')}</Link></div>
-                <button type="submit" disabled={isLoading}>{isLoading ? 'Входим…' : t('auth.login')}</button>
+                <button type="submit" disabled={isLoading}>{isLoading ? t('auth.loggingIn') : t('auth.login')}</button>
             </form>
         </section>
     </div>;

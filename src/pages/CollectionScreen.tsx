@@ -97,9 +97,9 @@ export default function CollectionScreen() {
     const isOwner = collection?.creator.id === userId;
     const isPrivate = collection?.is_private ?? collection?.isPrivate ?? false;
     const errorMessage = !isValidId
-        ? 'Не удалось открыть коллекцию.'
+        ? t('collection.openError')
         : error
-            ? 'Не удалось загрузить коллекцию.'
+            ? t('collection.loadError')
             : null;
     const { data: commentsData, error: commentsError, isLoading: isCommentsLoading, reload: reloadComments } = useAsyncLoad(
         signal => api.get<CollectionCommentsResponse>(`/collection/comment/all/${collectionId}/0`, { signal }),
@@ -139,11 +139,11 @@ export default function CollectionScreen() {
         const description = editDescription.trim();
 
         if (title.length < 10 || title.length > 60) {
-            setManageError('Название должно содержать от 10 до 60 символов.');
+            setManageError(t('collections.titleValidation'));
             return;
         }
         if (description.length > 1000) {
-            setManageError('Описание не должно превышать 1000 символов.');
+            setManageError(t('collections.descriptionValidation'));
             return;
         }
 
@@ -157,8 +157,8 @@ export default function CollectionScreen() {
             });
             setIsEditOpen(false);
             reload();
-        } catch (requestError) {
-            setManageError(requestError instanceof Error ? requestError.message : 'Не удалось сохранить изменения.');
+        } catch {
+            setManageError(t('collection.saveError'));
         } finally {
             setIsSaving(false);
         }
@@ -172,8 +172,8 @@ export default function CollectionScreen() {
         try {
             await api.getViaAgent<{ code: number }>(`/collectionMy/delete/${collection.id}`);
             navigate('/collections', { replace: true });
-        } catch (requestError) {
-            setManageError(requestError instanceof Error ? requestError.message : 'Не удалось удалить коллекцию.');
+        } catch {
+            setManageError(t('collection.deleteError'));
         } finally {
             setIsDeleting(false);
         }
@@ -230,40 +230,40 @@ export default function CollectionScreen() {
             setReplyTarget(null);
             setEditTarget(null);
             reloadComments();
-        } catch (requestError) {
-            setCommentError(requestError instanceof Error ? requestError.message : 'Не удалось отправить комментарий.');
+        } catch {
+            setCommentError(t('collection.commentError'));
         } finally {
             setIsSendingComment(false);
         }
     };
 
     return <PageLayout size="wide" className={styles.page}>
-        <PageHeader title={collection?.title ?? 'Коллекция'} back />
+        <PageHeader title={collection?.title ?? t('collection.title')} back />
 
         {collection && <section className={styles.hero}>
-            {collection.image && <RemoteImage className={styles.cover} src={collection.image} alt="" />}
+            {collection.image && <RemoteImage className={styles.cover} src={collection.image} alt={t('collection.coverAlt', { title: collection.title })} />}
             <div className={styles.description}>
-                {isPrivate && <p className={styles.privateNotice}>Это закрытая коллекция — она доступна только автору.</p>}
+                {isPrivate && <p className={styles.privateNotice}>{t('collection.privateNotice')}</p>}
                 {collection.description && <p>{collection.description}</p>}
                 <Link className={styles.creator} to={`/account/${collection.creator.id}`}>
-                    <RemoteImage src={collection.creator.avatar} alt="" />
+                    <RemoteImage src={collection.creator.avatar} alt={t('collection.creatorAlt', { name: collection.creator.login })} />
                     <span>{collection.creator.login}</span>
                 </Link>
                 <div className={styles.actions}>
                     <button type="button" className={styles.actionButton} disabled={isFavoriteLoading} onClick={() => void toggleFavorite()}>
                         <img src={isFavorite ? circleCheckIcon : circlePlusIcon} alt="" />
-                        {isFavorite ? 'Сохранено' : 'Сохранить'}
+                        {t(isFavorite ? 'collection.saved' : 'collection.save')}
                     </button>
                     {!isPrivate && <button type="button" className={styles.actionButton} onClick={() => setIsCommentsOpen(true)}>
                         <img src={commentsIcon} alt="" />
                         Комментарии
                     </button>}
                     {isOwner && <>
-                        <button type="button" className={styles.actionButton} onClick={openEdit}>Редактировать</button>
+                        <button type="button" className={styles.actionButton} onClick={openEdit}>{t('collection.edit')}</button>
                         <button type="button" className={`${styles.actionButton} ${styles.deleteButton}`} onClick={() => {
                             setManageError(null);
                             setIsDeleteOpen(true);
-                        }}>Удалить</button>
+                        }}>{t('collection.delete')}</button>
                     </>}
                 </div>
                 {manageError && <p className={styles.manageError}>{manageError}</p>}
@@ -271,10 +271,10 @@ export default function CollectionScreen() {
         </section>}
 
         <section className={styles.releases}>
-            <div className={styles.sectionHeader}><h2>Релизы коллекции</h2></div>
-            {isLoading && <PageState status="loading" message="Загружаем коллекцию…" />}
+            <div className={styles.sectionHeader}><h2>{t('collection.releases')}</h2></div>
+            {isLoading && <PageState status="loading" message={t('collection.loading')} />}
             {!isLoading && errorMessage && <PageState status="error" message={errorMessage} onRetry={isValidId ? reload : undefined} />}
-            {!isLoading && !errorMessage && releases.length === 0 && <PageState status="empty" message="В этой коллекции пока нет релизов." />}
+            {!isLoading && !errorMessage && releases.length === 0 && <PageState status="empty" message={t('collection.empty')} />}
             <div className={styles.releaseList}>
                 {releases.map(release => <AnimeCardHorizontal key={release.id} anime={release} />)}
             </div>
@@ -282,7 +282,7 @@ export default function CollectionScreen() {
         <Modal
             isOpen={isCommentsOpen}
             onClose={() => setIsCommentsOpen(false)}
-            title="Комментарии коллекции"
+            title={t('collection.commentsTitle')}
             stickyHeader
             contentClassName={styles.commentsModal}
             contentStyle={{ width: 'min(1180px, calc(100vw - 32px))', maxHeight: '80vh' }}
@@ -328,9 +328,9 @@ export default function CollectionScreen() {
                 </div>
                 {commentError && <p className={styles.commentError}>{commentError}</p>}
             </form>
-            {isCommentsLoading && <p className={styles.commentsMessage}>Загружаем комментарии…</p>}
-            {commentsError as Error && <p className={styles.error}>Не удалось загрузить комментарии.</p>}
-            {!isCommentsLoading && !commentsError && comments.length === 0 && <p className={styles.commentsMessage}>Комментариев пока нет.</p>}
+            {isCommentsLoading && <p className={styles.commentsMessage}>{t('collection.commentsLoading')}</p>}
+            {commentsError as Error && <p className={styles.error}>{t('collection.commentsError')}</p>}
+            {!isCommentsLoading && !commentsError && comments.length === 0 && <p className={styles.commentsMessage}>{t('collection.commentsEmpty')}</p>}
             {!isCommentsLoading && comments.length > 0 && <div className={styles.commentsList}>
                 {comments.map(comment => <CommentComponent
                     key={comment.id}
@@ -347,24 +347,24 @@ export default function CollectionScreen() {
         <Modal
             isOpen={isEditOpen}
             onClose={() => setIsEditOpen(false)}
-            title="Редактировать коллекцию"
+            title={t('collection.editTitle')}
             actions={[
-                { label: 'Отмена', variant: 'secondary', onClick: () => setIsEditOpen(false) },
-                { label: isSaving ? 'Сохраняем…' : 'Сохранить', onClick: () => void saveCollection() },
+                { label: t('collection.cancel'), variant: 'secondary', onClick: () => setIsEditOpen(false) },
+                { label: t(isSaving ? 'collection.saving' : 'collection.saveChanges'), onClick: () => void saveCollection() },
             ]}
         >
             <div className={styles.editForm}>
                 <label>
-                    <span>Название</span>
+                    <span>{t('collections.name')}</span>
                     <input value={editTitle} minLength={10} maxLength={60} onChange={event => setEditTitle(event.target.value)} />
                 </label>
                 <label>
-                    <span>Описание</span>
+                    <span>{t('collections.description')}</span>
                     <textarea value={editDescription} maxLength={1000} onChange={event => setEditDescription(event.target.value)} />
                 </label>
                 <label className={styles.privateToggle}>
                     <input type="checkbox" checked={isEditPrivate} onChange={event => setIsEditPrivate(event.target.checked)} />
-                    <span>Доступна только мне</span>
+                    <span>{t('collections.private')}</span>
                 </label>
                 {manageError && <p className={styles.manageError}>{manageError}</p>}
             </div>
@@ -372,11 +372,11 @@ export default function CollectionScreen() {
         <Modal
             isOpen={isDeleteOpen}
             onClose={() => setIsDeleteOpen(false)}
-            title="Удалить коллекцию?"
-            text="Коллекция, её релизы и комментарии будут удалены без возможности восстановления."
+            title={t('collection.deleteTitle')}
+            text={t('collection.deleteText')}
             actions={[
-                { label: 'Отмена', variant: 'secondary', onClick: () => setIsDeleteOpen(false) },
-                { label: isDeleting ? 'Удаляем…' : 'Удалить', variant: 'danger', onClick: () => void deleteCollection() },
+                { label: t('collection.cancel'), variant: 'secondary', onClick: () => setIsDeleteOpen(false) },
+                { label: t(isDeleting ? 'collection.deleting' : 'collection.delete'), variant: 'danger', onClick: () => void deleteCollection() },
             ]}
         />
     </PageLayout>;

@@ -12,9 +12,10 @@ import leftArrowIcon from '../assets/icons/left-arrow.svg';
 import rightArrowIcon from '../assets/icons/right-arrow.svg';
 import styles from './OverviewScreen.module.css';
 import { useAsyncLoad } from '../shared/useAsyncLoad';
+import { useTranslation } from '../shared/useTranslation';
 
 type DiscoverComment = Omit<Comment, 'release'> & {
-    release?: { id: number; title_ru: string } | null;
+    release?: { id: number; title_ru: string; title_original?: string } | null;
     parent_comment_id?: number | null;
 };
 
@@ -35,6 +36,7 @@ let overviewCache: { token: string; data: OverviewData } | null = null;
 
 export default function OverviewScreen() {
     const api = useApi();
+    const { t, language } = useTranslation();
     const { userToken } = useUser();
     const navigate = useNavigate();
     const [activeInterestingIndex, setActiveInterestingIndex] = useState(0);
@@ -76,26 +78,26 @@ export default function OverviewScreen() {
         : 0;
 
     return <PageLayout className={styles.page} size="wide">
-        {isLoading && <PageState status="loading" message="Загружаем обзор…" />}
-        {!isLoading && Boolean(error) && <PageState status="error" message="Не удалось загрузить обзор." onRetry={reload} />}
+        {isLoading && <PageState status="loading" message={t('overview.loading')} />}
+        {!isLoading && Boolean(error) && <PageState status="error" message={t('overview.error')} onRetry={reload} />}
 
         {!isLoading && !error && <>
             {(data.interesting.length > 0 || data.discussing.length > 0) && <div className={styles.topLayout}>
                 {data.interesting.length > 0 && <section className={styles.featured}>
-                    <SectionTitle title="Интересное" />
+                    <SectionTitle title={t('overview.interesting')} />
                     <div className={styles.gallery}>
                         <FeaturedItem key={data.interesting[visibleInterestingIndex].id} item={data.interesting[visibleInterestingIndex]} />
                         {data.interesting.length > 1 && <>
                             <button
                                 type="button"
                                 className={`${styles.galleryButton} ${styles.galleryPrevious}`}
-                                aria-label="Предыдущий баннер"
+                                aria-label={t('overview.previous')}
                                 onClick={() => setActiveInterestingIndex(index => (index - 1 + data.interesting.length) % data.interesting.length)}
                             ><img src={leftArrowIcon} alt="" /></button>
                             <button
                                 type="button"
                                 className={`${styles.galleryButton} ${styles.galleryNext}`}
-                                aria-label="Следующий баннер"
+                                aria-label={t('overview.next')}
                                 onClick={() => setActiveInterestingIndex(index => (index + 1) % data.interesting.length)}
                             ><img src={rightArrowIcon} alt="" /></button>
                         </>}
@@ -103,56 +105,56 @@ export default function OverviewScreen() {
                 </section>}
 
                 {data.discussing.length > 0 && <section className={styles.topDiscussing}>
-                    <SectionTitle title="Сейчас обсуждают" />
+                    <SectionTitle title={t('overview.discussing')} />
                     <div className={styles.releaseList}>
                         {data.discussing.map(anime => <AnimeCardHorizontal key={anime.id} anime={anime} compact />)}
                     </div>
                 </section>}
             </div>}
 
-            <nav className={styles.quickActions} aria-label="Быстрые переходы">
+            <nav className={styles.quickActions} aria-label={t('overview.quickAria')}>
                 <button type="button" className={`${styles.quickAction} ${styles.quickActionPopular}`} onClick={() => navigate('/filter', { state: { filter: { sort: 3 }, autoSearch: true } })}>
                     <span className={styles.quickActionIcon} aria-hidden="true" />
-                    <span>Популярное</span>
+                    <span>{t('overview.popular')}</span>
                 </button>
                 <button type="button" className={`${styles.quickAction} ${styles.quickActionSchedule}`} onClick={() => navigate('/filter', { state: { filter: { status_id: 2 }, autoSearch: true } })}>
                     <span className={styles.quickActionIcon} aria-hidden="true" />
-                    <span>Расписание</span>
+                    <span>{t('overview.schedule')}</span>
                 </button>
                 <button type="button" className={`${styles.quickAction} ${styles.quickActionFilter}`} onClick={() => navigate('/filter')}>
                     <span className={styles.quickActionIcon} aria-hidden="true" />
-                    <span>Фильтр</span>
+                    <span>{t('overview.filter')}</span>
                 </button>
                 <Link to="/random" className={`${styles.quickAction} ${styles.quickActionRandom}`}>
                     <span className={styles.quickActionIcon} aria-hidden="true" />
-                    <span>Рандом</span>
+                    <span>{t('overview.random')}</span>
                 </Link>
             </nav>
 
             <section className={styles.section}>
-                <SectionTitle title="Рекомендуем тебе" description="Релизы, которые могут тебе понравиться" />
+                <SectionTitle title={t('overview.recommended')} description={t('overview.recommendedDescription')} />
                 {data.recommendations.length > 0
                     ? <div className={styles.posterRail}>
                         {data.recommendations.map(anime => <AnimeCard key={anime.id} anime={anime} />)}
                     </div>
-                    : <p className={styles.recommendationsEmpty}>Оцените хотя бы 20 релизов, чтобы получить персональные рекомендации.</p>}
+                    : <p className={styles.recommendationsEmpty}>{t('overview.rateMore')}</p>}
             </section>
 
             {data.watching.length > 0 && <section className={styles.section}>
-                <SectionTitle title="Сейчас смотрят" />
+                <SectionTitle title={t('overview.watching')} />
                 <div className={styles.posterRail}>
                     {data.watching.map(anime => <AnimeCard key={anime.id} anime={anime} />)}
                 </div>
             </section>}
 
             {data.comments.length > 0 && <section className={styles.section}>
-                <SectionTitle title="Комментарии недели" />
+                <SectionTitle title={t('overview.weekComments')} />
                 <div className={styles.comments}>
-                    {data.comments.slice(0, 6).map(comment => <CommentPreview key={comment.id} comment={comment} />)}
+                    {data.comments.slice(0, 6).map(comment => <CommentPreview key={comment.id} comment={comment} language={language} />)}
                 </div>
             </section>}
 
-            {!data.interesting.length && !data.recommendations.length && !data.watching.length && !data.discussing.length && <p className={styles.empty}>Пока нечего показать. Попробуй открыть страницу позже.</p>}
+            {!data.interesting.length && !data.recommendations.length && !data.watching.length && !data.discussing.length && <p className={styles.empty}>{t('overview.empty')}</p>}
         </>}
     </PageLayout>;
 }
@@ -207,13 +209,13 @@ function FeaturedItem({ item }: { item: DiscoverInteresting }) {
         : <article className={styles.featuredItem}>{content}</article>;
 }
 
-function CommentPreview({ comment }: { comment: DiscoverComment }) {
+function CommentPreview({ comment, language }: { comment: DiscoverComment; language: 'russian' | 'english' }) {
     const releaseId = Number(comment.release?.id);
     const canOpenRelease = Number.isInteger(releaseId) && releaseId > 0;
     const content = <>
         <RemoteImage className={styles.commentAvatar} src={comment.profile.avatar} alt="" />
         <span className={styles.commentBody}>
-            <span><b>{comment.profile.login}</b>{comment.release && <> · {comment.release.title_ru}</>}</span>
+            <span><b>{comment.profile.login}</b>{comment.release && <> · {language === 'english' ? comment.release.title_original || comment.release.title_ru : comment.release.title_ru}</>}</span>
             <span className={styles.commentMessage}>{comment.message}</span>
         </span>
         {comment.vote_count > 0 && <em className={styles.commentRating}>{comment.vote_count}</em>}

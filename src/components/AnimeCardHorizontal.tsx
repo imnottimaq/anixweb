@@ -6,7 +6,7 @@ import { profileListStatus } from "../shared/profileListStatus"
 import starIcon from '../assets/icons/star.svg'
 import RemoteImage from './RemoteImage';
 import { useSettings } from '../shared/contexts/settingsContext';
-import { plural } from '../shared/plural';
+import { useTranslation } from '../shared/useTranslation';
 
 export interface AnimeCardProps {
   anime: Anime;
@@ -15,6 +15,7 @@ export interface AnimeCardProps {
 
 export default function AnimeCardHorizontal({ anime, compact = false }: AnimeCardProps) {
   const { settings } = useSettings();
+  const { t, selectPlural } = useTranslation();
   const listStatus = profileListStatus[anime.profile_list_status as 0 | 1 | 2 | 3 | 4 | 5];
   const [loadedImage, setLoadedImage] = useState<string | null>(null);
   const isImageLoaded = loadedImage === anime.image;
@@ -32,17 +33,17 @@ export default function AnimeCardHorizontal({ anime, compact = false }: AnimeCar
           onLoad={() => setLoadedImage(anime.image)}
           onError={() => setLoadedImage(anime.image)}
         />
-        {listStatus && <span className={`${styles['list-status']} ${styles[`status-${listStatus.color}`]}`}>{listStatus.label}</span>}
+        {listStatus && <span className={`${styles['list-status']} ${styles[`status-${listStatus.color}`]}`}>{t(listStatus.labelKey)}</span>}
       </div>
       <div className={styles.info}>
         <p className={styles['anime-title']}>{title}</p>
         <p className={styles['anime-meta']}>
-          {anime.episodes_released || "?"} из {anime.episodes_total || "?"} эп.
+          {anime.episodes_released || "?"} {t('misc.outOf')} {anime.episodes_total || "?"} {t('misc.episodes')}
           {anime.grade !== 0 && <span className={styles['anime-rating']}><img src={starIcon} alt="" />{anime.grade.toFixed(2)}</span>}
         </p>
         {anime.description && <p className={styles['anime-description']}>{anime.description}</p>}
         {compact && anime.comment_per_day_count > 0 && <p className={styles['comment-activity']}>
-          {anime.comment_per_day_count} {plural(anime.comment_per_day_count, 'комментарий', 'комментария', 'комментариев')} за сутки
+          {t('card.commentsPerDay', { count: anime.comment_per_day_count, comments: t(`comments.count.${selectPlural(anime.comment_per_day_count) as 'one' | 'few' | 'many' | 'other'}`) })}
         </p>}
       </div>
     </Link>

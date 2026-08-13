@@ -9,15 +9,16 @@ import { useUser } from '../shared/contexts/userContext';
 import { Modal } from '../modals/ModalTemplate';
 import SelectDropdown from '../components/SelectDropdown';
 import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from '../shared/useTranslation';
 import styles from './CollectionsScreen.module.css';
 
 const COLLECTION_SORTS = [
-    { value: 1, label: 'Популярное за всё время' },
-    { value: 2, label: 'Популярное за год' },
-    { value: 3, label: 'Популярное за сезон' },
-    { value: 4, label: 'Популярное за неделю' },
-    { value: 5, label: 'Недавно добавленные' },
-    { value: 6, label: 'Случайный порядок' },
+    { value: 1, labelKey: 'collections.sortAllTime' },
+    { value: 2, labelKey: 'collections.sortYear' },
+    { value: 3, labelKey: 'collections.sortSeason' },
+    { value: 4, labelKey: 'collections.sortWeek' },
+    { value: 5, labelKey: 'collections.sortRecent' },
+    { value: 6, labelKey: 'collections.sortRandom' },
 ] as const;
 
 type CollectionsView = 'all' | 'mine';
@@ -30,6 +31,7 @@ function isEmptyCollectionResponse(error: unknown) {
 
 export default function CollectionsScreen() {
     const api = useApi();
+    const { t } = useTranslation();
     const { userId, userToken } = useUser();
     const [searchParams] = useSearchParams();
     const { setSearchScope } = useSearchScope();
@@ -98,7 +100,8 @@ export default function CollectionsScreen() {
     const collections = [...initialCollections, ...extraPages.flatMap(item => item.collections)];
     const lastLoadedPage = extraPages.at(-1)?.page ?? currentData?.current_page ?? 0;
     const hasMore = lastLoadedPage < (currentData?.total_page_count ?? 0);
-    const errorMessage = error instanceof Error ? error.message : error ? 'Не удалось загрузить коллекции' : null;
+    const errorMessage = error ? t('collections.loadError') : null;
+    const sortOptions = COLLECTION_SORTS.map(option => ({ value: option.value, label: t(option.labelKey) }));
 
     useEffect(() => {
         setSearchScope({ type: 'collections' });
@@ -155,15 +158,15 @@ export default function CollectionsScreen() {
                 if (activeCacheKeyRef.current === cacheKey) setExtraPages(nextPages);
                 return;
             }
-            setLoadMoreError('Не удалось загрузить следующую страницу.');
+            setLoadMoreError(t('collections.loadMoreError'));
         } finally {
             setIsLoadingMore(false);
         }
-    }, [api, cacheKey, getPagePath, hasMore, isLoadingMore, lastLoadedPage]);
+    }, [api, cacheKey, getPagePath, hasMore, isLoadingMore, lastLoadedPage, t]);
 
     const changeView = (nextView: CollectionsView) => {
         if (nextView === 'mine' && !canShowMine) {
-            alert('Войдите в аккаунт, чтобы посмотреть свои коллекции');
+            alert(t('collections.loginMine'));
             return;
         }
         if (nextView === view) return;
@@ -186,23 +189,23 @@ export default function CollectionsScreen() {
         const description = newCollectionDescription.trim();
         if (isCreating) return;
         if (title.length < 10 || title.length > 60) {
-            setCreateError('Название должно содержать от 10 до 60 символов.');
+            setCreateError(t('collections.titleValidation'));
             return;
         }
         if (description.length > 1000) {
-            setCreateError('Описание не должно превышать 1000 символов.');
+            setCreateError(t('collections.descriptionValidation'));
             return;
         }
         if (selectedReleases.length === 0) {
-            setCreateError('Добавьте хотя бы один релиз.');
+            setCreateError(t('collections.releaseRequired'));
             return;
         }
         if (selectedReleases.length > 100) {
-            setCreateError('В коллекции может быть не больше 100 релизов.');
+            setCreateError(t('collections.releaseLimit'));
             return;
         }
         if (!userToken) {
-            setCreateError('Войдите в аккаунт, чтобы создать коллекцию.');
+            setCreateError(t('collections.loginCreate'));
             return;
         }
 
@@ -228,7 +231,7 @@ export default function CollectionsScreen() {
                         await api.postFormViaAgent(`/collectionMy/editImage/${collectionId}`, image);
                     } catch (error) {
                         coverUploadFailed = true;
-                        console.error('Коллекция создана, но обложку загрузить не удалось:', error);
+                        console.error('Collection cover upload failed:', error);
                     }
                 }
             }
@@ -241,7 +244,7 @@ export default function CollectionsScreen() {
             setSelectedReleases([]);
             setIsCreateModalOpen(false);
             setCreateNotice(coverUploadFailed
-                ? 'Коллекция создана, но обложку загрузить не удалось. Её можно добавить позже при редактировании.'
+                ? t('collections.coverError')
                 : null);
             setFirstPagesCache(current => {
                 const next = new Map(current);
@@ -252,8 +255,8 @@ export default function CollectionsScreen() {
             setExtraPages([]);
             if (view === 'mine') reload();
             else changeView('mine');
-        } catch (error) {
-            setCreateError(error instanceof Error ? error.message : 'Не удалось создать коллекцию.');
+        } catch {
+            setCreateError(t('collections.createError'));
         } finally {
             setIsCreating(false);
         }
@@ -274,57 +277,57 @@ export default function CollectionsScreen() {
     return <section className={styles.main}>
         <header className={styles.header}>
             <div>
-                <h1>{isProfileView ? 'Коллекции пользователя' : 'Коллекции'}</h1>
-                <p>{isProfileView ? 'Подборки, созданные пользователем' : 'Подборки аниме от сообщества'}</p>
+                <h1>{t(isProfileView ? 'collections.profileTitle' : 'collections.title')}</h1>
+                <p>{t(isProfileView ? 'collections.profileSubtitle' : 'collections.subtitle')}</p>
             </div>
             <div className={styles.toolbar}>
-                {!isProfileView && <><button type="button" className={`${styles.toolbarButton} ${styles.createButton}`} onClick={() => setIsCreateModalOpen(true)}>Создать коллекцию</button>
-                <button type="button" className={`${styles.toolbarButton} ${isMine ? styles.toolbarButtonActive : ''}`} onClick={() => changeView(isMine ? 'all' : 'mine')}>{isMine ? 'Все коллекции' : 'Мои коллекции'}</button></>}
+                {!isProfileView && <><button type="button" className={`${styles.toolbarButton} ${styles.createButton}`} onClick={() => setIsCreateModalOpen(true)}>{t('collections.create')}</button>
+                <button type="button" className={`${styles.toolbarButton} ${isMine ? styles.toolbarButtonActive : ''}`} onClick={() => changeView(isMine ? 'all' : 'mine')}>{t(isMine ? 'collections.all' : 'collections.mine')}</button></>}
                 <div className={styles.sortDropdown}>
-                    <SelectDropdown value={sort} options={COLLECTION_SORTS} onChange={changeSort} ariaLabel="Сортировка коллекций" />
+                    <SelectDropdown value={sort} options={sortOptions} onChange={changeSort} ariaLabel={t('collections.sortAria')} />
                 </div>
             </div>
         </header>
         {createNotice && <p className={styles.message} role="status">{createNotice}</p>}
-        {isCurrentViewLoading && <p className={styles.message}>Загружаем коллекции...</p>}
+        {isCurrentViewLoading && <p className={styles.message}>{t('collections.loading')}</p>}
         {errorMessage && <p className={`${styles.message} ${styles.error}`}>{errorMessage}</p>}
-        {!isCurrentViewLoading && !errorMessage && collections.length === 0 && <p className={styles.message}>Коллекций пока нет.</p>}
+        {!isCurrentViewLoading && !errorMessage && collections.length === 0 && <p className={styles.message}>{t('collections.empty')}</p>}
         <div className={styles.list}>
             {collections.map(collection => <CollectionCard key={collection.id} collection={collection} />)}
         </div>
         {hasMore && <div ref={triggerRef} className={styles.loadMoreTrigger} />}
-        {isLoadingMore && <p className={styles.loadingMore}>Загружаем ещё коллекции…</p>}
+        {isLoadingMore && <p className={styles.loadingMore}>{t('collections.loadMore')}</p>}
         {loadMoreError && <p className={`${styles.message} ${styles.error}`}>{loadMoreError}</p>}
-        <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Новая коллекция" contentClassName={styles.createModal}>
+        <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title={t('collections.new')} contentClassName={styles.createModal}>
             <form className={styles.createForm} onSubmit={event => {
                 event.preventDefault();
                 void createCollection();
             }}>
                 <label>
-                    <span>Название</span>
+                    <span>{t('collections.name')}</span>
                     <input value={newCollectionTitle} minLength={10} maxLength={60} onChange={event => {
                         setNewCollectionTitle(event.target.value);
                         setCreateError(null);
                     }} autoFocus />
                 </label>
                 <label>
-                    <span>Описание</span>
+                    <span>{t('collections.description')}</span>
                     <textarea value={newCollectionDescription} maxLength={1000} onChange={event => setNewCollectionDescription(event.target.value)} />
                 </label>
                 <label className={styles.coverField}>
-                    <span>Обложка</span>
+                    <span>{t('collections.cover')}</span>
                     <input type="file" accept="image/*" onChange={event => setNewCollectionCover(event.target.files?.[0] ?? null)} />
-                    <small>{newCollectionCover ? newCollectionCover.name : 'Не выбрана'}</small>
+                    <small>{newCollectionCover ? newCollectionCover.name : t('collections.notSelected')}</small>
                 </label>
                 <label className={styles.privateToggle}>
                     <input type="checkbox" checked={isNewCollectionPrivate} onChange={event => setIsNewCollectionPrivate(event.target.checked)} />
-                    <span>Доступна только мне</span>
+                    <span>{t('collections.private')}</span>
                 </label>
                 <div className={styles.releasePicker}>
-                    <span>Релизы в коллекции ({selectedReleases.length}/100)</span>
-                    <input value={releaseQuery} placeholder="Начните вводить название…" onChange={event => setReleaseQuery(event.target.value)} />
+                    <span>{t('collections.releasesCount', { count: selectedReleases.length })}</span>
+                    <input value={releaseQuery} placeholder={t('collections.searchPlaceholder')} onChange={event => setReleaseQuery(event.target.value)} />
                     {releaseQuery.trim().length >= 2 && <div className={styles.releaseSearchResults}>
-                        {isReleaseSearchLoading && <small>Ищем релизы…</small>}
+                        {isReleaseSearchLoading && <small>{t('collections.searching')}</small>}
                         {!isReleaseSearchLoading && releaseResults.map(release => {
                             const isSelected = selectedReleases.some(selected => selected.id === release.id);
                             return <button key={release.id} type="button" disabled={isSelected || selectedReleases.length >= 100} onClick={() => {
@@ -332,20 +335,20 @@ export default function CollectionsScreen() {
                                 setReleaseQuery('');
                                 setReleaseResults([]);
                             }}>
-                                <RemoteImage src={release.image} alt="" />
-                                <span>{release.title_ru}</span>
+                                <RemoteImage src={release.image} alt={release.title_ru || release.title_original} />
+                                <span>{release.title_ru || release.title_original}</span>
                             </button>;
                         })}
-                        {!isReleaseSearchLoading && releaseResults.length === 0 && <small>Ничего не найдено</small>}
+                        {!isReleaseSearchLoading && releaseResults.length === 0 && <small>{t('collections.searchEmpty')}</small>}
                     </div>}
                     {selectedReleases.length > 0 && <div className={styles.selectedReleases}>
-                        {selectedReleases.map(release => <button key={release.id} type="button" onClick={() => setSelectedReleases(current => current.filter(selected => selected.id !== release.id))}>
-                            <span>{release.title_ru}</span> ×
+                        {selectedReleases.map(release => <button key={release.id} type="button" aria-label={t('collections.removeRelease', { title: release.title_ru || release.title_original })} onClick={() => setSelectedReleases(current => current.filter(selected => selected.id !== release.id))}>
+                            <span>{release.title_ru || release.title_original}</span> ×
                         </button>)}
                     </div>}
                 </div>
                 {createError && <p className={styles.error}>{createError}</p>}
-                <button type="submit" className={styles.createSubmit} disabled={isCreating}>{isCreating ? 'Создаём…' : 'Создать'}</button>
+                <button type="submit" className={styles.createSubmit} disabled={isCreating}>{t(isCreating ? 'collections.creating' : 'collections.create')}</button>
             </form>
         </Modal>
     </section>;

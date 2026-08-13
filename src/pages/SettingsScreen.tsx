@@ -28,18 +28,18 @@ export default function SettingsScreen(){
         player: { ...previous.player, ...player },
     }));
     const keybindingLabels: Record<PlayerKeybindingAction, string> = {
-        togglePlayback: 'Воспроизведение / пауза',
-        seekBackward: 'Перемотать назад на 5 секунд',
-        seekForward: 'Перемотать вперёд на 5 секунд',
-        volumeDown: 'Уменьшить громкость',
-        volumeUp: 'Увеличить громкость',
-        toggleMute: 'Включить / выключить звук',
-        toggleFullscreen: 'Полноэкранный режим',
-        previousEpisode: 'Предыдущая серия',
-        nextEpisode: 'Следующая серия',
-        skipOpening: 'Пропустить опенинг',
+        togglePlayback: t('settings.keybinding.togglePlayback'),
+        seekBackward: t('settings.keybinding.seekBackward'),
+        seekForward: t('settings.keybinding.seekForward'),
+        volumeDown: t('settings.keybinding.volumeDown'),
+        volumeUp: t('settings.keybinding.volumeUp'),
+        toggleMute: t('settings.keybinding.toggleMute'),
+        toggleFullscreen: t('settings.keybinding.toggleFullscreen'),
+        previousEpisode: t('settings.keybinding.previousEpisode'),
+        nextEpisode: t('settings.keybinding.nextEpisode'),
+        skipOpening: t('settings.keybinding.skipOpening'),
     };
-    const formatKey = (code: string) => ({ Space: 'Пробел', ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓' }[code] ?? code.replace(/^Key/, ''));
+    const formatKey = (code: string) => ({ Space: t('settings.key.space'), ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓' }[code] ?? code.replace(/^Key/, ''));
 
     useEffect(() => {
         let isCancelled = false;
@@ -58,7 +58,7 @@ export default function SettingsScreen(){
 
     return (
         <PageLayout>
-            <PageHeader title="Настройки" description="Настройте внешний вид, контент и проигрыватель." />
+            <PageHeader title={t('nav.settings')} description={t('settings.description')} />
             <div className={styles['content']}>
                 <h2 className={styles.sectionTitle}>{t('settings.appearance')}</h2>
                 <div className={styles['settings-item']}>
@@ -67,8 +67,8 @@ export default function SettingsScreen(){
                         <p>{t('settings.language.desc')}</p>
                     </div>
                     <div className={styles['select']}>
-                        <button type="button" className={settings.appearance.language === 'russian' ? styles.active : ''} onClick={() => updateAppearance({ language: 'russian' })}>Русский</button>
-                        <button type="button" className={settings.appearance.language === 'english' ? styles.active : ''} onClick={() => updateAppearance({ language: 'english' })}>English</button>
+                        <button type="button" className={settings.appearance.language === 'russian' ? styles.active : ''} onClick={() => updateAppearance({ language: 'russian' })}>{t('settings.language.russian')}</button>
+                        <button type="button" className={settings.appearance.language === 'english' ? styles.active : ''} onClick={() => updateAppearance({ language: 'english' })}>{t('settings.language.english')}</button>
                     </div>
                    
                 </div>
@@ -115,8 +115,8 @@ export default function SettingsScreen(){
                     <ToggleSettingsItem title={t('settings.rememberSource')} desc={t('settings.rememberSource.desc')} checked={settings.content.rememberSource} onChange={rememberSource => updateContent({ rememberSource })}/>
                     <ToggleSettingsItem title={t('settings.rememberTime')} desc={t('settings.rememberTime.desc')} checked={settings.content.rememberEpisodeTime} onChange={rememberEpisodeTime => updateContent({ rememberEpisodeTime })}/>
                     <ToggleSettingsItem
-                        title="Проксировать поиск через Shikimori API"
-                        desc="Позволяет более точно искать аниме на английском языке, но занимает больше времени. Включайте только тогда, если у вас часто не работает поиск на английском."
+                        title={t('settings.proxySearch')}
+                        desc={t('settings.proxySearch.desc')}
                         checked={settings.content.proxySearchThroughShikimori}
                         onChange={proxySearchThroughShikimori => updateContent({ proxySearchThroughShikimori })}
                     />
@@ -174,8 +174,8 @@ export default function SettingsScreen(){
                     </label>
                     <div className={styles['keybindings-setting']}>
                         <div className={styles['keybindings-heading']}>
-                            <span><strong>Горячие клавиши</strong><small>Нажмите на клавишу, затем нажмите нужную кнопку. Повторяющиеся бинды заменяются.</small></span>
-                            <button type="button" onClick={() => updatePlayer({ keybindings: { ...defaultPlayerKeybindings } })}>Сбросить</button>
+                            <span><strong>{t('settings.keybindings')}</strong><small>{t('settings.keybindings.desc')}</small></span>
+                            <button type="button" onClick={() => updatePlayer({ keybindings: { ...defaultPlayerKeybindings } })}>{t('misc.reset')}</button>
                         </div>
                         <div className={styles['keybindings-list']}>
                             {playerKeybindingActions.map(action => <div className={styles['keybinding-row']} key={action}>
@@ -201,7 +201,7 @@ export default function SettingsScreen(){
                                         });
                                         setCapturingBinding(null);
                                     }}
-                                >{capturingBinding === action ? 'Нажмите клавишу…' : formatKey(keybindings[action]) || 'Не назначено'}</button>
+                                >{capturingBinding === action ? t('settings.keybindings.capture') : formatKey(keybindings[action]) || t('settings.keybindings.unassigned')}</button>
                             </div>)}
                         </div>
                     </div>

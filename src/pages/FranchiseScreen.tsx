@@ -7,6 +7,7 @@ import RemoteImage from '../components/RemoteImage';
 import { useApi } from '../shared/apiClient';
 import type { Anime } from '../shared/types/api';
 import styles from './FranchiseScreen.module.css';
+import { useTranslation } from '../shared/useTranslation';
 
 type FranchiseInfo = {
     id: number;
@@ -31,6 +32,7 @@ export default function FranchiseScreen() {
     const { id } = useParams<{ id: string }>();
     const location = useLocation();
     const api = useApi();
+    const { t, language } = useTranslation();
     const franchiseFromState = location.state?.franchise as FranchiseInfo | undefined;
     const franchiseId = Number(id);
     const [franchise, setFranchise] = useState<FranchiseInfo | null>(franchiseFromState ?? null);
@@ -41,6 +43,7 @@ export default function FranchiseScreen() {
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [retryIndex, setRetryIndex] = useState(0);
+    const hasValidFranchiseId = Number.isFinite(franchiseId) && franchiseId > 0;
 
     const loadPage = useCallback((async (page: number) => {
         const path = `/related/${franchiseId}/${page}`;
@@ -48,13 +51,11 @@ export default function FranchiseScreen() {
     }), [api, franchiseId])
 
     useEffect(() => {
-        if (!Number.isFinite(franchiseId) || franchiseId <= 0) {
-            setError('Не удалось открыть франшизу.');
-            setIsLoading(false);
-            return;
-        }
+        if (!hasValidFranchiseId) return;
 
         let cancelled = false;
+        // Reset pagination when the route changes before starting the new request.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setIsLoading(true);
         setError(null);
         setReleases([]);
@@ -71,14 +72,14 @@ export default function FranchiseScreen() {
                 setFranchise(current => data.related ?? current);
             })
             .catch(() => {
-                if (!cancelled) setError('Не удалось загрузить релизы франшизы.');
+                if (!cancelled) setError(t('franchise.loadError'));
             })
             .finally(() => {
                 if (!cancelled) setIsLoading(false);
             });
 
         return () => { cancelled = true; };
-    }, [franchiseFromState, franchiseId, loadPage, retryIndex]);
+    }, [franchiseFromState, franchiseId, hasValidFranchiseId, loadPage, retryIndex, t]);
 
     const loadMore = async () => {
         if (isLoadingMore || currentPage >= totalPageCount) return;
@@ -92,41 +93,42 @@ export default function FranchiseScreen() {
             setCurrentPage(data.current_page ?? currentPage + 1);
             setTotalPageCount(data.total_page_count ?? data.total_pages ?? totalPageCount);
         } catch {
-            setError('Не удалось загрузить следующую страницу.');
+            setError(t('franchise.moreError'));
         } finally {
             setIsLoadingMore(false);
         }
     };
 
-    const title = franchise?.name_ru || franchise?.name || 'Франшиза';
+    const title = language === 'english' ? franchise?.name || franchise?.name_ru || t('franchise.title') : franchise?.name_ru || franchise?.name || t('franchise.title');
     const poster = franchise?.image || franchise?.images?.[0];
 
     return <PageLayout size="wide" className={styles.page}>
         <PageHeader title={title} description={franchise?.description} back />
 
         {poster && <section className={styles.hero}>
-            <RemoteImage className={styles.cover} src={poster} alt={`Обложка: ${title}`} />
+            <RemoteImage className={styles.cover} src={poster} alt={t('franchise.coverAlt', { title })} />
         </section>}
 
         <section className={styles.releases}>
             <div className={styles.sectionHeader}>
-                <h2>Релизы франшизы</h2>
+                <h2>{t('search.franchiseReleases')}</h2>
             </div>
-            {isLoading && <PageState status="loading" message="Загружаем релизы франшизы…" />}
-            {!isLoading && error && <PageState
+            {!hasValidFranchiseId && <PageState status="error" message={t('franchise.openError')} />}
+            {hasValidFranchiseId && isLoading && <PageState status="loading" message={t('franchise.loading')} />}
+            {hasValidFranchiseId && !isLoading && error && <PageState
                 status="error"
                 message={error}
-                onRetry={Number.isFinite(franchiseId) && franchiseId > 0
+                onRetry={hasValidFranchiseId
                     ? () => releases.length > 0 ? void loadMore() : setRetryIndex(index => index + 1)
                     : undefined}
             />}
-            {!isLoading && !error && releases.length === 0 && <PageState status="empty" message="В этой франшизе пока нет релизов." />}
+            {hasValidFranchiseId && !isLoading && !error && releases.length === 0 && <PageState status="empty" message={t('franchise.empty')} />}
             <div className={styles.timeline}>
                 {releases.map(release => <div key={release.id} className={styles.timelineItem}>
                     <AnimeCardHorizontal anime={release} />
                 </div>)}
             </div>
-            {currentPage < totalPageCount && <button type="button" className={styles.moreButton} disabled={isLoadingMore} onClick={() => void loadMore()}>{isLoadingMore ? 'Загружаем…' : 'Показать ещё'}</button>}
+            {currentPage < totalPageCount && <button type="button" className={styles.moreButton} disabled={isLoadingMore} onClick={() => void loadMore()}>{isLoadingMore ? t('franchise.loadingMore') : t('franchise.showMore')}</button>}
         </section>
     </PageLayout>;
 }

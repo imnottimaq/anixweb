@@ -1,16 +1,17 @@
 import { Link } from 'react-router-dom';
 import type { Collection } from '../shared/types/api';
-import { plural } from '../shared/plural';
 import RemoteImage from './RemoteImage';
 import styles from './CollectionCard.module.css';
+import { useTranslation } from '../shared/useTranslation';
 
 interface CollectionCardProps {
     collection: Collection;
 }
 
 export default function CollectionCard({ collection }: CollectionCardProps) {
+    const { t, selectPlural } = useTranslation();
     return <article className={styles.card}>
-        <Link className={styles.mainLink} to={`/collection/${collection.id}`} aria-label={`Открыть коллекцию «${collection.title}»`}>
+        <Link className={styles.mainLink} to={`/collection/${collection.id}`} aria-label={t('collection.open', { title: collection.title })}>
             <RemoteImage src={collection.image} className={styles.poster} alt={collection.title} />
             <div className={styles.content}>
                 <h2>{collection.title}</h2>
@@ -23,8 +24,8 @@ export default function CollectionCard({ collection }: CollectionCardProps) {
                 <span>{collection.creator.login}</span>
             </Link>
             <div className={styles.stats}>
-                <span>{collection.comment_count} {plural(collection.comment_count, 'комментарий', 'комментария', 'комментариев')}</span>
-                <span>{collection.favorites_count} сохранений</span>
+                <span>{collection.comment_count} {t(`comments.count.${selectPlural(collection.comment_count) as 'one' | 'few' | 'many' | 'other'}`)}</span>
+                <span>{t(`collection.saved.${selectPlural(collection.favorites_count) as 'one' | 'few' | 'many' | 'other'}`, { count: collection.favorites_count })}</span>
             </div>
         </footer>
     </article>;
