@@ -14,7 +14,7 @@ import { useUser } from '../shared/contexts/userContext';
 import { clearPlayerSession, getPlayerSession, setPlayerSession, type PlayerSession } from '../shared/playerSession';
 import { getWatchProgress, saveWatchProgress } from '../shared/watchProgress';
 import { extractVideoLinks } from '../utils/LinkParser';
-import { canUseAnime4KVideo, checkAnime4KVideoSupport } from '../shared/anime4kSupport';
+import { canUseAnime4KVideo, checkAnime4KVideoSupport, isSafariBrowser } from '../shared/anime4kSupport';
 import { useTranslation } from '../shared/useTranslation';
 import { type WatchRoomState, WatchRoomSocket } from '../shared/watchRoom';
 import { getRoomParticipant } from '../shared/roomParticipant';
@@ -341,6 +341,10 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
         setIsBuffering(true);
 
         const isHls = stream.type === HLS_MIME_TYPE || stream.src.includes('.m3u8') || stream.src.includes(':hls:');
+        const canPlayNativeHls = isHls && Boolean(
+            video.canPlayType('application/vnd.apple.mpegurl')
+            || video.canPlayType(HLS_MIME_TYPE)
+        );
         let hls: Hls | undefined;
         let isAbandoningStream = false;
         let mediaRecoveryAttempts = 0;
@@ -367,7 +371,12 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
             }
         };
 
-        if (isHls && Hls.isSupported()) {
+        // Safari has a native HLS pipeline. Prefer it over MediaSource/hls.js:
+        // it is better integrated with WebKit's buffering, seeking and
+        // fullscreen playback, especially after backgrounding the tab.
+        if (canPlayNativeHls) {
+            video.src = stream.src;
+        } else if (isHls && Hls.isSupported()) {
             hls = new Hls({
                 // Fail a persistently broken SourceBuffer quickly; the player
                 // then tries another quality instead of logging forever.
@@ -742,7 +751,9 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                                         <small>{webGpuStatus === 'checking'
                                             ? t('settings.qualityUpscale.webgpuChecking')
                                             : webGpuStatus === 'unsupported'
-                                                ? t('settings.qualityUpscale.webgpuNotSupported')
+                                                ? t(isSafariBrowser()
+                                                    ? 'settings.qualityUpscale.webgpuSafariNotSupported'
+                                                    : 'settings.qualityUpscale.webgpuNotSupported')
                                                 : 'Anime4K'}</small>
                                     </span>
                                     <label className={styles['player-toggle']}>
@@ -818,6 +829,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                 <video
                     ref={videoRef}
                     preload="auto"
+                    autoPlay={shouldPlayNextEpisode}
                     crossOrigin="anonymous"
                     onLoadStart={() => setIsBuffering(true)}
                     onWaiting={() => setIsBuffering(true)}

@@ -113,26 +113,6 @@
 .privateToggle { display: flex !important; align-items: center; gap: 9px !important; color: var(--text-color) !important; cursor: pointer; }
 .privateToggle input { width: 17px; height: 17px; accent-color: var(--accent-color); }
 
-.commentsModal { max-width: 900px; }
-.commentsMessage { margin: 20px 0; color: var(--text-secondary); text-align: center; }
-.commentsList { display: grid; gap: 12px; }
-.commentArea { display: flex; flex-direction: column; gap: 10px; margin: 0 0 18px; padding: 12px; }
-.commentArea textarea { box-sizing: border-box; width: 100%; min-height: 104px; padding: 10px 11px; border: 1px solid var(--border-color); border-radius: 9px; outline: none; resize: none; color: var(--text-color); background: var(--background-color); font: inherit; line-height: 1.4; }
-.commentArea textarea:focus { border-color: var(--accent-color); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 24%, transparent); }
-.replyContext { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 9px; border-radius: 8px; color: var(--text-color); background: color-mix(in srgb, var(--accent-color) 14%, var(--background-color)); font-size: 13px; }
-.replyContext strong { color: var(--accent-color); }
-.replyContext button { display: grid; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; place-items: center; cursor: pointer; color: var(--text-color); background: transparent; font-size: 19px; line-height: 1; }
-.replyContext button:hover { background: color-mix(in srgb, var(--text-color) 10%, transparent); }
-.commentControls { display: flex; align-items: center; gap: 10px; }
-.spoilerToggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; user-select: none; }
-.spoilerToggle input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent-color); }
-.commentCounter { margin-left: auto; color: color-mix(in srgb, var(--text-color) 58%, transparent); font-size: 12px; font-variant-numeric: tabular-nums; }
-.sendButton { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 34px; padding: 7px 12px; border: 0; border-radius: 9px; cursor: pointer; color: var(--background-color); background: var(--accent-color); font: inherit; font-size: 13px; font-weight: 700; }
-.sendButton img { width: 15px; height: 15px; }
-.sendButton:hover:not(:disabled) { filter: brightness(.94); }
-.sendButton:disabled { cursor: not-allowed; opacity: .52; }
-.commentError { margin: 0; color: var(--status-dropped); font-size: 13px; }
-
 .releases { margin-top: 34px; }
 .sectionHeader { max-width: 1060px; margin: 0 auto 16px; }
 .sectionHeader h2 { font-size: clamp(22px, 2.3vw, 30px); }

@@ -293,7 +293,7 @@
 .comments-stat:hover { background: color-mix(in srgb, var(--accent-color) 11%, transparent); }
 .comments-stat:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
 
-.profile-comments-modal { --modal-width: min(1040px, calc(100vw - 32px)); }
+.profile-comments-modal { --modal-width: min(1040px, calc(100vw - 32px)); --modal-sticky-header-padding-top: 12px; --modal-sticky-header-padding-bottom: 12px; overflow-x: hidden; border-radius: 1rem; }
 .profile-comments-tabs { display: flex; gap: 6px; margin: 0 0 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
 .profile-comments-tabs button { min-height: 34px; padding: 0 12px; border: 0; border-radius: var(--radius-control); cursor: pointer; color: var(--text-secondary); background: transparent; font: inherit; }
 .profile-comments-tabs button:hover { color: var(--text-color); background: var(--lighter-background-color); }

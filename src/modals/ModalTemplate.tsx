@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type UIEventHandler } from 'react';
 import XMarkIcon from '../assets/icons/xmark.svg'
 import styles from './ModalTemplate.module.css'
 import { useTranslation } from '../shared/useTranslation';
@@ -21,11 +21,12 @@ type ModalProps = {
     size? : "small" | "medium" | "large" | "fullscreen";
     showCloseButton?: boolean;
     stickyHeader?: boolean;
+    onBodyScroll?: UIEventHandler<HTMLDivElement>;
     contentClassName?: string;
     contentStyle?: React.CSSProperties;
 };
 
-export function Modal({ isOpen, onClose, title, text, actions, children, size, showCloseButton, stickyHeader = false, contentClassName, contentStyle }: ModalProps) {
+export function Modal({ isOpen, onClose, title, text, actions, children, size, showCloseButton, stickyHeader = false, onBodyScroll, contentClassName, contentStyle }: ModalProps) {
     const { t } = useTranslation();
     const [isClosing, setIsClosing] = useState(false);
 
@@ -66,22 +67,24 @@ export function Modal({ isOpen, onClose, title, text, actions, children, size, s
                     <img alt="" src={XMarkIcon}/>
                 </button>}
             </header>}
-            {text && <p className={styles.text}>{text}</p>}
-            {typeof children === 'function' ? children(handleClose) : children}
+            <div className={styles['modal-body']} onScroll={onBodyScroll}>
+                {text && <p className={styles.text}>{text}</p>}
+                {typeof children === 'function' ? children(handleClose) : children}
 
-            {actions && (
-            <footer className={styles.actions}>
-                {actions.map((action) => (
-                <button
-                    key={action.label}
-                    className={`${styles.action} ${styles[`action-${action.variant ?? 'primary'}`]}`}
-                    onClick={action.onClick}
-                >
-                    {action.label}
-                </button>
-                ))}
-            </footer>
-            )}
+                {actions && (
+                <footer className={styles.actions}>
+                    {actions.map((action) => (
+                    <button
+                        key={action.label}
+                        className={`${styles.action} ${styles[`action-${action.variant ?? 'primary'}`]}`}
+                        onClick={action.onClick}
+                    >
+                        {action.label}
+                    </button>
+                    ))}
+                </footer>
+                )}
+            </div>
         </section>
         </div>
     );

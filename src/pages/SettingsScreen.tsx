@@ -2,7 +2,7 @@ import ToggleSettingsItem from '../components/ToggleSettingsItem'
 import { PageHeader, PageLayout } from '../components/PageLayout'
 import { useSettings } from '../shared/contexts/settingsContext'
 import { useEffect, useState } from 'react'
-import { canUseAnime4KVideo, checkAnime4KVideoSupport } from '../shared/anime4kSupport'
+import { canUseAnime4KVideo, checkAnime4KVideoSupport, isSafariBrowser } from '../shared/anime4kSupport'
 import { useTranslation } from '../shared/useTranslation'
 import { defaultPlayerKeybindings, playerKeybindingActions, type PlayerKeybindingAction } from '../shared/types/settings'
 import styles from './SettingsScreen.module.css'
@@ -154,7 +154,9 @@ export default function SettingsScreen(){
                     <p className={`${styles['webgpu-status']} ${styles[`webgpu-${webGpuStatus}`]}`}>
                         {webGpuStatus === 'checking' && t('settings.qualityUpscale.webgpuChecking')}
                         {webGpuStatus === 'supported' && t('settings.qualityUpscale.webgpuSupported')}
-                        {webGpuStatus === 'unsupported' && t('settings.qualityUpscale.webgpuNotSupported')}
+                        {webGpuStatus === 'unsupported' && t(isSafariBrowser()
+                            ? 'settings.qualityUpscale.webgpuSafariNotSupported'
+                            : 'settings.qualityUpscale.webgpuNotSupported')}
                     </p>
                     <label className={styles['select-setting']}>
                         <span><strong>{t('settings.upscalerMode')}</strong><small>{t('settings.upscalerMode.desc')}</small></span>

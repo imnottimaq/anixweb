@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom"
 import styles from './ReleaseScreen.module.css'
 import { type Anime, type Collection } from "../shared/types/api";
@@ -14,6 +14,7 @@ import RemoteImage from '../components/RemoteImage';
 import { useTranslation } from '../shared/useTranslation';
 import { plural } from '../shared/plural';
 import { Modal } from '../modals/ModalTemplate';
+import CommentsModal from '../modals/CommentsModal';
 import { useAsyncLoad } from '../shared/useAsyncLoad';
 
 //Icons
@@ -22,7 +23,6 @@ import calendarIcon from "../assets/icons/calendar.svg"
 import tagsIcon from "../assets/icons/tags.svg"
 import albumIcon from "../assets/icons/album-collection.svg"
 import favoriteIcon from '../assets/icons/bookmark.svg'
-import sendIcon from '../assets/icons/send.svg'
 import leftArrowIcon from '../assets/icons/left-arrow.svg'
 import rightArrowIcon from '../assets/icons/right-arrow.svg'
 import commentsIcon from '../assets/icons/message-circle-dots.svg'
@@ -37,7 +37,7 @@ import PageState from '../components/PageState';
 
 export default function ReleaseScreen(){
     const {id} = useParams<{id: string}>();
-    const {userToken, userId, setUserId} = useUser();
+    const {userToken, userId} = useUser();
     const {settings} = useSettings();
     const { t } = useTranslation();
     const navigate = useNavigate();
@@ -79,21 +79,11 @@ export default function ReleaseScreen(){
     const [loadedRequestKey, setLoadedRequestKey] = useState<string | null>(null);
     const [releaseLoadError, setReleaseLoadError] = useState<{ key: string; message: string } | null>(null);
     const [releaseLoadAttempt, setReleaseLoadAttempt] = useState(0);
-    const [commentText, setCommentText] = useState('');
-    const [commentSpoiler, setCommentSpoiler] = useState(false);
-    const [isSendingComment, setIsSendingComment] = useState(false);
-    const [commentError, setCommentError] = useState<string | null>(null);
-    const [replyTarget, setReplyTarget] = useState<CommentType | null>(null);
-    const [newReply, setNewReply] = useState<{ parentCommentId: number; comment: CommentType } | null>(null);
-    const [editTarget, setEditTarget] = useState<CommentType | null>(null);
-    const [editedComment, setEditedComment] = useState<{ commentId: number; message: string; spoiler: boolean } | null>(null);
     const [isCommentsOpen, setIsCommentsOpen] = useState(false);
-    const [shouldFocusCommentInput, setShouldFocusCommentInput] = useState(false);
-    const commentInputRef = useRef<HTMLTextAreaElement>(null);
+    const [commentsInitialAction, setCommentsInitialAction] = useState<{ type: 'compose' } | { type: 'reply' | 'edit'; comment: CommentType } | null>(null);
 
     const releaseAttemptKey = `${requestKey}:${releaseLoadAttempt}`;
     const isReleaseLoading = loadedRequestKey !== releaseAttemptKey;
-    const isCommentTooShort = commentText.trim().length < 5;
     const releaseId = Number(id);
     const isValidReleaseId = Number.isInteger(releaseId) && releaseId > 0;
     const { data: commentsData, error: commentsLoadError, isLoading: isCommentsLoading, reload: reloadComments } = useAsyncLoad(
@@ -104,20 +94,10 @@ export default function ReleaseScreen(){
             initialData: { code: 0, content: [], total_count: 0, total_page_count: 0, current_page: 0 },
         },
     );
-    const releaseComments = commentsData?.content ?? [];
-
-    useEffect(() => {
-        if (!isCommentsOpen || !shouldFocusCommentInput) return;
-
-        const frame = window.requestAnimationFrame(() => {
-            commentInputRef.current?.focus();
-            setShouldFocusCommentInput(false);
-        });
-        return () => window.cancelAnimationFrame(frame);
-    }, [isCommentsOpen, shouldFocusCommentInput]);
+    const firstPageComments = commentsData?.content ?? [];
 
     const openCommentEditor = () => {
-        setShouldFocusCommentInput(true);
+        setCommentsInitialAction({ type: 'compose' });
         setIsCommentsOpen(true);
     };
 
@@ -284,75 +264,13 @@ export default function ReleaseScreen(){
     };
 
     const startReply = (comment: CommentType) => {
-        setReplyTarget(comment);
-        setEditTarget(null);
-        setCommentText(`${comment.profile.login}, `);
-        setCommentError(null);
-        openCommentEditor();
+        setCommentsInitialAction({ type: 'reply', comment });
+        setIsCommentsOpen(true);
     };
 
     const startEdit = (comment: CommentType) => {
-        setEditTarget(comment);
-        setReplyTarget(null);
-        setCommentText(comment.message);
-        setCommentSpoiler(comment.is_spoiler);
-        setCommentError(null);
-        openCommentEditor();
-    };
-
-    const sendComment = async () => {
-        const message = commentText.trim();
-        if (message.length < 5 || isSendingComment) {
-            setCommentError(t('comments.minLength'));
-            return;
-        }
-
-        if (!userToken) {
-            setCommentError(t('release.loginToChangeStatus'));
-            return;
-        }
-
-        setIsSendingComment(true);
-        setCommentError(null);
-
-        try {
-            if (editTarget) {
-                await api.post<{code?:number}>(`/release/comment/edit/${editTarget.id}`, {message, spoiler: commentSpoiler});
-                setEditedComment({ commentId: editTarget.id, message, spoiler: commentSpoiler });
-            } else {
-                const result = await api.postViaAgent<{code: number, comment: CommentType | null}>
-                    (`/release/comment/add/${animeData.id}`, {
-                    message,
-                    spoiler: commentSpoiler,
-                    parentCommentId: replyTarget?.id ?? null, 
-                    replyToProfileId: replyTarget?.profile.id ?? null
-                })
-
-                if (!result.comment) throw new Error('Server hasnt returned created comment')
-
-                const createdComment = result.comment;
-                if (createdComment) {
-                    setUserId(createdComment.profile.id);
-                    if (replyTarget) {
-                        setNewReply({ parentCommentId: replyTarget.id, comment: createdComment });
-                    } else {
-                        setAnimeData((previous) => ({
-                            ...previous,
-                            comments: [createdComment, ...previous.comments],
-                        }));
-                    }
-                }
-            }
-            setCommentText('');
-            setCommentSpoiler(false);
-            setReplyTarget(null);
-            setEditTarget(null);
-            reloadComments();
-        } catch (error) {
-            setCommentError(error instanceof Error ? error.message : t('release.loadError'));
-        } finally {
-            setIsSendingComment(false);
-        }
+        setCommentsInitialAction({ type: 'edit', comment });
+        setIsCommentsOpen(true);
     };
 
     useEffect(() => {
@@ -630,89 +548,32 @@ export default function ReleaseScreen(){
                         </button>
                         {isCommentsLoading && <p className={styles['empty-comments']}>{t('misc.loading')}</p>}
                         {Boolean(commentsLoadError) && <p className={styles['comment-error']}>{t('release.loadError')}</p>}
-                        {!isCommentsLoading && !commentsLoadError && releaseComments.length === 0 && <p className={styles['empty-comments']}>{t('release.noComments')}</p>}
+                        {!isCommentsLoading && !commentsLoadError && firstPageComments.length === 0 && <p className={styles['empty-comments']}>{t('release.noComments')}</p>}
                         {!isCommentsLoading && <div className={styles['comments-page-list']}>
-                            {releaseComments.map((comment: CommentType) => (
+                            {firstPageComments.map((comment: CommentType) => (
                                 <Comment
                                     key={comment.id}
                                     comment={comment}
                                     releaseId={animeData.id}
                                     onReply={startReply}
                                     onEdit={startEdit}
-                                    newReply={newReply}
-                                    editedComment={editedComment}
                                     onDelete={reloadComments}
                                 />
                             ))}
                         </div>}
                     </section>
-                    <Modal
-                        isOpen={isCommentsOpen}
-                        onClose={() => setIsCommentsOpen(false)}
+                    {isCommentsOpen && <CommentsModal
+                        isOpen
+                        entityId={animeData.id}
+                        variant="release"
                         title={t('release.commentSection')}
-                        stickyHeader
-                        contentClassName={styles['comments-modal']}
-                        contentStyle={{ width: 'min(1180px, calc(100vw - 32px))', maxHeight: '80vh' }}
-                    >
-                        {isCommentsLoading && <p className={styles['empty-comments']}>{t('misc.loading')}</p>}
-                        {Boolean(commentsLoadError) && <p className={styles['comment-error']}>{t('release.loadError')}</p>}
-                        {!isCommentsLoading && !commentsLoadError && releaseComments.length === 0 && <p className={styles['empty-comments']}>{t('release.noComments')}</p>}
-                        {!isCommentsLoading && releaseComments.map((comment: CommentType) => (
-                            <Comment
-                                key={comment.id}
-                                comment={comment}
-                                releaseId={animeData.id}
-                                onReply={startReply}
-                                onEdit={startEdit}
-                                newReply={newReply}
-                                editedComment={editedComment}
-                                onDelete={reloadComments}
-                            />
-                        ))}
-                        <form className={styles['comment-area']} onSubmit={(event) => {
-                            event.preventDefault();
-                            void sendComment();
-                        }}>
-                            {replyTarget && <div className={styles['reply-context']}>
-                                <span>{t('comments.replyFor')}<strong>{replyTarget.profile.login}</strong></span>
-                                <button type="button" onClick={() => setReplyTarget(null)} aria-label={t('release.cancelReply')}>×</button>
-                            </div>}
-                            {editTarget && <div className={styles['reply-context']}>
-                                <span>{t('comments.editing')}</span>
-                                <button type="button" onClick={() => setEditTarget(null)} aria-label={t('release.cancelEdit')}>×</button>
-                            </div>}
-                            <textarea
-                                ref={commentInputRef}
-                                placeholder={t('comments.writePlaceholder')}
-                                value={commentText}
-                                maxLength={1000}
-                                onChange={(event) => {
-                                    setCommentText(event.target.value);
-                                    setCommentError(null);
-                                }}
-                            />
-                            <div className={styles['comment-controls']}>
-                                <label className={styles['spoiler-toggle']}>
-                                    <input
-                                        type="checkbox"
-                                        checked={commentSpoiler}
-                                        onChange={(event) => setCommentSpoiler(event.target.checked)}
-                                    />
-                                    <span>{t('comments.spoiler')}</span>
-                                </label>
-                                <span className={styles['comment-counter']}>{commentText.length}/1000</span>
-                                <button
-                                    type="submit"
-                                    className={styles['send-btn']}
-                                    disabled={isCommentTooShort || isSendingComment}
-                                >
-                                    <img src={sendIcon} alt="" />
-                                    {isSendingComment ? t('comments.sending') : t('comments.send')}
-                                </button>
-                            </div>
-                            {commentError && <p className={styles['comment-error']}>{commentError}</p>}
-                        </form>
-                    </Modal>
+                        initialAction={commentsInitialAction}
+                        onCommentsChanged={reloadComments}
+                        onClose={() => {
+                            setIsCommentsOpen(false);
+                            setCommentsInitialAction(null);
+                        }}
+                    />}
                 </div>
             </div>
             <Modal

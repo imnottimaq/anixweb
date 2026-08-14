@@ -1,0 +1,54 @@
+.modal {
+    --modal-sticky-header-padding-top: 12px;
+    --modal-sticky-header-padding-bottom: 12px;
+    overflow-x: hidden;
+    border-radius: 1rem;
+}
+
+.message { margin: 20px 0; color: var(--text-secondary); text-align: center; }
+.error { margin: 0; color: var(--status-dropped); font-size: 13px; }
+
+.composer {
+    position: sticky;
+    bottom: -20px;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    margin: 18px 0 -20px;
+    padding: 12px;
+    border-top: 1px solid var(--border-color);
+    box-sizing: border-box;
+    background: var(--background-color);
+    box-shadow: 0 -10px 22px color-mix(in srgb, var(--background-color) 82%, transparent);
+}
+
+.composer textarea {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 104px;
+    padding: 10px 11px;
+    border: 1px solid var(--border-color);
+    border-radius: 9px;
+    outline: none;
+    resize: none;
+    color: var(--text-color);
+    background: var(--background-color);
+    font: inherit;
+    line-height: 1.4;
+}
+
+.composer textarea:focus { border-color: var(--accent-color); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 24%, transparent); }
+.context { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 9px; border-radius: 8px; color: var(--text-color); background: color-mix(in srgb, var(--accent-color) 14%, var(--background-color)); font-size: 13px; }
+.context strong { color: var(--accent-color); }
+.context button { display: grid; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; place-items: center; cursor: pointer; color: var(--text-color); background: transparent; font-size: 19px; line-height: 1; }
+.context button:hover { background: color-mix(in srgb, var(--text-color) 10%, transparent); }
+.controls { display: flex; align-items: center; gap: 10px; }
+.spoiler { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; user-select: none; }
+.spoiler input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent-color); }
+.counter { margin-left: auto; color: color-mix(in srgb, var(--text-color) 58%, transparent); font-size: 12px; font-variant-numeric: tabular-nums; }
+.send { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 34px; padding: 7px 12px; border: 0; border-radius: 9px; cursor: pointer; color: var(--background-color); background: var(--accent-color); font: inherit; font-size: 13px; font-weight: 700; }
+.send img { width: 15px; height: 15px; }
+.send:hover:not(:disabled) { filter: brightness(.94); }
+.send:disabled { cursor: not-allowed; opacity: .52; }

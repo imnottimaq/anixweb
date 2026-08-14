@@ -10,6 +10,7 @@
 .episode-row {
     display: flex;
     align-items: center;
+    height: 32px;
 }
 
 button.episode,
@@ -17,6 +18,8 @@ button.seen{
     display: flex;
     flex-direction: row;
     align-items: center;
+    height: 100%;
+    box-sizing: border-box;
     appearance: none;
     border: 0;
     background-color: transparent;
@@ -29,7 +32,7 @@ button.episode {
 
 button.seen {
     flex: 0 0 auto;
-    padding: 8px;
+    padding: 6px;
 }
 
 button.seen img {
@@ -42,6 +45,9 @@ button.seen img {
     text-align: left;
     margin: 2px 0;
     width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .episode img{

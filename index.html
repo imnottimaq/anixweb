@@ -16,6 +16,10 @@
     <link rel="shortcut icon" href="https://anixart.tv/assets/icons/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Anixweb</title>
+    <script>
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      if (isSafari) document.documentElement.classList.add('browser-safari');
+    </script>
   </head>
   <body>
     <div id="root"></div>

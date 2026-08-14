@@ -2,6 +2,11 @@ type WebGpuNavigator = Navigator & {
     gpu?: { requestAdapter: () => Promise<unknown | null> };
 };
 
+export function isSafariBrowser() {
+    return /Safari\//i.test(navigator.userAgent)
+        && !/(Chrome|Chromium|CriOS|FxiOS|EdgiOS|OPiOS|Android)/i.test(navigator.userAgent);
+}
+
 // Firefox/Zen exposes WebGPU, but currently cannot pass an HTMLVideoElement
 // to GPUQueue.copyExternalImageToTexture — the API Anime4K-WebGPU relies on.
 export function canUseAnime4KVideo() {

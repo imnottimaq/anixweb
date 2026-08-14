@@ -11,6 +11,7 @@
 
 .watchlist-line progress{
     position: absolute;
+    -webkit-appearance: none;
     appearance: none;
     background-color: transparent;
     border: 0;
@@ -20,6 +21,10 @@
 
 .watchlist-line progress::-webkit-progress-value {
     border: 0;
+}
+
+.watchlist-line progress::-webkit-progress-bar {
+    background-color: transparent;
 }
 
 .watchlist-line progress::-moz-progress-bar {

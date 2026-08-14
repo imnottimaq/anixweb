@@ -31,11 +31,38 @@
     background-color: var(--background-color);
     border-radius: 1rem;
     box-shadow: 0 24px 70px rgba(0, 0, 0, 0.3);
+    scrollbar-color: color-mix(in srgb, var(--text-secondary) 55%, transparent) transparent;
+    scrollbar-width: thin;
     animation: modal-in 220ms cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.modal::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.modal::-webkit-scrollbar-track,
+.modal::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+.modal::-webkit-scrollbar-track {
+    margin-block: 12px;
+}
+
+.modal::-webkit-scrollbar-thumb {
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--text-secondary) 55%, transparent);
+    background-clip: padding-box;
 }
 
 .modal-closing {
     animation: modal-out 180ms ease-in both;
+}
+
+.modal-body {
+    display: contents;
 }
 
 .modal-header {
@@ -80,13 +107,43 @@
 }
 
 .sticky-header .modal-header {
-    position: sticky;
-    top: -20px;
     z-index: 2;
-    margin: -20px -20px 14px;
-    padding: 16px 20px 12px;
+    flex: 0 0 auto;
+    margin: -20px -20px 0;
+    padding: var(--modal-sticky-header-padding-top, 12px) 20px var(--modal-sticky-header-padding-bottom, 12px);
     border-bottom: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent);
     background: var(--background-color);
+}
+
+.sticky-header {
+    overflow: hidden;
+}
+
+.sticky-header .modal-body {
+    display: block;
+    min-height: 0;
+    margin: 0 -20px -20px;
+    padding: 14px 20px 20px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-color: color-mix(in srgb, var(--text-secondary) 55%, transparent) transparent;
+    scrollbar-width: thin;
+}
+
+.sticky-header .modal-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.sticky-header .modal-body::-webkit-scrollbar-track {
+    margin-block: 10px;
+    background: transparent;
+}
+
+.sticky-header .modal-body::-webkit-scrollbar-thumb {
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--text-secondary) 55%, transparent);
+    background-clip: padding-box;
 }
 
 .text {
@@ -172,9 +229,13 @@
     }
 
     .sticky-header .modal-header {
-        top: -16px;
-        margin: -16px -16px 14px;
-        padding: 14px 16px 10px;
+        margin: -16px -16px 0;
+        padding: var(--modal-sticky-header-padding-top, 10px) 16px var(--modal-sticky-header-padding-bottom, 10px);
+    }
+
+    .sticky-header .modal-body {
+        margin: 0 -16px -16px;
+        padding: 12px 16px 16px;
     }
 
     .actions {
