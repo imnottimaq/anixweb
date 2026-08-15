@@ -27,8 +27,8 @@ import PrevIcon from '../assets/icons/video-prev.svg';
 import NextIcon from '../assets/icons/video-next.svg';
 import BackIcon from '../assets/icons/arrow-left.svg';
 import SkipIcon from '../assets/icons/chevron-right.svg';
-import MinimizeIcon from '../assets/icons/expand.svg';
-import MaximizeIcon from '../assets/icons/compress.svg';
+import ExpandIcon from '../assets/icons/expand.svg';
+import CompressIcon from '../assets/icons/compress.svg';
 import SettingsIcon from '../assets/icons/gear.svg';
 import VolumeMaxIcon from '../assets/icons/volume-max.svg';
 import VolumeMuteIcon from '../assets/icons/volume-xmark.svg';
@@ -146,10 +146,10 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
     const [upscalerReadyKey, setUpscalerReadyKey] = useState<string | null>(null);
     const [isEpisodeChanging, setIsEpisodeChanging] = useState(false);
-    const [shouldPlayNextEpisode, setShouldPlayNextEpisode] = useState(false);
     const [resumePromptTime, setResumePromptTime] = useState<number | null>(null);
     const [streamError, setStreamError] = useState<string | null>(null);
     const promptedEpisodesRef = useRef(new Set<string>());
+    const autoplayAttemptedForRef = useRef<string | null>(null);
     const fallbackPositionRef = useRef<{ time: number; shouldPlay: boolean } | null>(null);
     const roomSocketRef = useRef(new WatchRoomSocket());
     const applyingRoomStateRef = useRef(false);
@@ -524,7 +524,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
         };
     }, [settings.player.qualityUpgrade, settings.player.qualityUpgradeMode, stream, upscalerKey]);
 
-    const changeEpisode = useCallback(async (targetEpisode: NonNullable<typeof previousEpisode>, shouldStartPlayback = true) => {
+    const changeEpisode = useCallback(async (targetEpisode: NonNullable<typeof previousEpisode>) => {
         if (isEpisodeChanging) return;
 
         setIsEpisodeChanging(true);
@@ -537,7 +537,6 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                     api.get<{ code: number }>(`/history/add/${animeId}/${playerSession.sourceId}/${targetEpisode.position}`),
                 ]).catch(error => console.error('Не удалось отметить серию просмотренной:', error));
             }
-            setShouldPlayNextEpisode(shouldStartPlayback);
             setFallbackQuality(null);
             onSessionChange({
                 ...playerSession,
@@ -800,7 +799,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                                 else void playerRef.current?.requestFullscreen();
                             }}
                         >
-                            <img src={isMaximized ? MinimizeIcon : MaximizeIcon} />
+                            <img src={isMaximized ? CompressIcon : ExpandIcon} alt="" />
                         </button>
                     </div>
                     <div className={styles.timeline}>
@@ -829,12 +828,20 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                 <video
                     ref={videoRef}
                     preload="auto"
-                    autoPlay={shouldPlayNextEpisode}
+                    autoPlay
                     crossOrigin="anonymous"
                     onLoadStart={() => setIsBuffering(true)}
                     onWaiting={() => setIsBuffering(true)}
                     onStalled={() => setIsBuffering(true)}
-                    onCanPlay={() => setIsBuffering(false)}
+                    onCanPlay={event => {
+                        setIsBuffering(false);
+                        if (autoplayAttemptedForRef.current === progressKey) return;
+                        autoplayAttemptedForRef.current = progressKey;
+                        setResumePromptTime(null);
+                        if (event.currentTarget.paused) {
+                            void event.currentTarget.play().catch(error => console.error('Не удалось автоматически запустить серию:', error));
+                        }
+                    }}
                     onPlay={event => {
                         setIsPlaying(true);
                         sendRoomPlayback('play', event.currentTarget.currentTime);
@@ -885,10 +892,6 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                             const resumeTime = Math.min(savedTime, Math.max(video.duration - 1, 0));
                             promptedEpisodesRef.current.add(progressKey);
                             setResumePromptTime(resumeTime);
-                            setShouldPlayNextEpisode(false);
-                        } else if (shouldPlayNextEpisode) {
-                            void video.play().catch(error => console.error('Не удалось запустить следующую серию:', error));
-                            setShouldPlayNextEpisode(false);
                         }
                     }}
                     onDurationChange={event => setDuration(event.currentTarget.duration)}
