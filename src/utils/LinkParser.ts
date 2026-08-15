@@ -122,7 +122,7 @@ export class KodikParser {
         const urlResponse = await (await proxyFetch(url)).text();
 
         const paramsMatch = urlResponse.match(/var\s+urlParams\s*=\s*(['"])(?<params>.*?)\1/is);
-        const urlParams = JSON.parse(paramsMatch?.groups?.params || "{}");
+        const urlParams = JSON.parse(paramsMatch?.groups?.params || "{}") as Record<string, string>;
 
         const videoInfoHash = urlResponse.match(/hash\s*=\s*['"](?<hash>[a-zA-Z0-9]+)['"]/is)?.groups?.hash;
         const videoInfoId = urlResponse.match(/id\s*=\s*['"](?<id>\d+)['"]/is)?.groups?.id;
@@ -145,7 +145,7 @@ export class KodikParser {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'Accept': 'application/json'
             },
-            body: new URLSearchParams(requestBody as any).toString() 
+            body: new URLSearchParams(requestBody).toString()
         });
 
         const contentType = directLinksResponse.headers.get("content-type");
@@ -225,14 +225,14 @@ export interface AniLibriaAnime {
         description: string
     },
     description: string
-    notification: any,
+    notification: unknown,
     episodes_count: number | null,
-    external_player: any,
+    external_player: unknown,
     is_in_production: boolean,
     is_blocked_by_geo: boolean,
     is_blocked_by_copyrights: boolean,
     added_in_users_favorites: number,
-    average_duration_of_episode: any,
+    average_duration_of_episode: unknown,
     added_in_planned_collection: number,
     added_in_watched_collection: number,
     added_in_watching_collection: number,
@@ -277,7 +277,7 @@ export interface AniLibriaMember {
         description: string
     },
     nickname: string,
-    user: any
+    user: unknown
 }
 
 /**
@@ -309,8 +309,8 @@ export interface AniLibriaEpisode {
     hls_720: string,
     hls_1080: string,
     duration: number,
-    rutube_id: any,
-    youtube_id: any,
+    rutube_id: unknown,
+    youtube_id: unknown,
     updated_at: string,
     sort_order: number,
     release_id: number,

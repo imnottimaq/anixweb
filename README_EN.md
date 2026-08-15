@@ -38,6 +38,7 @@ npm run dev
 - App availability directly depends on the availability of the Anixart API
 - Some features of the official app have not yet been implemented
 - Future maintenance and development are not guaranteed
+- Registration may not work for email addresses hosted by some non-standard email providers
 
 ## Feedback
 
