@@ -30,6 +30,7 @@ import folderPlusIcon from '../assets/icons/folder-plus.svg'
 import bellIcon from '../assets/icons/bell.svg'
 
 import { setPlayerSession } from '../shared/playerSession'
+import { useRoomPresence } from '../shared/contexts/roomContext'
 import RecommendedRelease from "../components/RecommendedRelease";
 import { useApi } from "../shared/apiClient";
 import type { PagedResponse } from '../shared/types/api';
@@ -45,12 +46,8 @@ export default function ReleaseScreen(){
     const api = useApi();
     const roomParams = new URLSearchParams(location.search);
     const roomId = roomParams.get('room');
-    const roomAutoSelect = roomId
-        && Number.isInteger(Number(roomParams.get('dub')))
-        && Number.isInteger(Number(roomParams.get('source')))
-        && Number.isInteger(Number(roomParams.get('episode')))
-        ? { dubId: Number(roomParams.get('dub')), sourceId: Number(roomParams.get('source')), episode: Number(roomParams.get('episode')) }
-        : null;
+    const { send: sendRoom, room, status: roomStatus } = useRoomPresence();
+    const [roomSelectionError, setRoomSelectionError] = useState<string | null>(null);
     const partialData = location.state?.partialAnime || null;
 
     const [animeData, setAnimeData] = useState<Anime>(partialData);
@@ -642,15 +639,28 @@ export default function ReleaseScreen(){
                     <button type="button" disabled={isNotificationSettingsLoading || isNotificationSettingsSaving} onClick={() => void saveReleaseNotifications()}>{isNotificationSettingsSaving ? t('collection.saving') : t('collection.saveChanges')}</button>
                 </div>
             </Modal>
-            {(isDubScreenOpen || roomAutoSelect) && <DubSelectModal 
-                isOpen={isDubScreenOpen || Boolean(roomAutoSelect)}
-                autoSelect={roomAutoSelect}
+            {roomSelectionError && <p role="alert">{roomSelectionError}</p>}
+            {(isDubScreenOpen) && <DubSelectModal
+                isOpen={isDubScreenOpen}
+                resolveSources={!roomId}
                 onClose={() => {
                     setIsDubScreenOpen(false);
-                    if (roomAutoSelect) navigate(`/anime/${animeData.id}?room=${encodeURIComponent(roomId!)}`, { replace: true });
                 }}
                 releaseId={animeData?.id}
-                onEpisodeSelect={(sources, episode, episodes, sourceId, dubId) => {
+                onEpisodeSelect={async (sources, episode, episodes, sourceId, dubId) => {
+                    if (roomId) {
+                        try {
+                            if (room?.roomId !== roomId || roomStatus !== 'connected') throw new Error('Сначала подключитесь к комнате');
+                            await sendRoom({ type: 'set_media', media: {
+                                releaseId: animeData.id,
+                                releaseName: settings.appearance.language === 'english' ? animeData.title_original : animeData.title_ru,
+                                dubId, sourceId, episode: episode.position, episodeName: episode.name,
+                            } });
+                            setIsDubScreenOpen(false);
+                            navigate('/anime/' + animeData.id + '/watch?room=' + encodeURIComponent(roomId));
+                        } catch (error) { setRoomSelectionError(error instanceof Error ? error.message : String(error)); }
+                        return;
+                    }
                     setIsDubScreenOpen(false)
                     setPlayerSession({
                         sources,

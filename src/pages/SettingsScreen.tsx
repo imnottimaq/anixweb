@@ -56,6 +56,14 @@ export default function SettingsScreen(){
         return () => { isCancelled = true; };
     }, []);
 
+    const upscalerWarning = webGpuStatus === 'checking'
+        ? t('settings.qualityUpscale.webgpuChecking')
+        : webGpuStatus === 'unsupported'
+        ? t(isSafariBrowser()
+            ? 'settings.qualityUpscale.webgpuSafariNotSupported'
+            : 'settings.qualityUpscale.webgpuNotSupported')
+        : undefined;
+
     return (
         <PageLayout>
             <PageHeader title={t('nav.settings')} description={t('settings.description')} />
@@ -104,7 +112,7 @@ export default function SettingsScreen(){
                 </section>
 
                 <section className={styles['settings-section']}>
-                    <h1>{t('settings.content')}</h1>
+                    <h2 className={styles.sectionTitle}>{t('settings.content')}</h2>
                     <label className={styles['select-setting']}>
                         <span><strong>{t('settings.startPage')}</strong><small>{t('settings.startPage.desc')}</small></span>
                         <select value={settings.content.defaultTabOnHome} onChange={event => updateContent({ defaultTabOnHome: event.target.value as typeof settings.content.defaultTabOnHome })}>
@@ -129,7 +137,7 @@ export default function SettingsScreen(){
                 </section>
 
                 <section className={styles['settings-section']}>
-                    <h1>{t('settings.player')}</h1>
+                    <h2 className={styles.sectionTitle}>{t('settings.player')}</h2>
                     <label className={styles['select-setting']}>
                         <span><strong>{t('settings.defaultQuality')}</strong><small>{t('settings.defaultQuality.desc')}</small></span>
                         <select value={settings.player.defaultQuality} onChange={event => updatePlayer({ defaultQuality: event.target.value as typeof settings.player.defaultQuality })}>
@@ -149,18 +157,12 @@ export default function SettingsScreen(){
                         desc={t('settings.qualityUpscale.desc')}
                         checked={settings.player.qualityUpgrade}
                         disabled={webGpuStatus !== 'supported'}
+                        tooltip={upscalerWarning}
                         onChange={qualityUpgrade => updatePlayer({ qualityUpgrade })}
                     />
-                    <p className={`${styles['webgpu-status']} ${styles[`webgpu-${webGpuStatus}`]}`}>
-                        {webGpuStatus === 'checking' && t('settings.qualityUpscale.webgpuChecking')}
-                        {webGpuStatus === 'supported' && t('settings.qualityUpscale.webgpuSupported')}
-                        {webGpuStatus === 'unsupported' && t(isSafariBrowser()
-                            ? 'settings.qualityUpscale.webgpuSafariNotSupported'
-                            : 'settings.qualityUpscale.webgpuNotSupported')}
-                    </p>
                     <label className={styles['select-setting']}>
                         <span><strong>{t('settings.upscalerMode')}</strong><small>{t('settings.upscalerMode.desc')}</small></span>
-                        <select disabled={webGpuStatus !== 'supported'} value={settings.player.qualityUpgradeMode} onChange={event => updatePlayer({ qualityUpgradeMode: event.target.value as typeof settings.player.qualityUpgradeMode })}>
+                        <select disabled={webGpuStatus !== 'supported'} title={upscalerWarning} value={settings.player.qualityUpgradeMode} onChange={event => updatePlayer({ qualityUpgradeMode: event.target.value as typeof settings.player.qualityUpgradeMode })}>
                             <option value="weak">{t('settings.upscalerMode.modeLow')}</option>
                             <option value="medium">{t('settings.upscalerMode.modeMedium')}</option>
                             <option value="strong">{t('settings.upscalerMode.modeHigh')}</option>

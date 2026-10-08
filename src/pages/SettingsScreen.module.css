@@ -1,7 +1,10 @@
-.sectionTitle {
+.sectionTitle,
+.settings-section > h1,
+.settings-section > h2 {
     margin: 0 0 18px;
     color: var(--text-color);
     font-size: clamp(22px, 2vw, 28px);
+    font-weight: 700;
 }
 
 .settings-item {
@@ -10,31 +13,103 @@
     justify-content: space-between;
     gap: 24px;
     min-height: 64px;
-    padding: 10px 0;
+    padding: 12px 0;
     border-bottom: 1px solid color-mix(in srgb, var(--text-color) 13%, transparent);
 }
 
-.setting-copy {
+.setting-copy,
+.select-setting span,
+.range-setting span,
+.keybindings-heading > span {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
     min-width: 0;
 }
 
 .setting-copy h2,
-.card-type-section h2 {
+.card-type-section h2,
+.select-setting strong,
+.range-setting strong,
+.keybindings-heading strong {
     margin: 0;
     color: var(--text-color);
     font-size: 17px;
     font-weight: 600;
+    line-height: 1.25;
 }
 
-.card-type-section h2 {
-    font-size: 20px;
-}
-
-.setting-copy p {
+.setting-copy p,
+.select-setting small,
+.range-setting small,
+.keybindings-heading small {
+    display: block;
     max-width: 620px;
-    margin: 6px 0 0;
+    margin: 0;
     color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 400;
     line-height: 1.45;
+}
+
+.toggle-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    margin-left: auto;
+}
+
+.toggle-wrapper[data-disabled="true"] {
+    cursor: not-allowed;
+}
+
+.toggle-wrapper[data-disabled="true"] .switch {
+    pointer-events: none;
+}
+
+.toggle-tooltip {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    right: 0;
+    z-index: 100;
+    width: max-content;
+    max-width: 290px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--text-color);
+    background: var(--lighter-background-color);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(4px);
+    transition: opacity .18s ease, transform .18s ease, visibility .18s ease;
+    word-break: normal;
+    overflow-wrap: break-word;
+    text-align: left;
+}
+
+.toggle-tooltip::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    right: 18px;
+    width: 8px;
+    height: 8px;
+    background: var(--lighter-background-color);
+    border-right: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+    transform: rotate(45deg);
+}
+
+.toggle-wrapper:hover .toggle-tooltip,
+.toggle-wrapper:focus-within .toggle-tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
 }
 
 .switch {
@@ -100,11 +175,6 @@
     margin-top: 48px;
 }
 
-.settings-section > h1 {
-    margin: 0 0 12px;
-    font-size: clamp(26px, 2.5vw, 34px);
-}
-
 .select-setting,
 .range-setting {
     display: flex;
@@ -112,16 +182,9 @@
     justify-content: space-between;
     gap: 24px;
     min-height: 64px;
-    padding: 10px 0;
+    padding: 12px 0;
     border-bottom: 1px solid color-mix(in srgb, var(--text-color) 13%, transparent);
 }
-
-.select-setting span,
-.range-setting span { display: flex; flex-direction: column; gap: 5px; }
-.select-setting strong,
-.range-setting strong { color: var(--text-color); font-size: 17px; font-weight: 600; }
-.select-setting small,
-.range-setting small { color: var(--text-secondary); }
 
 .select-setting select {
     min-width: 165px;
@@ -136,14 +199,6 @@
 
 .select-setting select:disabled { cursor: not-allowed; opacity: .5; }
 
-.webgpu-status {
-    margin: -16px 0 2px;
-    font-size: 13px;
-}
-
-.webgpu-checking { color: var(--text-secondary); }
-.webgpu-supported { color: var(--status-watching); }
-.webgpu-unsupported { color: var(--status-dropped); }
 
 .range-control {
     display: flex;
@@ -185,9 +240,7 @@
     gap: 20px;
 }
 
-.keybindings-heading > span { display: grid; gap: 5px; }
-.keybindings-heading strong { font-size: 18px; }
-.keybindings-heading small { color: var(--text-secondary); }
+.keybindings-heading > span { display: flex; flex-direction: column; gap: 4px; }
 .keybindings-heading > button,
 .keybinding-row > button {
     min-width: 82px;

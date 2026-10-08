@@ -1,0 +1,144 @@
+.modal {
+    --modal-width: min(480px, calc(100vw - 32px));
+}
+
+.hint {
+    margin: 0 0 16px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.signInNotice {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--accent-color) 6%, var(--card-bg));
+    font-size: 13px;
+}
+
+.signInNotice p {
+    margin: 0;
+    color: var(--text-secondary);
+}
+
+.signInLink {
+    color: var(--accent-color);
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.signInLink:hover {
+    text-decoration: underline;
+}
+
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.field input,
+.field select {
+    width: 100%;
+    height: 44px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 9px;
+    color: var(--text-color);
+    background: var(--background-color);
+    font: inherit;
+    font-weight: 400;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.field input:focus,
+.field select:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color) 18%, transparent);
+}
+
+.fieldHint {
+    margin: -6px 0 2px !important;
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.error {
+    margin: 0;
+    color: var(--status-dropped);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.cancelButton,
+.submitButton {
+    min-height: 40px;
+    padding: 9px 18px;
+    border-radius: 9px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 0.15s ease, background 0.15s ease;
+}
+
+.cancelButton {
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    background: transparent;
+}
+
+.cancelButton:hover:not(:disabled) {
+    background: var(--surface-muted);
+}
+
+.submitButton {
+    border: 1px solid transparent;
+    background: var(--accent-color);
+    color: var(--accent-text-color);
+}
+
+.submitButton:hover:not(:disabled) {
+    filter: brightness(.94);
+}
+
+.submitButton:disabled,
+.cancelButton:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+@media (max-width: 540px) {
+    .actions {
+        flex-direction: column-reverse;
+    }
+
+    .cancelButton,
+    .submitButton {
+        width: 100%;
+    }
+}

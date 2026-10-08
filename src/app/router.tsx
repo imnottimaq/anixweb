@@ -6,9 +6,8 @@ import RouteLoader from '../components/RouteLoader';
 import { HomepageScreen, OverviewScreen, FavoritesScreen, ReleaseScreen, PlayerScreen, FranchiseScreen,
     AccountScreen, EditAccountScreen, LoginScreen, RecoverScreen, NewAccountScreen, RandomAnime, SettingsScreen,
     NotificationsScreen, NotificationSettingsScreen, ReleaseNotificationSettingsScreen, WatchRoomScreen, FilterSearchScreen,
-    CollectionScreen, FriendsPage
+    CollectionScreen, CollectionsScreen, FriendsPage
  } from './components';
-import CollectionsScreen from '../pages/CollectionsScreen';
 
 function lazyPage(page: ReactNode) {
     return <Suspense fallback={<RouteLoader />}>{page}</Suspense>;

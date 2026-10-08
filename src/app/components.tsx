@@ -19,4 +19,5 @@ export const FranchiseScreen = lazy(() => import('../pages/FranchiseScreen'));
 export const OverviewScreen = lazy(() => import('../pages/OverviewScreen'))
 export const FilterSearchScreen = lazy(() => import('../pages/FilterSearchScreen'));
 export const CollectionScreen = lazy(() => import('../pages/CollectionScreen'));
+export const CollectionsScreen = lazy(() => import('../pages/CollectionsScreen'));
 export const FriendsPage = lazy(() => import('../pages/FriendsPage'));

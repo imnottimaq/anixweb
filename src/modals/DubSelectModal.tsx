@@ -17,6 +17,7 @@ interface DubSelectModalProps {
   onClose: () => void;
   releaseId: number;
   token: string;
+  resolveSources?: boolean;
   autoSelect?: { dubId: number; sourceId: number; episode: number } | null;
   onEpisodeSelect: (sources: VideoSources, episode: PlayerSessionEpisode, episodes: PlayerSessionEpisode[], sourceId: number, dubId: number) => void;
 }
@@ -48,7 +49,7 @@ function formatProgressTime(seconds: number) {
     return `${String(minutes).padStart(2, '0')}:${remainingSeconds}`;
 }
 
-export default function DubSelectModal({ isOpen, onClose, releaseId, token, autoSelect, onEpisodeSelect }: DubSelectModalProps){
+export default function DubSelectModal({ isOpen, onClose, releaseId, token, autoSelect, resolveSources = true, onEpisodeSelect }: DubSelectModalProps){
     const { settings, setSettings } = useSettings();
     const api = useApi();
     const { t } = useTranslation();
@@ -149,15 +150,15 @@ export default function DubSelectModal({ isOpen, onClose, releaseId, token, auto
         const sourceId = selectedSource;
         const dubId = selectedDub;
         const episodes = episodesData.map(({ name, position, url }) => ({ name, position, url }));
-        const sources = await extractVideoLinks(episode.url);
+        const sources = resolveSources ? await extractVideoLinks(episode.url) : {};
         if (!sources) throw new Error('Не удалось получить ссылки на видео');
-        if (shouldMarkWatched && token) await SetWatched(api, releaseId, sourceId, episode.position);
+        if (resolveSources && shouldMarkWatched && token) await SetWatched(api, releaseId, sourceId, episode.position);
         onEpisodeSelect(sources, {
             name: episode.name,
             position: episode.position,
             url: episode.url,
         }, episodes, sourceId, dubId);
-    }, [api, episodesData, onEpisodeSelect, releaseId, selectedDub, selectedSource, token]);
+    }, [api, episodesData, onEpisodeSelect, releaseId, resolveSources, selectedDub, selectedSource, token]);
 
     useEffect(() => {
         if (!isOpen || !autoSelect || selectedDub !== autoSelect.dubId || selectedSource !== autoSelect.sourceId) return;

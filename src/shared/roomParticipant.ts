@@ -1,4 +1,4 @@
-import type { RoomParticipant } from './watchRoom';
+import type { Profile } from './roomProtocol';
 
 type StoredIdentity = { id: number; login: string; avatar?: string | null };
 
@@ -8,7 +8,7 @@ export function saveRoomIdentity(profile: StoredIdentity) {
     localStorage.setItem(IDENTITY_KEY, JSON.stringify(profile));
 }
 
-export function getRoomParticipant(userId: number): Omit<RoomParticipant, 'canControl'> {
+export function getRoomParticipant(userId: number): Profile {
     try {
         const identity = JSON.parse(localStorage.getItem(IDENTITY_KEY) ?? 'null') as StoredIdentity | null;
         if (identity?.id === userId && identity.login) {

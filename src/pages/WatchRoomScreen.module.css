@@ -1,117 +1,135 @@
-.page {
-    width: min(1040px, 100%);
-    margin: 0 auto;
-    padding: 32px 20px 52px;
-    box-sizing: border-box;
-}
-
-.hero { margin-bottom: 24px; }
-.hero h1, .roomHeader h1 { margin: 0; }
-.hero p, .roomHeader p, .muted { color: var(--text-secondary); }
-.beta { display: inline-flex; vertical-align: middle; align-items: center; margin-left: 7px; padding: 3px 8px; border-radius: 999px; color: var(--accent-color); background: color-mix(in srgb, var(--accent-color) 14%, transparent); font-size: 12px; font-weight: 600; }
-
-.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
-
-.card {
-    padding: 20px;
-    border: 1px solid var(--border-color);
-    border-radius: 16px;
-    background: transparent;
-}
-
-.card h2 { margin-top: 0; }
-
-.card label {
-    display: grid;
-    gap: 6px;
-    margin: 14px 0;
-}
-
-.card input, .card select {
-    width: 100%;
-    min-width: 0;
-    padding: 10px 12px;
-    box-sizing: border-box;
-    border: 1px solid var(--border-color);
-    border-radius: 9px;
-    color: var(--text-color);
-    background: var(--background-color);
-    font: inherit;
-}
-
-.card input:focus-visible, .card select:focus-visible, .card button:focus-visible,
-.rooms a:focus-visible, .release-results a:focus-visible, .back:focus-visible, .open-release:focus-visible {
-    outline: 2px solid var(--accent-color);
-    outline-offset: 3px;
-}
-
-.card button, .open-release {
-    padding: 9px 13px;
-    border: 0;
-    border-radius: 9px;
-    cursor: pointer;
-    color: var(--accent-text-color);
-    background: var(--accent-color);
-    font: inherit;
-}
-
-.cardHeading, .roomHeader, .participants > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.cardHeading button, .participants button { color: var(--accent-color); background: transparent; }
-.rooms, .participants { display: grid; gap: 8px; }
-
-.rooms a {
-    display: grid;
-    gap: 3px;
-    padding: 11px;
-    border-radius: 10px;
-    color: inherit;
-    text-decoration: none;
-    background: color-mix(in srgb, var(--text-color) 6%, transparent);
-}
-
-.rooms span { color: var(--text-secondary); font-size: 13px; }
-.participants > div { padding: 8px 0; border-bottom: 1px solid var(--border-color); }
-.participant { display: inline-flex; align-items: center; gap: 9px; min-width: 0; }
-.avatar { display: grid; width: 30px; height: 30px; flex: 0 0 30px; overflow: hidden; place-items: center; border-radius: 50%; color: var(--accent-text-color); background: var(--accent-color); font-size: 13px; font-weight: 700; }
+.page { width: min(1120px, 100%); margin: auto; padding: 32px 20px 56px; }
+.hero { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px 24px; margin-bottom: 28px; }
+.heroTitle, .roomPageHeader h1 { margin: 0; font-size: clamp(27px, 4vw, 38px); line-height: 1.15; }
+.heroDescription { grid-column: 1; grid-row: 2; margin: 0; color: var(--text-secondary); line-height: 1.6; max-width: 680px; }
+.heroActions { grid-column: 2; grid-row: 1; display: flex; align-items: center; gap: 12px; }
+.primaryButton { min-height: 40px; padding: 10px 18px; border: 1px solid transparent; border-radius: 9px; background: var(--accent-color); color: var(--accent-text-color); font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; transition: filter .15s ease; }
+.primaryButton:hover:not(:disabled) { filter: brightness(.94); }
+.primaryButton:disabled { opacity: .55; cursor: not-allowed; }
+.secondaryButton { min-height: 40px; padding: 9px 16px; border: 1px solid var(--border-color); border-radius: 9px; color: var(--text-color); background: transparent; cursor: pointer; font: inherit; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; transition: background .15s ease, border-color .15s ease; }
+.secondaryButton:hover:not(:disabled) { background: var(--surface-muted); }
+.secondaryButton:disabled { opacity: .55; cursor: not-allowed; }
+.eyebrow { display: block; color: var(--text-secondary); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.muted { color: var(--text-secondary); font-size: 14px; line-height: 1.5; }
+.entryGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.card { min-width: 0; padding: 24px; border: 1px solid var(--border-color); border-radius: 16px; background: var(--card-bg); }
+.card h2 { margin: 0 0 10px; font-size: 21px; line-height: 1.25; }
+.card > p { margin: 0 0 16px; }
+.step { display: inline-flex; padding: 5px 9px; margin-bottom: 14px; border-radius: 6px; color: var(--accent-color); background: color-mix(in srgb, var(--accent-color) 10%, transparent); font-size: 12px; font-weight: 700; }
+.field { display: flex; flex-direction: column; gap: 8px; margin: 18px 0 12px; font-size: 14px; font-weight: 600; }
+.field input, .field select { width: 100%; height: 44px; min-width: 0; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 9px; color: var(--text-color); background: var(--background-color); font: inherit; font-weight: 400; }
+.fieldHint { margin: 8px 0 20px !important; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
+.card button, .primaryLink { min-height: 40px; padding: 10px 14px; border: 1px solid transparent; border-radius: 9px; background: var(--accent-color); color: var(--accent-text-color); font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; }
+.primaryLink { display: inline-flex; align-items: center; justify-content: center; gap: 12px; white-space: nowrap; }
+.card button:hover:not(:disabled), .primaryLink:hover { filter: brightness(.94); }
+.card button:disabled { opacity: .55; cursor: not-allowed; }
+.fullButton { width: 100%; margin-top: 4px; }
+.secondary, .card .secondary { min-height: 40px; padding: 9px 14px; border: 1px solid var(--border-color); border-radius: 9px; color: var(--text-color); background: transparent; cursor: pointer; font: inherit; }
+.joinCard { display: flex; flex-direction: column; }
+.joinCard .fullButton { margin-top: auto; }
+.codeInput { font-family: ui-monospace, monospace !important; font-size: 19px !important; letter-spacing: .14em; text-transform: uppercase; }
+.activeRoom, .signIn { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 18px 22px; margin: 0 0 20px; border: 1px solid var(--border-color); border-radius: 12px; background: color-mix(in srgb, var(--accent-color) 6%, var(--card-bg)); }
+.activeRoom strong { display: block; margin-top: 6px; }
+.signIn p { margin: 5px 0 0; color: var(--text-secondary); }
+.publicSection { margin-top: 24px; }
+.sectionHeading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.sectionHeading h2, .sectionHeading h3 { margin: 0; }
+.sectionHeading p { margin: 7px 0 0; }
+.rooms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
+.roomCard { display: flex; align-items: center; gap: 14px; min-width: 0; padding: 18px; border: 1px solid var(--border-color); border-radius: 12px; color: var(--text-color); background: var(--card-bg); text-decoration: none; }
+.roomCard:hover { border-color: var(--accent-color); }
+.roomCard > div { min-width: 0; flex: 1; }
+.roomCard strong { display: block; overflow-wrap: anywhere; }
+.roomCard p { margin: 5px 0 2px; font-size: 14px; }
+.roomCard small, .roomCount { color: var(--text-secondary); font-size: 12px; }
+.roomCount { text-align: right; }
+.roomIcon, .mediaIcon { display: grid; place-items: center; flex-shrink: 0; width: 42px; height: 42px; border-radius: 12px; background: var(--accent-color); }
+.roomIcon img, .mediaIcon img { width: 18px; height: 18px; }
+.emptyState { display: grid; justify-items: center; padding: 36px 18px; margin-top: 18px; border: 1px dashed var(--border-color); border-radius: 12px; text-align: center; }
+.emptyState p { margin: 8px 0 0; color: var(--text-secondary); }
+.back { display: inline-block; margin-bottom: 20px; color: var(--text-secondary); text-decoration: none; font-size: 14px; }
+.back:hover { color: var(--text-color); }
+.roomPageHeader { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 22px; }
+.roomPageHeader h1 { margin-bottom: 0; overflow-wrap: anywhere; }
+.badge { display: inline-flex; padding: 5px 9px; border-radius: 6px; color: var(--text-color); background: color-mix(in srgb, var(--text-color) 8%, transparent); font-size: 12px; white-space: nowrap; }
+.roomGrid { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 22px; align-items: start; }
+.roomContent { display: grid; gap: 20px; min-width: 0; }
+.mediaHero { display: flex; gap: 18px; align-items: flex-start; padding: 28px; }
+.mediaIcon { width: 48px; height: 48px; }
+.mediaHero > div { min-width: 0; }
+.mediaHero h2 { margin: 8px 0; font-size: clamp(21px, 3vw, 27px); overflow-wrap: anywhere; }
+.mediaActions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 18px; }
+.searchResults { display: grid; gap: 8px; margin-top: 16px; max-height: 450px; overflow: auto; }
+.card .searchResult { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; text-align: left; background: var(--background-color); border-color: var(--border-color); color: var(--text-color); font-weight: 400; }
+.searchResult img { width: 42px; height: 58px; object-fit: cover; border-radius: 6px; }
+.searchResult > span:first-of-type { flex: 1; min-width: 0; }
+.searchResult strong { display: block; overflow-wrap: anywhere; }
+.searchResult small { display: block; margin-top: 5px; color: var(--text-secondary); }
+.panel { padding: 20px; }
+.panelHeader { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 18px; }
+.panelHeader h2 { margin: 0; }
+.connection { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-secondary); }
+.online { background: var(--status-watching); }
+.roleInfo { padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid var(--border-color); }
+.roleInfo p { margin: 8px 0 0; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
+.compact .roleInfo p { display: none; }
+.invitation { display: grid; gap: 10px; padding-bottom: 20px; border-bottom: 1px solid var(--border-color); }
+.invitation .sectionHeading h3 { font-size: 14px; }
+.invitation .sectionHeading > span { font-size: 11px; }
+.inviteButton { width: 100%; }
+.card .codeButton { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-color: var(--border-color); color: var(--text-secondary); background: transparent; font-size: 12px; font-weight: 400; }
+.codeButton strong { color: var(--text-color); font-family: ui-monospace, monospace; font-size: 15px; letter-spacing: .08em; }
+.sectionTitle { font-size: 14px; margin: 20px 0 12px; }
+.participants { display: grid; gap: 2px; }
+.participantRow { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px 0; }
+.avatar { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; overflow: hidden; border-radius: 50%; color: var(--accent-text-color); background: var(--accent-color); font-size: 13px; font-weight: 700; }
 .avatar img { width: 100%; height: 100%; object-fit: cover; }
-.error { margin-top: 16px; color: var(--status-dropped); }
-.back { color: var(--accent-color); text-decoration: none; }
-.roomHeader { margin: 16px 0 24px; }
-.room-actions { display: inline-flex; gap: 8px; }
-.copy-link { border: 1px solid var(--border-color) !important; color: var(--text-color) !important; background: transparent !important; }
-.copy-link:hover { border-color: var(--accent-color) !important; color: var(--accent-color) !important; }
-.leave-room { border: 1px solid color-mix(in srgb, var(--status-dropped) 65%, transparent) !important; color: var(--status-dropped) !important; background: transparent !important; }
-.leave-room:hover { background: color-mix(in srgb, var(--status-dropped) 10%, transparent) !important; }
-.search-label { display: grid; gap: 6px; margin-top: 14px; }
-.release-results { display: grid; gap: 7px; margin-top: 12px; max-height: 350px; overflow-y: auto; }
-.release-results a { display: grid; gap: 3px; padding: 10px 12px; color: var(--text-color); text-decoration: none; border: 1px solid var(--border-color); border-radius: 10px; background: color-mix(in srgb, var(--text-color) 4%, transparent); }
-.release-results a:hover { border-color: var(--accent-color); background: color-mix(in srgb, var(--accent-color) 10%, transparent); }
-.release-results span { color: var(--text-secondary); font-size: 13px; }
-.join-by-code { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border-color); }
-.join-by-code label { margin: 0; }
-.join-by-code button:disabled { cursor: not-allowed; opacity: .55; }
-.participant-menu-wrap { position: relative; }
-.participant-menu-button { width: 30px; height: 30px; padding: 0 !important; border: 0 !important; border-radius: 8px !important; color: var(--text-secondary) !important; background: transparent !important; font-size: 20px !important; line-height: 1; }
-.participant-menu-button:hover { color: var(--text-color) !important; background: color-mix(in srgb, var(--text-color) 8%, transparent) !important; }
-.participant-menu { position: absolute; z-index: 4; top: calc(100% + 4px); right: 0; display: grid; min-width: 190px; padding: 5px; border: 1px solid var(--border-color); border-radius: 10px; box-shadow: 0 10px 24px rgb(0 0 0 / 18%); background: var(--card-bg); }
-.participant-menu button { padding: 8px 10px; border: 0; border-radius: 7px; color: var(--text-color); background: transparent; text-align: left; white-space: nowrap; }
-.participant-menu button:hover { background: color-mix(in srgb, var(--text-color) 8%, transparent); }
-.participant-menu .kick-button { color: var(--status-dropped); }
-.open-release { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; white-space: nowrap; }
-
-@media (max-width: 700px) {
-    .page { padding: 24px 14px 44px; overflow-x: hidden; }
-    .grid { grid-template-columns: 1fr; }
-    .roomHeader, .cardHeading { align-items: flex-start; flex-direction: column; }
-    .room-actions { width: 100%; flex-wrap: wrap; }
-    .room-actions button { flex: 1 1 150px; }
-    .join-by-code { grid-template-columns: 1fr; }
-    .join-by-code button { width: 100%; }
-    .card { min-width: 0; padding: 16px; }
-    .participants > div { min-width: 0; }
-    .participant > span:last-child { overflow-wrap: anywhere; }
+.participantText { min-width: 0; flex: 1; }
+.participantText > strong { display: block; font-size: 14px; overflow-wrap: anywhere; }
+.participantStatus { display: block; margin-top: 3px; color: var(--text-secondary); font-size: 12px; }
+.roleBadge { max-width: 90px; color: var(--text-secondary); font-size: 11px; text-align: right; }
+.participantMenu { position: relative; }
+.participantMenu summary { display: grid; place-items: center; min-width: 30px; height: 36px; border-radius: 6px; list-style: none; cursor: pointer; font-size: 23px; color: var(--text-secondary); }
+.participantMenu summary::-webkit-details-marker { display: none; }
+.participantMenu summary:hover { color: var(--text-color); background: var(--surface-muted); }
+.menuActions { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 40; display: grid; width: 220px; padding: 5px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--lighter-background-color); box-shadow: 0 12px 32px #0003; }
+.card .menuActions button { padding: 10px; text-align: left; background: transparent; color: var(--text-color); font-size: 13px; font-weight: 400; }
+.card .menuActions button:hover:not(:disabled) { background: var(--surface-muted); }
+.card .dangerText { color: var(--status-dropped); }
+.panelFooter { display: flex; justify-content: flex-end; border-top: 1px solid var(--border-color); margin-top: 18px; padding-top: 14px; }
+.card .leaveButton { min-height: 36px; padding: 7px 12px; color: var(--status-dropped); background: transparent; border-color: color-mix(in srgb, var(--status-dropped) 30%, transparent); font-size: 13px; }
+.waiting { padding: 14px; margin: 0 0 18px; border: 1px solid color-mix(in srgb, var(--status-hold) 35%, transparent); border-radius: 10px; background: color-mix(in srgb, var(--status-hold) 8%, transparent); }
+.waiting strong { font-size: 14px; }
+.waiting p, .waiting small { display: block; margin: 7px 0 0; font-size: 12px; line-height: 1.5; color: var(--text-secondary); overflow-wrap: anywhere; }
+.waitProgress { height: 3px; overflow: hidden; margin-top: 12px; background: var(--border-color); border-radius: 4px; }
+.waitProgress span { display: block; height: 100%; background: var(--status-hold); transition: width .25s linear; }
+.inlineError { color: var(--status-dropped); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.success { color: var(--status-watching); font-size: 13px; line-height: 1.5; }
+.notice { margin-bottom: 18px; font-size: 13px; }
+.confirmDialog { width: min(440px, calc(100vw - 32px)); padding: 26px; border: 1px solid var(--border-color); border-radius: 16px; background: var(--card-bg); color: var(--text-color); box-shadow: 0 20px 80px #0005; }
+.confirmDialog::backdrop { background: #0008; }
+.confirmDialog h2 { font-size: 22px; overflow-wrap: anywhere; }
+.confirmDialog > p { line-height: 1.6; color: var(--text-secondary); }
+.dialogActions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.card .dangerButton { background: var(--status-dropped); color: #fff; }
+.page button:focus-visible, .page input:focus-visible, .page select:focus-visible, .page a:focus-visible, .panel button:focus-visible, .panel summary:focus-visible { outline: var(--focus-ring); outline-offset: 3px; }
+@media (max-width: 850px) { .roomGrid { grid-template-columns: 1fr; } .rooms { grid-template-columns: 1fr; } }
+@media (max-width: 600px) {
+    .page { padding: 22px 14px 36px; }
+    .hero { display: flex; flex-direction: column; align-items: stretch; gap: 12px; margin-bottom: 24px; }
+    .heroTitle { margin: 0; }
+    .heroDescription { margin: 0; }
+    .heroActions { width: 100%; flex-direction: column; margin-top: 6px; }
+    .heroActions button { width: 100%; }
+    .entryGrid { grid-template-columns: 1fr; }
+    .card { padding: 20px; }
+    .activeRoom, .signIn { align-items: stretch; flex-direction: column; padding: 18px; }
+    .roomPageHeader { align-items: flex-start; flex-direction: column; }
+    .mediaHero { flex-direction: column; gap: 12px; }
+    .roomCard { flex-wrap: wrap; }
+    .roomCount { margin-left: 56px; text-align: left; }
+    .sectionHeading { align-items: flex-start; }
+    .publicSection .sectionHeading p { max-width: 210px; }
 }
-
-@media (prefers-reduced-motion: reduce) {
-    .card button, .rooms a, .release-results a { scroll-behavior: auto; transition: none; }
-}
+@media (prefers-reduced-motion: reduce) { .waitProgress span { transition: none; } }

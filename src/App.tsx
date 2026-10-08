@@ -1,19 +1,19 @@
-import { useCallback, useEffect, useRef, useState,} from 'react'
-import {  RouterProvider } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { RouterProvider } from 'react-router-dom';
 import { router } from './app/router';
 import { type AppSettings, defaultAppSettings, defaultPlayerKeybindings } from './shared/types/settings';
 import { UserContext } from './shared/contexts/userContext';
 import { SettingsContext } from './shared/contexts/settingsContext';
 import { SearchContext, type SearchScope } from './shared/contexts/searchContext';
 import { getStoredUserToken, setStoredUserToken } from './shared/authToken';
-import { getRoomParticipant, saveRoomIdentity } from './shared/roomParticipant';
-import { RoomContext } from './shared/contexts/roomContext';
-import { WatchRoomSocket } from './shared/watchRoom';
+import { saveRoomIdentity } from './shared/roomParticipant';
+import RoomProvider from './shared/contexts/RoomProvider';
+
 import { htmlLanguageByLanguage, isLanguage } from './shared/locale';
 
 function App() {
   const [userToken, setUserTokenState] = useState<string>(getStoredUserToken);
-  const [userId, setUserIdState] = useState<number>(() => +(localStorage.getItem('user_id') || ""))
+  const [userId, setUserIdState] = useState<number>(() => +(localStorage.getItem('user_id') || ""));
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem('app_settings');
 
@@ -42,15 +42,6 @@ function App() {
     }
   });
   const [searchScope, setSearchScope] = useState<SearchScope>({ type: 'releases' });
-  const [activeRoomId, setActiveRoomIdState] = useState<string | null>(() => localStorage.getItem('active_watch_room'));
-  const roomSocketRef = useRef(new WatchRoomSocket());
-
-  const setActiveRoomId = useCallback((roomId: string | null) => {
-    setActiveRoomIdState(roomId);
-    if (roomId) localStorage.setItem('active_watch_room', roomId);
-    else localStorage.removeItem('active_watch_room');
-  }, []);
-
   useEffect(() => {
     localStorage.setItem('app_settings', JSON.stringify(settings));
     document.documentElement.lang = htmlLanguageByLanguage[settings.appearance.language];
@@ -76,7 +67,7 @@ function App() {
           }
         }
       } catch (error) {
-        console.error('Не удалось определить ID текущего профиля:', error);
+        console.error('Failed to load current profile:', error);
       }
     };
 
@@ -87,47 +78,35 @@ function App() {
     };
   }, [userToken]);
 
-  useEffect(() => {
-    const room = roomSocketRef.current
-    if (!activeRoomId || userId <= 0) return;
-    room.connect(activeRoomId, getRoomParticipant(userId), () => {}, error => {
-      console.error('Ошибка фонового подключения к комнате:', error);
-      setActiveRoomId(null);
-    }, () => setActiveRoomId(null));
-    return () => room.disconnect();
-  }, [activeRoomId, setActiveRoomId, userId]);
-
-  useEffect(() => {
-    const clearRoomPresence = () => localStorage.removeItem('active_watch_room');
-    window.addEventListener('pagehide', clearRoomPresence);
-    return () => window.removeEventListener('pagehide', clearRoomPresence);
-  }, []);
-
-  const setUserToken = (token: string) => {
+  const setUserToken = useCallback((token: string) => {
     setUserTokenState(token);
     setStoredUserToken(token);
-  };
+  }, []);
 
-  const setUserId = (id: string | number) => {
-    setUserIdState(+id)
+  const setUserId = useCallback((id: string | number) => {
+    setUserIdState(+id);
     if (id) {
-      localStorage.setItem('user_id', id.toString())
+      localStorage.setItem('user_id', id.toString());
     } else {
-      localStorage.removeItem('user_id')
+      localStorage.removeItem('user_id');
     }
-  }
-  
+  }, []);
+
+  const settingsValue = useMemo(() => ({ settings, setSettings }), [settings]);
+  const userValue = useMemo(() => ({ userToken, setUserToken, userId, setUserId }), [userToken, setUserToken, userId, setUserId]);
+  const searchValue = useMemo(() => ({ searchScope, setSearchScope }), [searchScope]);
+
   return (
-    <SettingsContext.Provider value={{settings, setSettings}}>
-      <UserContext.Provider value={{userToken, setUserToken, userId, setUserId}}>
-        <RoomContext.Provider value={{activeRoomId, setActiveRoomId}}>
-          <SearchContext.Provider value={{searchScope, setSearchScope}}>
+    <SettingsContext.Provider value={settingsValue}>
+      <UserContext.Provider value={userValue}>
+        <RoomProvider>
+          <SearchContext.Provider value={searchValue}>
             <RouterProvider router={router} />
           </SearchContext.Provider>
-        </RoomContext.Provider>
+        </RoomProvider>
       </UserContext.Provider>
     </SettingsContext.Provider>
-  )
+  );
 }
 
-export default App
+export default App;

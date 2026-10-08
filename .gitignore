@@ -28,5 +28,21 @@ dist-ssr
 !.env.example
 .vite
 *.tsbuildinfo
+.eslintcache
 coverage
+
+# Test artifacts
+test-results/
+playwright-report/
+blob-report/
+
+# Cloudflare / Wrangler local artifacts
+.wrangler/
+.dev.vars
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+
 

@@ -40,6 +40,12 @@ jobs:
           BASE_PATH: ${{ steps.pages.outputs.base_path }}
           VITE_ROOM_SERVER_URL: ${{ vars.VITE_ROOM_SERVER_URL }}
 
+      - name: Test
+        run: npm test
+
+      - name: Lint
+        run: npm run lint
+
       - name: Add SPA fallback
         run: cp dist/index.html dist/404.html
 

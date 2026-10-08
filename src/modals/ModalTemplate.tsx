@@ -1,4 +1,4 @@
-import { useState, type UIEventHandler } from 'react';
+import { useCallback, useEffect, useState, type UIEventHandler } from 'react';
 import XMarkIcon from '../assets/icons/xmark.svg'
 import styles from './ModalTemplate.module.css'
 import { useTranslation } from '../shared/useTranslation';
@@ -30,7 +30,7 @@ export function Modal({ isOpen, onClose, title, text, actions, children, size, s
     const { t } = useTranslation();
     const [isClosing, setIsClosing] = useState(false);
 
-    const handleClose = () => {
+    const handleClose = useCallback(() => {
         if (isClosing) return;
 
         setIsClosing(true);
@@ -38,7 +38,20 @@ export function Modal({ isOpen, onClose, title, text, actions, children, size, s
             setIsClosing(false);
             onClose();
         }, 180);
-    };
+    }, [isClosing, onClose]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                handleClose();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, handleClose]);
     if (!isOpen) return null;
 
     return (
@@ -58,11 +71,11 @@ export function Modal({ isOpen, onClose, title, text, actions, children, size, s
             style={contentStyle}
             role="dialog"
             aria-modal="true"
-            aria-label={title ? 'modal-title' : undefined}
+            aria-labelledby={title ? 'modal-title' : undefined}
             onMouseDown={(event) => event.stopPropagation()}
         >
             {(title || showCloseButton !== false) && <header className={styles['modal-header']}>
-                {title && <h2 className={styles.title}>{title}</h2>}
+                {title && <h2 id="modal-title" className={styles.title}>{title}</h2>}
                 {showCloseButton !== false && <button className={styles['close-button']} onClick={handleClose} aria-label={t('misc.close')}>
                     <img alt="" src={XMarkIcon}/>
                 </button>}

@@ -196,9 +196,9 @@
     outline-offset: 2px;
 }
 
-.size-sm { width: min(400px, calc(100vw - 32px)); }
-.size-md { width: min(560px, calc(100vw - 32px)); }
-.size-lg { width: min(900px, calc(100vw - 32px)); max-height: 80vh; }
+.size-sm, .size-small { width: min(400px, calc(100vw - 32px)); }
+.size-md, .size-medium { width: min(560px, calc(100vw - 32px)); }
+.size-lg, .size-large { width: min(900px, calc(100vw - 32px)); max-height: 80vh; }
 .size-fullscreen { width: 100vw; height: 100vh; border-radius: 0; }
 
 @keyframes overlay-in {

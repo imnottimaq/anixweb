@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import Hls, {
     XhrLoader,
     type FragmentLoaderConstructor,
+    type PlaylistLoaderConstructor,
     type LoaderCallbacks,
     type LoaderConfiguration,
     type LoaderContext,
@@ -16,10 +17,13 @@ import { getWatchProgress, saveWatchProgress } from '../shared/watchProgress';
 import { extractVideoLinks } from '../utils/LinkParser';
 import { canUseAnime4KVideo, checkAnime4KVideoSupport, isSafariBrowser } from '../shared/anime4kSupport';
 import { useTranslation } from '../shared/useTranslation';
-import { type WatchRoomState, WatchRoomSocket } from '../shared/watchRoom';
-import { getRoomParticipant } from '../shared/roomParticipant';
+import { resolveRoomMedia } from '../shared/mediaResolver';
+import { PlaybackBridge } from '../shared/playbackBridge';
+import RoomPanel from '../components/RoomPanel';
 import { useRoomPresence } from '../shared/contexts/roomContext';
 import { useApi } from '../shared/apiClient';
+import { createUpscalerScope } from '../shared/upscalerScope';
+import { getCorsProxyUrl } from '../shared/proxy';
 
 import PlayIcon from '../assets/icons/play.svg';
 import PauseIcon from '../assets/icons/pause.svg';
@@ -34,7 +38,6 @@ import VolumeMaxIcon from '../assets/icons/volume-max.svg';
 import VolumeMuteIcon from '../assets/icons/volume-xmark.svg';
 
 const HLS_MIME_TYPE = 'application/x-mpegURL';
-const STREAM_PROXY_BASE = 'https://kodik-proxy.imnottimaq.workers.dev/corsproxy?url=';
 const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 const ASPECT_RATIOS = {
     original: null,
@@ -57,7 +60,7 @@ class CorsFallbackFragmentLoader extends XhrLoader {
         const loadWithProxy = () => {
             const proxiedContext = {
                 ...context,
-                url: `${STREAM_PROXY_BASE}${encodeURIComponent(context.url)}`,
+                url: getCorsProxyUrl(context.url),
             };
 
             super.load(proxiedContext, config, {
@@ -88,14 +91,76 @@ class CorsFallbackFragmentLoader extends XhrLoader {
 export default function PlayerScreen() {
     const [playerSession, setCurrentPlayerSession] = useState(getPlayerSession);
     const [searchParams] = useSearchParams();
+    const roomId = searchParams.get('room');
+    const code = searchParams.get('code') ?? undefined;
+    const { room, activeRoomId, status, error, join, send, self } = useRoomPresence();
+    const { userId } = useUser();
+    const roomProfileId = self?.profileId ?? userId;
+    const api = useApi();
+    const navigate = useNavigate();
+    const [resolved, setResolved] = useState<{ version: number; roomId: string; session: PlayerSession } | null>(null);
+    const [resolveError, setResolveError] = useState<string | null>(null);
+    const [reload, setReload] = useState(0);
+    const roomMedia = room?.roomId === roomId ? room.media : null;
+    const version = room?.roomId === roomId ? room.mediaVersion : -1;
+    const confirmedRoomId = room?.roomId ?? null;
+    const viewer = room?.participants.find(participant => participant.profileId === roomProfileId);
+    const isViewing = viewer?.viewing ?? false;
+    const isParticipant = Boolean(viewer);
+    const mediaRef = useRef(roomMedia);
+    const syncEpochRef = useRef(room?.syncEpoch ?? 0);
+    useEffect(() => { mediaRef.current = roomMedia; syncEpochRef.current = room?.syncEpoch ?? 0; }, [roomMedia, room?.syncEpoch]);
+    const joinedRouteRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        if (!roomId || joinedRouteRef.current === roomId || status === 'replaced') return;
+        joinedRouteRef.current = roomId;
+        if (activeRoomId !== roomId) void join(roomId, code).catch(() => {});
+    }, [activeRoomId, code, join, roomId, status]);
+    useEffect(() => {
+        if (roomId && activeRoomId === roomId && confirmedRoomId === roomId && status === 'connected' && isParticipant && !isViewing) {
+            void send({ type: 'set_viewing', viewing: true }).catch(() => {});
+        }
+    }, [activeRoomId, confirmedRoomId, isParticipant, isViewing, roomId, roomProfileId, send, status, version]);
+    useEffect(() => () => {
+        if (roomId) void send({ type: 'set_viewing', viewing: false }).catch(() => {});
+    }, [roomId, send]);
+    useEffect(() => {
+        const media = mediaRef.current;
+        if (!roomId || !media) return;
+        const controller = new AbortController();
+        setResolveError(null);
+        void resolveRoomMedia(api, media, controller.signal).then(session => {
+            if (controller.signal.aborted) return;
+            setResolved({ version, roomId, session });
+            navigate('/anime/' + media.releaseId + '/watch?room=' + encodeURIComponent(roomId), { replace: true });
+        }).catch(cause => {
+            if (controller.signal.aborted) return;
+            const message = cause instanceof Error ? cause.message : 'Не удалось загрузить видео';
+            setResolveError(message);
+            void send({ type: 'load_error', epoch: syncEpochRef.current, message: message.slice(0, 200) }).catch(() => {});
+        });
+        return () => controller.abort();
+    // Room revisions and playback commands never restart media extraction.
+    }, [api, navigate, reload, roomId, send, version]);
     const updateSession = useCallback((nextSession: PlayerSession) => {
         setPlayerSession(nextSession);
         setCurrentPlayerSession(nextSession);
     }, []);
 
+    if (roomId) {
+        if (resolved?.roomId === roomId && resolved.version === version && roomMedia) {
+            return <PlayerContent key={roomId + ':' + version} playerSession={resolved.session} onSessionChange={updateSession} roomId={roomId} />;
+        }
+        return <div className={styles.overlay}><div className={styles['room-loading']}>
+            <RoomPanel compact />
+            <p role="status">{resolveError || error || (!roomMedia && status === 'connected' ? 'В комнате ещё не выбрана серия' : 'Загрузка видео…')}</p>
+            {resolveError && <button onClick={() => setReload(value => value + 1)}>Повторить</button>}
+            <button onClick={() => navigate('/together/' + encodeURIComponent(roomId))}>Вернуться в комнату</button>
+        </div></div>;
+    }
     if (!playerSession) return <Navigate to="/" replace />;
-
-    return <PlayerContent playerSession={playerSession} onSessionChange={updateSession} roomId={searchParams.get('room')} />;
+    return <PlayerContent playerSession={playerSession} onSessionChange={updateSession} roomId={null} />;
 }
 
 function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSession: PlayerSession; onSessionChange: (session: PlayerSession) => void; roomId: string | null }) {
@@ -104,7 +169,9 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     const { t } = useTranslation();
     const { userToken, userId } = useUser();
     const api = useApi();
-    const { setActiveRoomId } = useRoomPresence();
+    const { room: watchRoom, status: roomStatus, send, serverNow, self } = useRoomPresence();
+    const roomProfileId = self?.profileId ?? userId;
+    const canControlRoom = !roomId || (roomStatus === 'connected' && Boolean(watchRoom?.participants.some(participant => participant.profileId === roomProfileId && participant.canControl)));
     const playerRef = useRef<HTMLDivElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const upscaleCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -141,6 +208,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     const [volume, setVolume] = useState(settings.player.volume / 100);
     const [isPlayerSettingsOpen, setIsPlayerSettingsOpen] = useState(false);
     const [playbackRate, setPlaybackRate] = useState(1);
+    const displayedPlaybackRate = roomId && watchRoom ? watchRoom.playback.rate : playbackRate;
     const [aspectRatio, setAspectRatio] = useState<AspectRatio>('original');
     const [nativeAspectRatio, setNativeAspectRatio] = useState<number | null>(null);
     const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
@@ -148,12 +216,20 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     const [isEpisodeChanging, setIsEpisodeChanging] = useState(false);
     const [resumePromptTime, setResumePromptTime] = useState<number | null>(null);
     const [streamError, setStreamError] = useState<string | null>(null);
-    const promptedEpisodesRef = useRef(new Set<string>());
-    const autoplayAttemptedForRef = useRef<string | null>(null);
+    const promptedEpisodeRef = useRef<string | null>(null);
+    const autoplayAttemptedRef = useRef(false);
+    const resumePendingRef = useRef(false);
+    const loadPlaybackRef = useRef<boolean | null>(null);
+    const metadataLoadedRef = useRef(false);
     const fallbackPositionRef = useRef<{ time: number; shouldPlay: boolean } | null>(null);
-    const roomSocketRef = useRef(new WatchRoomSocket());
-    const applyingRoomStateRef = useRef(false);
-    const [watchRoom, setWatchRoom] = useState<WatchRoomState | null>(null);
+    const episodeRequestRef = useRef(0);
+    const episodeChangePendingRef = useRef(false);
+    const playerClosedRef = useRef(false);
+    const bridgeRef = useRef<PlaybackBridge | null>(null);
+    const roomStateRef = useRef(watchRoom);
+    const roomStatusRef = useRef(roomStatus);
+    useEffect(() => { roomStateRef.current = watchRoom; roomStatusRef.current = roomStatus; }, [watchRoom, roomStatus]);
+    const [isRoomPanelOpen, setIsRoomPanelOpen] = useState(false);
     const [areControlsVisible, setAreControlsVisible] = useState(true);
     const [webGpuStatus, setWebGpuStatus] = useState<'checking' | 'supported' | 'unsupported'>(() => (
         canUseAnime4KVideo() ? 'checking' : 'unsupported'
@@ -162,7 +238,6 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
 
     const stream = sources[selectedQuality]?.[0];
 
-    useEffect(() => { if (roomId) setActiveRoomId(roomId); }, [roomId, setActiveRoomId]);
     const timelineProgress = Number.isFinite(duration) && duration > 0
         ? Math.min((currentTime / duration) * 100, 100)
         : 0;
@@ -171,6 +246,14 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
         : 0;
     const episodeKey = String(episodeNumber ?? 'unknown');
     const progressKey = `${animeId}:${episodeKey}`;
+    useEffect(() => {
+        playerClosedRef.current = false;
+        return () => {
+            playerClosedRef.current = true;
+            episodeRequestRef.current += 1;
+            episodeChangePendingRef.current = false;
+        };
+    }, [progressKey]);
     const currentEpisodeIndex = playerSession.episodes?.findIndex(episode => episode.position === episodeNumber) ?? -1;
     const previousEpisode = currentEpisodeIndex > 0 ? playerSession.episodes?.[currentEpisodeIndex - 1] : undefined;
     const nextEpisode = currentEpisodeIndex >= 0 ? playerSession.episodes?.[currentEpisodeIndex + 1] : undefined;
@@ -186,66 +269,46 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
 
     const saveEpisodeTime = useCallback(() => {
         const video = videoRef.current;
-        if (!settings.content.rememberEpisodeTime || !video || !Number.isFinite(video.currentTime)) return;
+        if (!settings.content.rememberEpisodeTime || !video || !metadataLoadedRef.current || resumePendingRef.current
+            || !Number.isFinite(video.currentTime)) return;
 
         saveWatchProgress(animeId, episodeKey, video.ended ? -1 : Math.floor(video.currentTime));
     }, [animeId, episodeKey, settings.content.rememberEpisodeTime]);
 
     const sendRoomPlayback = useCallback((type: 'play' | 'pause' | 'seek' | 'set_rate', position: number, rate?: number) => {
-        if (!roomId || applyingRoomStateRef.current) return;
-        const canControl = watchRoom?.participants.some(participant => participant.profileId === userId && participant.canControl);
-        if (!canControl) return;
-        if (type === 'set_rate') roomSocketRef.current.send({ type, position, rate: rate ?? 1 });
-        else roomSocketRef.current.send({ type, position });
-    }, [roomId, userId, watchRoom]);
+        if (!roomId || !canControlRoom) return;
+        void send(type === 'set_rate' ? { type, position, rate: rate ?? 1 } : { type, position }).catch(error => setStreamError(String(error)));
+    }, [canControlRoom, roomId, send]);
 
     useEffect(() => {
-        const room = roomSocketRef.current;
-        if (!roomId || userId <= 0) return;
-        const participant = getRoomParticipant(userId);
-        room.connect(roomId, participant, state => {
-            setWatchRoom(state);
-            const video = videoRef.current;
-            if (!video || !state.media || state.media.releaseId !== animeId || state.media.episode !== episodeNumber) {
-                if (state.hostId === userId && playerSession.dubId && playerSession.sourceId && episodeNumber !== undefined) return;
-                if (state.media) navigate(roomMediaUrl(roomId, state.media), { replace: true });
-                return;
-            }
-            const targetTime = state.playback.position;
-            applyingRoomStateRef.current = true;
-            if (Math.abs(video.currentTime - targetTime) > .75) video.currentTime = targetTime;
-            video.playbackRate = state.playback.rate;
-            if (state.playback.paused && !video.paused) video.pause();
-            if (!state.playback.paused && video.paused) void video.play().catch(error => console.error('Не удалось синхронизировать плеер:', error));
-            window.setTimeout(() => { applyingRoomStateRef.current = false; }, 120);
-        }, error => console.error('Ошибка комнаты:', error), () => {
-            setActiveRoomId(null);
-            navigate('/together', { replace: true });
-        });
-        const interval = window.setInterval(() => room.send({ type: 'sync_request' }), 15_000);
-        return () => { window.clearInterval(interval); room.disconnect(); };
-    }, [animeId, episodeNumber, navigate, playerSession.dubId, playerSession.sourceId, roomId, setActiveRoomId, userId]);
-
+        const video = videoRef.current;
+        if (!roomId || !video || !stream) return;
+        const bridge = new PlaybackBridge(video, send, serverNow, setStreamError);
+        bridgeRef.current = bridge;
+        bridge.update(roomStateRef.current, roomStatusRef.current === 'connected');
+        const interval = window.setInterval(() => bridge.synchronize(), 250);
+        return () => { window.clearInterval(interval); bridge.dispose(); bridgeRef.current = null; };
+    }, [roomId, send, serverNow, stream]);
     useEffect(() => {
-        const room = roomSocketRef.current
-        const isCurrentRoomMedia = watchRoom?.media
-            && watchRoom.media.releaseId === animeId
-            && watchRoom.media.dubId === playerSession.dubId
-            && watchRoom.media.sourceId === playerSession.sourceId
-            && watchRoom.media.episode === episodeNumber;
-        if (!roomId || !watchRoom || isCurrentRoomMedia || watchRoom.hostId !== userId || !playerSession.dubId || !playerSession.sourceId || episodeNumber === undefined) return;
-        room.send({
-            type: 'set_media',
-            media: {
-                releaseId: animeId,
-                releaseName: animeName,
-                dubId: playerSession.dubId,
-                sourceId: playerSession.sourceId,
-                episode: episodeNumber,
-                episodeName: episodeName ?? t('player.episodeTitle', { number: episodeNumber }),
-            },
-        });
-    }, [animeId, animeName, episodeName, episodeNumber, playerSession.dubId, playerSession.sourceId, roomId, t, userId, watchRoom]);
+        if (!roomId) return;
+        bridgeRef.current?.update(watchRoom, roomStatus === 'connected');
+    }, [roomId, roomStatus, watchRoom]);
+    useEffect(() => {
+        if (roomId && streamError && !streamError.includes('Браузер')) bridgeRef.current?.error(streamError);
+    }, [roomId, streamError]);
+
+    const togglePlayback = useCallback(() => {
+        const video = videoRef.current;
+        if (!video || !canControlRoom) return;
+        if (roomId) { sendRoomPlayback(watchRoom?.playback.intent === 'playing' ? 'pause' : 'play', video.currentTime); return; }
+        if (video.paused) void video.play(); else video.pause();
+    }, [canControlRoom, roomId, sendRoomPlayback, watchRoom?.playback.intent]);
+    const seekTo = useCallback((position: number) => {
+        if (!canControlRoom) return;
+        if (roomId) { sendRoomPlayback('seek', position); return; }
+        if (videoRef.current) videoRef.current.currentTime = position;
+        setCurrentTime(position);
+    }, [canControlRoom, roomId, sendRoomPlayback]);
 
     const switchToLowerQuality = useCallback(() => {
         const currentIndex = qualities.indexOf(selectedQuality);
@@ -262,9 +325,11 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     }, [qualities, selectedQuality, sources]);
 
     const closePlayer = () => {
+        playerClosedRef.current = true;
+        episodeRequestRef.current += 1;
         saveEpisodeTime();
         clearPlayerSession();
-        navigate(`/anime/${animeId}`);
+        navigate(roomId ? `/together/${encodeURIComponent(roomId)}` : `/anime/${animeId}`);
     };
 
     const showControls = useCallback(() => {
@@ -339,6 +404,11 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
         setResumePromptTime(null);
         setStreamError(null);
         setIsBuffering(true);
+        autoplayAttemptedRef.current = false;
+        resumePendingRef.current = false;
+        metadataLoadedRef.current = false;
+        loadPlaybackRef.current = null;
+        if (promptedEpisodeRef.current !== progressKey) promptedEpisodeRef.current = null;
 
         const isHls = stream.type === HLS_MIME_TYPE || stream.src.includes('.m3u8') || stream.src.includes(':hls:');
         const canPlayNativeHls = isHls && Boolean(
@@ -384,6 +454,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                 // XhrLoader is declared with the base context even though it
                 // works for Hls.js's specialised fragment loader context too.
                 fLoader: CorsFallbackFragmentLoader as unknown as FragmentLoaderConstructor,
+                pLoader: CorsFallbackFragmentLoader as unknown as PlaylistLoaderConstructor,
             });
             hls.loadSource(stream.src);
             hls.attachMedia(video);
@@ -451,7 +522,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
             video.removeAttribute('src');
             video.load();
         };
-    }, [stream, switchToLowerQuality, t]);
+    }, [stream, switchToLowerQuality, t, progressKey]);
 
     useEffect(() => {
         if (!settings.player.qualityUpgrade || !canUseAnime4KVideo()) return;
@@ -462,18 +533,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
 
         let isCancelled = false;
         let setupStarted = false;
-        const nativeRequestVideoFrame = video.requestVideoFrameCallback.bind(video);
-        const nativeCancelVideoFrame = video.cancelVideoFrameCallback.bind(video);
-        const scheduledFrames = new Set<number>();
-        const requestVideoFrame: typeof video.requestVideoFrameCallback = callback => {
-            const id = nativeRequestVideoFrame((now, metadata) => {
-                scheduledFrames.delete(id);
-                if (!isCancelled) callback(now, metadata);
-            });
-            scheduledFrames.add(id);
-            return id;
-        };
-        video.requestVideoFrameCallback = requestVideoFrame;
+        const scope = createUpscalerScope(video);
 
         const setupUpscaler = async () => {
             if (setupStarted || !video.videoWidth || !video.videoHeight) return;
@@ -493,43 +553,63 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                         ? ModeC
                         : ModeB;
 
-                await render({
+                await scope.initialize(() => render({
                     video,
                     canvas,
-                    pipelineBuilder: (device, inputTexture) => [new Preset({
-                        device,
-                        inputTexture,
-                        nativeDimensions: { width: video.videoWidth, height: video.videoHeight },
-                        targetDimensions: { width: canvas.width, height: canvas.height },
-                    })],
-                });
+                    pipelineBuilder: (device, inputTexture) => {
+                        scope.useDevice(device);
+                        return [new Preset({
+                            device,
+                            inputTexture,
+                            nativeDimensions: { width: video.videoWidth, height: video.videoHeight },
+                            targetDimensions: { width: canvas.width, height: canvas.height },
+                        })];
+                    },
+                }));
 
                 if (!isCancelled) setUpscalerReadyKey(upscalerKey);
             } catch (error) {
-                console.error('Не удалось включить Anime4K:', error);
+                if (!isCancelled) console.error('Не удалось включить Anime4K:', error);
             }
         };
 
-        const onLoadedData = () => { void setupUpscaler(); };
-        video.addEventListener('loadeddata', onLoadedData, { once: true });
-        if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) void setupUpscaler();
+        const onCanPlay = () => { void setupUpscaler(); };
+        video.addEventListener('canplay', onCanPlay, { once: true });
+        if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) void setupUpscaler();
 
         return () => {
             isCancelled = true;
-            video.removeEventListener('loadeddata', onLoadedData);
-            video.requestVideoFrameCallback = nativeRequestVideoFrame;
-            scheduledFrames.forEach(id => nativeCancelVideoFrame(id));
-            scheduledFrames.clear();
+            video.removeEventListener('canplay', onCanPlay);
+            scope.dispose();
             setUpscalerReadyKey(current => current === upscalerKey ? null : current);
         };
     }, [settings.player.qualityUpgrade, settings.player.qualityUpgradeMode, stream, upscalerKey]);
 
     const changeEpisode = useCallback(async (targetEpisode: NonNullable<typeof previousEpisode>) => {
-        if (isEpisodeChanging) return;
+        if (!canControlRoom || episodeChangePendingRef.current || playerClosedRef.current) return;
+        if (roomId) {
+            if (!playerSession.dubId || !playerSession.sourceId) return;
+            episodeChangePendingRef.current = true;
+            setIsEpisodeChanging(true);
+            try {
+                await send({ type: 'set_media', media: {
+                    releaseId: animeId, releaseName: animeName, dubId: playerSession.dubId,
+                    sourceId: playerSession.sourceId, episode: targetEpisode.position, episodeName: targetEpisode.name,
+                } });
+            } catch (error) {
+                episodeChangePendingRef.current = false;
+                setIsEpisodeChanging(false);
+                setStreamError(String(error));
+            }
+            return;
+        }
 
+        episodeChangePendingRef.current = true;
+        const requestId = ++episodeRequestRef.current;
         setIsEpisodeChanging(true);
         try {
             const sources = await extractVideoLinks(targetEpisode.url);
+            if (playerClosedRef.current || requestId !== episodeRequestRef.current) return;
             if (!sources) throw new Error('Не удалось получить ссылки на видео');
             if (playerSession.sourceId && userToken) {
                 void Promise.all([
@@ -538,6 +618,8 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                 ]).catch(error => console.error('Не удалось отметить серию просмотренной:', error));
             }
             setFallbackQuality(null);
+            saveEpisodeTime();
+            fallbackPositionRef.current = null;
             onSessionChange({
                 ...playerSession,
                 sources,
@@ -545,17 +627,25 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                 episodeName: targetEpisode.name,
             });
         } catch (error) {
-            console.error('Не удалось сменить серию:', error);
+            if (!playerClosedRef.current && requestId === episodeRequestRef.current) {
+                console.error('Не удалось сменить серию:', error);
+                setStreamError(t('player.streamUnavailable'));
+            }
         } finally {
-            setIsEpisodeChanging(false);
+            if (!playerClosedRef.current && requestId === episodeRequestRef.current) {
+                episodeChangePendingRef.current = false;
+                setIsEpisodeChanging(false);
+            }
         }
-    }, [animeId, api, isEpisodeChanging, onSessionChange, playerSession, userToken]);
+    }, [animeId, animeName, api, canControlRoom, onSessionChange, playerSession, roomId, send, userToken, saveEpisodeTime, t]);
 
     const startFrom = (time: number) => {
         const video = videoRef.current;
         if (!video) return;
 
         video.currentTime = time;
+        resumePendingRef.current = false;
+        autoplayAttemptedRef.current = true;
         setCurrentTime(time);
         setResumePromptTime(null);
         void video.play().catch(error => console.error('Не удалось запустить видео:', error));
@@ -574,17 +664,14 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
             if (!video) return;
             const seek = (offset: number) => {
                 const nextTime = Math.max(0, Math.min(video.currentTime + offset, Number.isFinite(video.duration) ? video.duration : Infinity));
-                video.currentTime = nextTime;
-                setCurrentTime(nextTime);
-                sendRoomPlayback('seek', nextTime);
+                seekTo(nextTime);
             };
 
             event.preventDefault();
             showControls();
             switch (action) {
                 case 'togglePlayback':
-                    if (video.paused) void video.play();
-                    else video.pause();
+                    togglePlayback();
                     break;
                 case 'seekBackward': seek(-5); break;
                 case 'seekForward': seek(5); break;
@@ -612,7 +699,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [changeEpisode, keybindings, nextEpisode, previousEpisode, sendRoomPlayback, setSettings, settings.player.showSkipOpeningButton, settings.player.skipOpeningValue, showControls]);
+    }, [changeEpisode, keybindings, nextEpisode, previousEpisode, seekTo, togglePlayback, setSettings, settings.player.showSkipOpeningButton, settings.player.skipOpeningValue, showControls]);
 
     if (!stream) return <div className={styles.overlay} role="dialog" aria-modal="true" aria-label={t('player.ariaLabel')}>
         <div className={styles.player}>
@@ -634,31 +721,29 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                 <div className={`${styles['player-controls']} ${!areControlsVisible ? styles['player-controls-hidden'] : ''}`}>
                     <div className={styles['playback-buttons']}>
                         <div className={styles['top-bar']}>
-                            <button className={styles['back-button']} onClick={closePlayer}><img src={BackIcon} /></button>
+                            <button className={styles['back-button']} aria-label={roomId ? t('room.return') : t('player.backToRelease')} onClick={closePlayer}><img src={BackIcon} alt="" /></button>
                             <div className={styles['title-block']}>
                                 <h3>{animeName}</h3>
                                 {episodeNumber !== undefined && <p>{episodeName}</p>}
                             </div>
                         </div>
                         <div className={styles['flow-buttons']}>
-                            <button type="button" className={styles['next-prev-buttons']} disabled={!previousEpisode || isEpisodeChanging} onClick={() => previousEpisode && void changeEpisode(previousEpisode)}><img src={PrevIcon} /></button>
+                            <button type="button" className={styles['next-prev-buttons']} disabled={!canControlRoom || !previousEpisode || isEpisodeChanging} onClick={() => previousEpisode && void changeEpisode(previousEpisode)}><img src={PrevIcon} /></button>
                             <button
                                 type="button"
                                 className={styles['play-button']}
-                                disabled={isBuffering}
-                                aria-label={isBuffering ? t('player.loading') : isPlaying ? t('player.pause') : t('player.play')}
-                                onClick={() => {
-                                    if (videoRef.current?.paused) void videoRef.current.play();
-                                    else videoRef.current?.pause();
-                                }}
+                                disabled={!canControlRoom || (!roomId && isBuffering)}
+                                aria-label={roomId ? t(watchRoom?.playback.intent === 'playing' ? 'player.pause' : 'player.play') : isBuffering ? t('player.loading') : isPlaying ? t('player.pause') : t('player.play')}
+                                onClick={togglePlayback}
                             >
                                 {isBuffering ? <span className={styles.spinner} aria-hidden="true" /> : <img src={isPlaying ? PauseIcon : PlayIcon} />}
                             </button>
-                            <button type="button" className={styles['next-prev-buttons']} disabled={!nextEpisode || isEpisodeChanging} onClick={() => nextEpisode && void changeEpisode(nextEpisode)}><img src={NextIcon} /></button>
+                            <button type="button" className={styles['next-prev-buttons']} disabled={!canControlRoom || !nextEpisode || isEpisodeChanging} onClick={() => nextEpisode && void changeEpisode(nextEpisode)}><img src={NextIcon} /></button>
                         </div>
                     </div>
 
                     <div className={styles['action-buttons']}>
+                        {roomId && <button type="button" className={styles['room-toggle']} aria-controls="watch-room-panel" aria-expanded={isRoomPanelOpen} onClick={() => setIsRoomPanelOpen(value => !value)}>{t('watchRoom.room')}</button>}
                         <span className={styles['time-code']}>
                             {formatTime(currentTime)} / {formatTime(duration)}
                         </span>
@@ -708,9 +793,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                                         ? Math.min(video.currentTime + settings.player.skipOpeningValue, video.duration)
                                         : video.currentTime + settings.player.skipOpeningValue;
 
-                                    video.currentTime = nextTime;
-                                    setCurrentTime(nextTime);
-                                    sendRoomPlayback('seek', nextTime);
+                                    seekTo(nextTime);
                                 }}
                             >
                                 <img src={SkipIcon} />
@@ -734,6 +817,14 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                                                 type="button"
                                                 className={requestedQuality === option ? styles.selected : ''}
                                                 onClick={() => {
+                                                    const nextQuality = option !== 'auto' && sources[option]?.[0] ? option : qualities[0];
+                                                    const video = videoRef.current;
+                                                    if (nextQuality !== selectedQuality && video) {
+                                                        fallbackPositionRef.current = {
+                                                            time: video.currentTime,
+                                                            shouldPlay: !video.paused,
+                                                        };
+                                                    }
                                                     setFallbackQuality(null);
                                                     setSettings(previous => ({
                                                         ...previous,
@@ -772,7 +863,8 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                                     <span className={styles['settings-label']}>{t('player.speed')}</span>
                                     <div className={styles['settings-options']}>
                                         {PLAYBACK_RATES.map(rate => (
-                                            <button key={rate} type="button" className={playbackRate === rate ? styles.selected : ''} onClick={() => {
+                                            <button key={rate} type="button" disabled={!canControlRoom} className={displayedPlaybackRate === rate ? styles.selected : ''} onClick={() => {
+                                                if (roomId) { if (videoRef.current) sendRoomPlayback('set_rate', videoRef.current.currentTime, rate); return; }
                                                 setPlaybackRate(rate);
                                                 if (videoRef.current) {
                                                     videoRef.current.playbackRate = rate;
@@ -813,13 +905,12 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                                 '--buffered-progress': `${bufferedProgress}%`,
                             } as CSSProperties}
                             step="0.1"
-                            disabled={!Number.isFinite(duration) || duration <= 0}
+                            disabled={!canControlRoom || !Number.isFinite(duration) || duration <= 0}
                             onInput={event => {
                                 const nextTime = Number(event.currentTarget.value);
-                                if (videoRef.current) videoRef.current.currentTime = nextTime;
-                                setCurrentTime(nextTime);
+                                if (!roomId) seekTo(nextTime);
                             }}
-                            onChange={event => sendRoomPlayback('seek', Number(event.currentTarget.value))}
+                            onChange={event => { if (roomId) seekTo(Number(event.currentTarget.value)); }}
                         />
                     </div>
                 </div>
@@ -828,45 +919,51 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                 <video
                     ref={videoRef}
                     preload="auto"
-                    autoPlay
-                    crossOrigin="anonymous"
+                    crossOrigin={settings.player.qualityUpgrade && webGpuStatus === 'supported' ? 'anonymous' : undefined}
                     onLoadStart={() => setIsBuffering(true)}
-                    onWaiting={() => setIsBuffering(true)}
-                    onStalled={() => setIsBuffering(true)}
+                    onWaiting={() => { setIsBuffering(true); bridgeRef.current?.buffering(); }}
+                    onStalled={() => { setIsBuffering(true); bridgeRef.current?.buffering(); }}
                     onCanPlay={event => {
                         setIsBuffering(false);
-                        if (autoplayAttemptedForRef.current === progressKey) return;
-                        autoplayAttemptedForRef.current = progressKey;
-                        setResumePromptTime(null);
+                        if (roomId) { bridgeRef.current?.synchronize(); return; }
+                        if (resumePendingRef.current) {
+                            event.currentTarget.pause();
+                            return;
+                        }
+                        if (autoplayAttemptedRef.current) return;
+                        autoplayAttemptedRef.current = true;
+                        if (loadPlaybackRef.current === false) {
+                            event.currentTarget.pause();
+                            return;
+                        }
                         if (event.currentTarget.paused) {
                             void event.currentTarget.play().catch(error => console.error('Не удалось автоматически запустить серию:', error));
                         }
                     }}
-                    onPlay={event => {
-                        setIsPlaying(true);
-                        sendRoomPlayback('play', event.currentTarget.currentTime);
-                    }}
-                    onPlaying={() => setIsBuffering(false)}
-                    onPause={event => {
-                        setIsPlaying(false);
-                        sendRoomPlayback('pause', event.currentTarget.currentTime);
-                    }}
+                    onPlay={() => setIsPlaying(true)}
+                    onPlaying={() => { setIsBuffering(false); bridgeRef.current?.synchronize(); }}
+                    onSeeked={() => bridgeRef.current?.synchronize()}
+                    onPause={() => setIsPlaying(false)}
                     playsInline
                     className={styles.video}
                     onEnded={() => {
                         setIsPlaying(false);
                         saveEpisodeTime();
-                        if (settings.player.autoplay && nextEpisode) {
+                        if (settings.player.autoplay && nextEpisode && (!roomId || watchRoom?.hostId === roomProfileId)) {
                             void changeEpisode(nextEpisode);
+                        } else if (roomId && watchRoom?.hostId === roomProfileId && videoRef.current) {
+                            sendRoomPlayback('pause', videoRef.current.currentTime);
                         }
                     }}
                     onLoadedMetadata={event => {
                         const video = event.currentTarget;
+                        metadataLoadedRef.current = true;
                         setDuration(video.duration);
                         setNativeAspectRatio(video.videoWidth > 0 && video.videoHeight > 0
                             ? video.videoWidth / video.videoHeight
                             : null);
-                        video.playbackRate = playbackRate;
+                        video.playbackRate = roomId && watchRoom ? watchRoom.playback.rate : playbackRate;
+                        if (roomId) { fallbackPositionRef.current = null; bridgeRef.current?.loadedMetadata(); return; }
 
                         const fallbackPosition = fallbackPositionRef.current;
                         if (fallbackPosition) {
@@ -876,8 +973,8 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                             video.currentTime = nextTime;
                             setCurrentTime(nextTime);
                             fallbackPositionRef.current = null;
+                            loadPlaybackRef.current = fallbackPosition.shouldPlay;
                             setStreamError(null);
-                            if (fallbackPosition.shouldPlay) void video.play().catch(error => console.error('Не удалось возобновить видео:', error));
                             return;
                         }
 
@@ -886,16 +983,25 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                             && typeof savedTime === 'number'
                             && savedTime > 0
                             && Number.isFinite(video.duration)
-                            && !promptedEpisodesRef.current.has(progressKey);
+                            && !roomId
+                            && promptedEpisodeRef.current !== progressKey;
 
                         if (canResume) {
                             const resumeTime = Math.min(savedTime, Math.max(video.duration - 1, 0));
-                            promptedEpisodesRef.current.add(progressKey);
+                            promptedEpisodeRef.current = progressKey;
+                            resumePendingRef.current = true;
+                            video.pause();
                             setResumePromptTime(resumeTime);
                         }
                     }}
                     onDurationChange={event => setDuration(event.currentTarget.duration)}
-                    onError={() => setIsBuffering(false)}
+                    onError={event => {
+                        if (playerClosedRef.current || !event.currentTarget.error || event.currentTarget.error.code === 1) return;
+                        if (!switchToLowerQuality()) {
+                            setStreamError(t('player.streamUnavailable'));
+                            setIsBuffering(false);
+                        }
+                    }}
                     onProgress={event => setBufferedTime(getBufferedEnd(event.currentTarget))}
                     onTimeUpdate={event => setCurrentTime(event.currentTarget.currentTime)}
                     onVolumeChange={event => {
@@ -906,6 +1012,8 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                 <canvas ref={upscaleCanvasRef} className={`${styles['upscale-canvas']} ${isUpscalerReady ? styles['upscale-canvas-visible'] : ''}`} />
                 </div>
                 </div>
+                {roomId && isRoomPanelOpen && <div id="watch-room-panel" className={styles['room-panel']}><RoomPanel compact /></div>}
+                {roomId && streamError?.includes('Браузер') && <button className={styles['unlock-playback']} onClick={() => { void videoRef.current?.play().then(() => setStreamError(null)).catch(() => {}); }}>Включить видео</button>}
                 {streamError && <div className={styles['stream-error']} role="status">{streamError}</div>}
                 {resumePromptTime !== null && <div className={styles['resume-prompt']} role="dialog" aria-modal="true" aria-label={t('misc.continue')}>
                     <div className={styles['resume-prompt-card']}>
@@ -920,16 +1028,6 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
             </div>
         </div>
     );
-}
-
-function roomMediaUrl(roomId: string, media: NonNullable<WatchRoomState['media']>) {
-    const params = new URLSearchParams({
-        room: roomId,
-        dub: String(media.dubId),
-        source: String(media.sourceId),
-        episode: String(media.episode),
-    });
-    return `/anime/${media.releaseId}?${params.toString()}`;
 }
 
 function formatTime(seconds: number) {

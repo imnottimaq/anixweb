@@ -1,175 +1,152 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useUser } from '../shared/contexts/userContext';
-import { createWatchRoom, getPublicWatchRooms, getWatchRoomProfile, resolveWatchRoomCode, type RoomVisibility, type WatchRoomState, WatchRoomSocket } from '../shared/watchRoom';
-import type { Anime } from '../shared/types/api';
-import { getRoomParticipant } from '../shared/roomParticipant';
-import RemoteImage from '../components/RemoteImage';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useRoomPresence } from '../shared/contexts/roomContext';
+import { useUser } from '../shared/contexts/userContext';
 import { useTranslation } from '../shared/useTranslation';
-import styles from './WatchRoomScreen.module.css';
+import { getPublicWatchRooms } from '../shared/watchRoom';
+import { roomErrorKey } from '../shared/roomError';
+import type { PublicRoom, RoomMedia } from '../shared/roomProtocol';
+import type { Anime } from '../shared/types/api';
 import { useApi } from '../shared/apiClient';
-
-type ParticipantProfile = { login: string; avatar: string | null };
+import RoomPanel from '../components/RoomPanel';
+import RoomMediaPicker from '../components/RoomMediaPicker';
+import RemoteImage from '../components/RemoteImage';
+import PlayIcon from '../assets/icons/play.svg';
+import CreateRoomModal from '../modals/CreateRoomModal';
+import JoinRoomModal from '../modals/JoinRoomModal';
+import styles from './WatchRoomScreen.module.css';
 
 export default function WatchRoomScreen() {
-    const { roomId } = useParams<{ roomId: string }>();
-    return roomId ? <ConnectedRoom roomId={roomId} /> : <WatchRoomLobby />;
+    const { roomId } = useParams();
+    return roomId ? <ConnectedRoom key={roomId} roomId={roomId} /> : <Lobby />;
 }
 
-function WatchRoomLobby() {
-    const navigate = useNavigate();
-    const { userId } = useUser();
+function Lobby() {
+    const { activeRoomId, room } = useRoomPresence();
+    const { userToken } = useUser();
     const { t, selectPlural } = useTranslation();
-    const [title, setTitle] = useState(() => t('watchRoom.defaultTitle'));
-    const [visibility, setVisibility] = useState<RoomVisibility>('private');
-    const [joinCode, setJoinCode] = useState('');
-    const [rooms, setRooms] = useState<Array<{ roomId: string; title: string; participants: number; media: WatchRoomState['media'] }>>([]);
-    const [message, setMessage] = useState('');
-
-    const participantCount = (count: number) => t(`watchRoom.participants.${selectPlural(count)}` as Parameters<typeof t>[0], { count });
-    const loadRooms = useCallback(async () => {
-        try { setRooms((await getPublicWatchRooms()).rooms); }
-        catch (error) { console.error('Failed to load watch rooms:', error); setMessage(t('watchRoom.loadError')); }
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [isJoinOpen, setIsJoinOpen] = useState(false);
+    const [rooms, setRooms] = useState<PublicRoom[]>([]);
+    const [cursor, setCursor] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [listError, setListError] = useState('');
+    const request = useRef(0);
+    const load = useCallback(async (after?: string) => {
+        const current = ++request.current;
+        setLoading(true); setListError('');
+        try {
+            const result = await getPublicWatchRooms(after);
+            if (current !== request.current) return;
+            setRooms(previous => after ? [...previous, ...result.rooms.filter(r => !previous.some(p => p.roomId === r.roomId))] : result.rooms);
+            setCursor(result.cursor);
+        } catch { if (current === request.current) setListError(t('watchRoom.loadError')); }
+        finally { if (current === request.current) setLoading(false); }
     }, [t]);
-
     useEffect(() => {
-        const timeout = window.setTimeout(() => { void loadRooms(); }, 0);
-        return () => window.clearTimeout(timeout);
-    }, [loadRooms]);
-
-    const create = async () => {
-        if (userId <= 0) return setMessage(t('watchRoom.signInCreate'));
-        try {
-            const room = await createWatchRoom({ title, visibility, host: getRoomParticipant(userId) });
-            navigate(`/together/${room.roomId}`);
-        } catch (error) { console.error('Failed to create watch room:', error); setMessage(t('watchRoom.createError')); }
-    };
-    const joinByCode = async () => {
-        try {
-            const room = await resolveWatchRoomCode(joinCode);
-            navigate(`/together/${room.roomId}`);
-        } catch (error) { console.error('Failed to join watch room:', error); setMessage(t('watchRoom.joinError')); }
-    };
+        let active = true;
+        const timer = window.setTimeout(() => { if (active) void load(); }, 0);
+        return () => { active = false; window.clearTimeout(timer); };
+    }, [load]);
 
     return <section className={styles.page}>
-        <div className={styles.hero}><h1>{t('watchRoom.title')} <span className={styles.beta}>{t('watchRoom.beta')}</span></h1><p>{t('watchRoom.description')}</p></div>
-        <div className={styles.grid}>
-            <form className={styles.card} onSubmit={event => { event.preventDefault(); void create(); }}>
-                <h2>{t('watchRoom.new')}</h2>
-                <label>{t('watchRoom.name')}<input value={title} maxLength={80} onChange={event => setTitle(event.target.value)} /></label>
-                <label>{t('watchRoom.visibility')}<select value={visibility} onChange={event => setVisibility(event.target.value as RoomVisibility)}><option value="private">{t('watchRoom.private')}</option><option value="public">{t('watchRoom.public')}</option></select></label>
-                <button type="submit">{t('watchRoom.create')}</button>
-                <div className={styles['join-by-code']}><label>{t('watchRoom.code')}<input value={joinCode} maxLength={8} placeholder="AB12CD34" onChange={event => setJoinCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} /></label><button type="button" disabled={joinCode.length !== 8} onClick={() => void joinByCode()}>{t('watchRoom.joinCode')}</button></div>
-            </form>
-            <div className={styles.card}><div className={styles.cardHeading}><h2>{t('watchRoom.publicRooms')}</h2><button type="button" onClick={() => void loadRooms()}>{t('watchRoom.refresh')}</button></div>
-                {rooms.length === 0 ? <p className={styles.muted}>{t('watchRoom.noRooms')}</p> : <div className={styles.rooms}>{rooms.map(room => <Link key={room.roomId} to={`/together/${room.roomId}`}><strong>{room.title}</strong><span>{room.media?.releaseName ?? t('watchRoom.noEpisode')} · {participantCount(room.participants)}</span></Link>)}</div>}
+        <header className={styles.hero}>
+            <h1 className={styles.heroTitle}>{t('watchRoom.title')}</h1>
+            <div className={styles.heroActions}>
+                <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={() => setIsJoinOpen(true)}
+                >
+                    {t('watchRoom.joinCode')}
+                </button>
+                <button
+                    type="button"
+                    className={styles.primaryButton}
+                    onClick={() => setIsCreateOpen(true)}
+                >
+                    {t('watchRoom.create')}
+                </button>
             </div>
-        </div>
-        {message && <p className={styles.error}>{message}</p>}
+            <p className={styles.heroDescription}>{t('watchRoom.description')}</p>
+        </header>
+        {activeRoomId && <div className={styles.activeRoom}><div><span className={styles.eyebrow}>{t('roomUX.activeTitle')}</span><strong>{room?.title ?? t('watchRoom.room')}</strong></div><Link className={styles.primaryLink} to={`/together/${activeRoomId}`}>{t('roomUX.returnRoom')} →</Link></div>}
+        {!userToken && <div className={styles.signIn}><div><strong>{t('roomUX.signInTitle')}</strong><p>{t('roomUX.signInHint')}</p></div><Link className={styles.primaryLink} to="/account/login">{t('nav.account')}</Link></div>}
+        <section className={styles.publicSection} aria-labelledby="public-rooms-title" aria-busy={loading}>
+            <header className={styles.sectionHeading}><div><h2 id="public-rooms-title">{t('watchRoom.publicRooms')}</h2><p className={styles.muted}>{t('roomUX.publicHintList')}</p></div><button className={styles.secondary} type="button" disabled={loading} onClick={() => void load()}>{t('watchRoom.refresh')}</button></header>
+            {listError && <p role="alert" className={styles.inlineError}>{listError}</p>}
+            <div className={styles.rooms}>{rooms.map(r => <Link key={r.roomId} to={`/together/${r.roomId}`} className={styles.roomCard}>
+                <span className={styles.roomIcon} aria-hidden="true"><img src={PlayIcon} alt="" /></span><div><strong>{r.title}</strong><p>{r.media?.releaseName ?? t('watchRoom.noEpisode')}</p>{r.media && <small>{r.media.episodeName}</small>}</div><span className={styles.roomCount}>{t(`watchRoom.participants.${selectPlural(r.participants)}`, { count: r.participants })}<span aria-hidden="true"> ↗</span></span>
+            </Link>)}</div>
+            {loading && <p role="status" className={styles.muted}>{t('page.loading')}</p>}
+            {!rooms.length && !loading && !listError && <div className={styles.emptyState}><strong>{t('roomUX.emptyRooms')}</strong><p>{t('roomUX.emptyRoomsHint')}</p></div>}
+            {cursor && <button type="button" className={styles.secondary} disabled={loading} onClick={() => void load(cursor)}>{t('roomV2.loadMore')}</button>}
+        </section>
+
+        <CreateRoomModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
+        <JoinRoomModal isOpen={isJoinOpen} onClose={() => setIsJoinOpen(false)} />
     </section>;
 }
 
 function ConnectedRoom({ roomId }: { roomId: string }) {
-    const navigate = useNavigate();
-    const { userId } = useUser();
-    const api = useApi();
-    const { setActiveRoomId } = useRoomPresence();
+    const { room: state, join, status, self, send } = useRoomPresence();
+    const room = state?.roomId === roomId ? state : null;
+    const { userToken, userId } = useUser();
     const { t, language } = useTranslation();
-    const socketRef = useRef(new WatchRoomSocket());
-    const [room, setRoom] = useState<WatchRoomState | null>(null);
-    const [message, setMessage] = useState(() => t('watchRoom.connectingRoom'));
-    const [releaseQuery, setReleaseQuery] = useState('');
-    const [releaseResults, setReleaseResults] = useState<Anime[]>([]);
-    const [isSearching, setIsSearching] = useState(false);
-    const [participantProfiles, setParticipantProfiles] = useState<Record<number, ParticipantProfile>>({});
-    const [unavailableProfiles, setUnavailableProfiles] = useState<number[]>([]);
-    const [openParticipantMenu, setOpenParticipantMenu] = useState<number | null>(null);
-    const isController = useMemo(() => Boolean(room?.participants.find(item => item.profileId === userId)?.canControl), [room, userId]);
-    const releaseTitle = (release: Anime) => language === 'english' ? release.title_original || release.title_ru : release.title_ru || release.title_original;
-
-    useEffect(() => { setActiveRoomId(roomId); }, [roomId, setActiveRoomId]);
+    const [params] = useSearchParams();
+    const code = params.get('code') ?? undefined;
+    const api = useApi();
+    const navigate = useNavigate();
+    const searchInput = useRef<HTMLInputElement>(null);
+    const [query, setQuery] = useState('');
+    const [result, setResult] = useState<{ query: string; status: 'loading' | 'ready' | 'error'; items: Anime[] }>({ query: '', status: 'ready', items: [] });
+    const [selected, setSelected] = useState<Anime | null>(null);
+    const [joinError, setJoinError] = useState('');
+    const canControl = status === 'connected' && (room?.participants.some(p => p.profileId === (self?.profileId ?? userId) && p.canControl) ?? false);
+    const normalizedQuery = query.trim();
+    useEffect(() => { if (userToken) void join(roomId, code).catch(cause => setJoinError(t(roomErrorKey(cause instanceof Error ? cause.message : '')))); }, [join, roomId, code, userToken, t]);
     useEffect(() => {
-        const previousTitle = document.title;
-        const mediaTitle = room?.media ? `${room.media.releaseName} · ${room.media.episodeName}` : room?.title ?? t('watchRoom.title');
-        document.title = `${mediaTitle} — Anixart`;
-        return () => { document.title = previousTitle; };
-    }, [room?.media, room?.title, t]);
-
-    useEffect(() => {
-        const socket = socketRef.current;
-        if (userId <= 0) {
-            const timeout = window.setTimeout(() => setMessage(t('watchRoom.signInJoin')), 0);
-            return () => window.clearTimeout(timeout);
-        }
-        socket.connect(roomId, getRoomParticipant(userId), state => { setRoom(state); setMessage(''); }, error => {
-            console.error('Watch room connection error:', error);
-            setMessage(t('watchRoom.connectionError'));
-        }, () => { setActiveRoomId(null); navigate('/together', { replace: true }); });
-        const interval = window.setInterval(() => socket.send({ type: 'sync_request' }), 15_000);
-        return () => { window.clearInterval(interval); socket.disconnect(); };
-    }, [navigate, roomId, setActiveRoomId, t, userId]);
-
-    useEffect(() => { if (room?.media) navigate(roomMediaUrl(roomId, room.media), { replace: true }); }, [navigate, room?.media, roomId]);
-    useEffect(() => {
-        if (!room?.participants.length) return;
-        let cancelled = false;
-        const missingIds = room.participants.map(participant => participant.profileId).filter(profileId => !participantProfiles[profileId] && !unavailableProfiles.includes(profileId));
-        if (!missingIds.length) return;
-        void Promise.all(missingIds.map(async profileId => {
-            const data = await getWatchRoomProfile(profileId);
-            return data?.profile?.login ? [profileId, { login: data.profile.login, avatar: data.profile.avatar ?? null }] as const : profileId;
-        })).then(results => {
-            if (cancelled) return;
-            const unavailable = results.filter((item): item is number => typeof item === 'number');
-            const loaded = Object.fromEntries(results.filter((item): item is readonly [number, ParticipantProfile] => Array.isArray(item)));
-            if (Object.keys(loaded).length) setParticipantProfiles(previous => ({ ...previous, ...loaded }));
-            if (unavailable.length) setUnavailableProfiles(previous => [...new Set([...previous, ...unavailable])]);
-        }).catch(error => console.error('Failed to load participant profiles:', error));
-        return () => { cancelled = true; };
-    }, [participantProfiles, room?.participants, unavailableProfiles]);
-
-    useEffect(() => {
-        const query = releaseQuery.trim();
-        if (!isController || room?.media || query.length < 2) return;
-        let isCurrent = true;
+        if (!canControl || normalizedQuery.length < 2 || selected) return;
+        let current = true;
         const timeout = window.setTimeout(() => {
-            setIsSearching(true);
-            searchReleases(query, api).then(results => { if (isCurrent) setReleaseResults(results); }).catch(error => {
-                console.error('Failed to search releases:', error);
-                if (isCurrent) setMessage(t('watchRoom.searchError'));
-            }).finally(() => { if (isCurrent) setIsSearching(false); });
+            setResult({ query: normalizedQuery, status: 'loading', items: [] });
+            void api.post<{ releases?: Anime[]; content?: Anime[] }>('/search/releases/0', { query: normalizedQuery, searchBy: 0 }, { 'Api-Version': 'v2' })
+                .then(data => { if (current) setResult({ query: normalizedQuery, status: 'ready', items: data.releases ?? data.content ?? [] }); })
+                .catch(() => { if (current) setResult({ query: normalizedQuery, status: 'error', items: [] }); });
         }, 350);
-        return () => { isCurrent = false; window.clearTimeout(timeout); };
-    }, [api, isController, releaseQuery, room?.media, t]);
-
-    const grant = (profileId: number, canControl: boolean) => socketRef.current.send({ type: canControl ? 'grant_control' : 'revoke_control', profileId });
-    const kick = (profileId: number) => { socketRef.current.send({ type: 'kick', profileId }); setOpenParticipantMenu(null); };
-    const leaveRoom = () => { socketRef.current.send({ type: 'leave' }); socketRef.current.disconnect(); setActiveRoomId(null); navigate('/together'); };
+        return () => { current = false; window.clearTimeout(timeout); };
+    }, [api, canControl, normalizedQuery, selected]);
+    const cancelSelection = () => { setSelected(null); window.requestAnimationFrame(() => searchInput.current?.focus()); };
+    const selectMedia = async (media: RoomMedia) => {
+        await send({ type: 'set_media', media });
+        navigate(`/anime/${media.releaseId}/watch?room=${encodeURIComponent(roomId)}`);
+    };
+    const searching = normalizedQuery.length >= 2 && (result.query !== normalizedQuery || result.status === 'loading');
 
     return <section className={styles.page}>
         <Link className={styles.back} to="/together">← {t('watchRoom.allRooms')}</Link>
-        <div className={styles.roomHeader}><div><h1>{room?.title ?? t('watchRoom.room')}</h1><p>{room ? (room.visibility === 'private' ? t('watchRoom.privateRoom') : t('watchRoom.publicRoom')) : t('watchRoom.connecting')}{room?.joinCode ? ` · ${t('watchRoom.codeValue', { code: room.joinCode })}` : ''}</p></div><div className={styles['room-actions']}><button className={styles['copy-link']} type="button" onClick={() => navigator.clipboard.writeText(window.location.href)}>{t('watchRoom.copyLink')}</button>{room?.joinCode && <button className={styles['copy-link']} type="button" onClick={() => navigator.clipboard.writeText(room.joinCode)}>{t('watchRoom.copyCode')}</button>}<button className={styles['leave-room']} type="button" onClick={leaveRoom}>{t('watchRoom.leave')}</button></div></div>
-        <div className={styles.grid}>
-            <div className={styles.card}><h2>{t('watchRoom.nowWatching')}</h2>{room?.media ? <><strong>{room.media.releaseName}</strong><p>{room.media.episodeName}</p><Link className={styles['open-release']} to={`/anime/${room.media.releaseId}?room=${encodeURIComponent(roomId)}`}>{t('watchRoom.openRelease')}</Link></> : isController ? <><p className={styles.muted}>{t('watchRoom.selectHint')}</p><label className={styles['search-label']}>{t('watchRoom.searchAnime')}<input autoFocus value={releaseQuery} placeholder={t('watchRoom.searchPlaceholder')} onChange={event => { const value = event.target.value; setReleaseQuery(value); if (value.trim().length < 2) { setReleaseResults([]); setIsSearching(false); } }} /></label>{isSearching && <p className={styles.muted}>{t('watchRoom.searching')}</p>}{releaseQuery.trim().length >= 2 && !isSearching && <div className={styles['release-results']}>{releaseResults.length ? releaseResults.map(release => <Link key={release.id} to={`/anime/${release.id}?room=${encodeURIComponent(roomId)}`} state={{ partialAnime: release }}><strong>{releaseTitle(release)}</strong><span>{release.year || t('watchRoom.unknownYear')} · {t('watchRoom.episodeCount', { count: release.episodes_released || 0 })}</span></Link>) : <p className={styles.muted}>{t('watchRoom.nothingFound')}</p>}</div>}</> : <p className={styles.muted}>{t('watchRoom.waitingHost')}</p>}</div>
-            <div className={styles.card}><h2>{t('watchRoom.participantsTitle', { count: room?.participants.length ?? 0 })}</h2><div className={styles.participants}>{room?.participants.map(participant => {
-                const profile = participantProfiles[participant.profileId];
-                const login = profile?.login ?? participant.login;
-                const avatar = profile?.avatar ?? participant.avatar;
-                const canManage = userId === room?.hostId && participant.profileId !== userId;
-                return <div key={participant.profileId}><span className={styles.participant}><span className={styles.avatar}>{avatar ? <RemoteImage src={avatar} alt={t('watchRoom.avatarAlt', { login })} /> : login[0]?.toUpperCase()}</span><span>{login}{participant.profileId === room.hostId ? ` · ${t('watchRoom.host')}` : ''}</span></span>{canManage && <div className={styles['participant-menu-wrap']}><button className={styles['participant-menu-button']} type="button" aria-label={t('watchRoom.actionsFor', { login })} onClick={() => setOpenParticipantMenu(current => current === participant.profileId ? null : participant.profileId)}>⋮</button>{openParticipantMenu === participant.profileId && <div className={styles['participant-menu']}>{room?.visibility === 'public' && <button type="button" onClick={() => { grant(participant.profileId, !participant.canControl); setOpenParticipantMenu(null); }}>{participant.canControl ? t('watchRoom.revokeControl') : t('watchRoom.grantControl')}</button>}<button className={styles['kick-button']} type="button" onClick={() => kick(participant.profileId)}>{t('watchRoom.kick')}</button></div>}</div>}</div>;
-            })}</div></div>
-        </div>
-        {message && <p className={styles.error}>{message}</p>}
+        <header className={styles.roomPageHeader}><div><span className={styles.eyebrow}>{t('watchRoom.title')}</span><h1>{room?.title ?? t('watchRoom.room')}</h1></div>{room && <span className={styles.badge}>{t(room.visibility === 'private' ? 'watchRoom.privateRoom' : 'watchRoom.publicRoom')}</span>}</header>
+        {!userToken ? <div className={styles.signIn}><p>{t('roomUX.signInHint')}</p><Link className={styles.primaryLink} to="/account/login">{t('nav.account')}</Link></div> : <div className={styles.roomGrid}>
+            <div className={styles.roomContent}>
+                <section className={`${styles.card} ${styles.mediaHero}`} aria-labelledby="room-media-title">
+                    <span className={styles.mediaIcon} aria-hidden="true"><img src={PlayIcon} alt="" /></span>
+                    <div><p className={styles.eyebrow}>{room?.media ? t('watchRoom.nowWatching') : t('watchRoom.title')}</p><h2 id="room-media-title">{room?.media?.releaseName ?? t('roomUX.emptyMedia')}</h2>
+                        <p className={styles.muted}>{room?.media?.episodeName ?? t(canControl ? 'roomUX.emptyMediaHint' : 'roomUX.waitHostHint')}</p>
+                        {room?.media && <div className={styles.mediaActions}><Link className={styles.primaryLink} to={`/anime/${room.media.releaseId}/watch?room=${encodeURIComponent(roomId)}`}>{t('roomUX.startTogether')} <span aria-hidden="true">→</span></Link><span className={styles.muted}>{room.barrier ? t('roomV2.waiting') : t(room.playback.paused ? 'roomUX.paused' : 'roomUX.playing')}</span></div>}
+                    </div>
+                </section>
+                {canControl && (selected ? <RoomMediaPicker release={selected} onCancel={cancelSelection} onSelected={selectMedia} disabled={status !== 'connected'} /> : <section className={styles.card} aria-labelledby="room-search-title">
+                    <h2 id="room-search-title">{t('roomUX.chooseAnime')}</h2>
+                    <label className={styles.field}>{t('watchRoom.searchAnime')}<input ref={searchInput} value={query} placeholder={t('watchRoom.searchPlaceholder')} onChange={event => setQuery(event.target.value)} /></label>
+                    {normalizedQuery.length < 2 ? <p className={styles.fieldHint}>{t('roomUX.searchHint')}</p> : searching ? <p role="status" className={styles.muted}>{t('watchRoom.searching')}</p> : result.status === 'error' ? <p role="alert" className={styles.inlineError}>{t('watchRoom.searchError')}</p> : <div className={styles.searchResults}>
+                        {result.items.length ? result.items.map(release => <button type="button" key={release.id} className={styles.searchResult} onClick={() => setSelected(release)}>
+                            {release.image && <RemoteImage src={release.image} alt="" loading="lazy" />}<span><strong>{language === 'english' ? release.title_original || release.title_ru : release.title_ru || release.title_original}</strong><small>{release.year || t('watchRoom.unknownYear')} · {t('watchRoom.episodeCount', { count: release.episodes_released || 0 })}</small></span><span aria-hidden="true">→</span>
+                        </button>) : <p className={styles.muted}>{t('roomUX.searchEmpty')}</p>}
+                    </div>}
+                </section>)}
+                {joinError && <p role="alert" className={styles.inlineError}>{joinError}</p>}
+            </div>
+            <RoomPanel />
+        </div>}
     </section>;
-}
-
-async function searchReleases(query: string, api: ReturnType<typeof useApi>) {
-    const response = await api.post<{code: number; releases?: Anime[]; content?: Anime[]}>('/search/releases/0', {query, searchBy: 0}, {'Api-Version': 'v2'});
-    return response.releases ?? response.content ?? [];
-}
-
-function roomMediaUrl(roomId: string, media: NonNullable<WatchRoomState['media']>) {
-    const params = new URLSearchParams({ room: roomId, dub: String(media.dubId), source: String(media.sourceId), episode: String(media.episode) });
-    return `/anime/${media.releaseId}?${params.toString()}`;
 }

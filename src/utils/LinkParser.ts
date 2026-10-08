@@ -1,4 +1,5 @@
 import type { VideoSources, VideoStreamType } from '../shared/types/video';
+import { getCorsProxyUrl } from '../shared/proxy';
 
 /*
     LinkParser.ts взят из AnixartJS(https://github.com/theDesConnet/AnixartJS)
@@ -18,11 +19,8 @@ import type { VideoSources, VideoStreamType } from '../shared/types/video';
  * Качество
  */
 
-const PROXY_BASE = "https://kodik-proxy.imnottimaq.workers.dev/corsproxy?url="; //
-
-async function proxyFetch(targetUrl: string, options?: RequestInit) {
-    const proxiedUrl = `${PROXY_BASE}${encodeURIComponent(targetUrl)}`;
-    
+export async function proxyFetch(targetUrl: string, options?: RequestInit) {
+    const proxiedUrl = getCorsProxyUrl(targetUrl);
     return fetch(proxiedUrl, options);
 }
 
@@ -101,16 +99,16 @@ export class KodikParser {
     private static _baseKodikDomain = 'kodikplayer.com'
     private static _endpointUrl = '/ftor';
 
-    public static async getLatestLink(url: string): Promise<string | null> {
+    public static async getLatestLink(url: string, signal?: AbortSignal): Promise<string | null> {
         const endpointUrlRegex = new RegExp(/url:atob\((?<encodedPath>[^"]+)\)/is);
         const appPlayerPathRegex = new RegExp(/src="(?<path>\/assets\/js\/app\.player_single\..*?\.js)"/is);
 
-        const playerResponse = await (await proxyFetch(url)).text();
+        const playerResponse = await (await proxyFetch(url, { signal })).text();
         const appPlayerPath = playerResponse.match(appPlayerPathRegex)?.groups?.path;
 
         if (!appPlayerPath) return null;
 
-        const appPlayerResponse = await (await proxyFetch(`https://${new URL(url).host}${appPlayerPath}`)).text();
+        const appPlayerResponse = await (await proxyFetch(`https://${new URL(url).host}${appPlayerPath}`, { signal })).text();
         const latestEndpoint = appPlayerResponse.match(endpointUrlRegex)?.groups?.encodedPath;
 
         if (!latestEndpoint) return null;
@@ -118,8 +116,8 @@ export class KodikParser {
         return atob(latestEndpoint);
     }
 
-    public static async getDirectLinks(url: string, endpointPath: string = this._endpointUrl): Promise<KodikVideoLinks | null> {
-        const urlResponse = await (await proxyFetch(url)).text();
+    public static async getDirectLinks(url: string, endpointPath: string = this._endpointUrl, signal?: AbortSignal): Promise<KodikVideoLinks | null> {
+        const urlResponse = await (await proxyFetch(url, { signal })).text();
 
         const paramsMatch = urlResponse.match(/var\s+urlParams\s*=\s*(['"])(?<params>.*?)\1/is);
         const urlParams = JSON.parse(paramsMatch?.groups?.params || "{}") as Record<string, string>;
@@ -140,6 +138,7 @@ export class KodikParser {
         const apiUrl = `https://${this._baseKodikDomain}${endpointPath}`;
 
         const directLinksResponse = await proxyFetch(apiUrl, {
+            signal,
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -336,11 +335,11 @@ export class AniLibriaParser {
     public static idPattern = /id=(?<id>\d+)/;
     public static episodePattern = /ep=(?<ep>\d+)/;
 
-    public static async getDirectLinks(link: string): Promise<AniLibriaReturnObject | null> {
+    public static async getDirectLinks(link: string, signal?: AbortSignal): Promise<AniLibriaReturnObject | null> {
         const id = this.idPattern.exec(link)?.groups?.id;
         const episode = this.episodePattern.exec(link)?.groups?.ep;
 
-        const request = await fetch(`https://${this._baseAniLibriaDomain}${this._endpointUrl}/${id}`);
+        const request = await fetch(`https://${this._baseAniLibriaDomain}${this._endpointUrl}/${id}`, { signal });
 
         const body = await request.json() as AniLibriaAnime;
 
@@ -374,14 +373,15 @@ export class SibnetParser {
 
     public static srcMatch = new RegExp(/src: (".*?")/);
 
-    public static async getDirectLink(link: string): Promise<string | null> {
-        const request = await proxyFetch(link);
+    public static async getDirectLink(link: string, signal?: AbortSignal): Promise<string | null> {
+        const request = await proxyFetch(link, { signal });
 
         const body = await request.text();
         const match = this.srcMatch.exec(body);
 
         if (match) {
             const srcRequest = await proxyFetch(`https://${this._baseSibnetDomain}${match[1].replace(/"/g, '')}`, {
+                signal,
                 headers: {
                     host: this._baseSibnetDomain,
                     referer: link
@@ -404,18 +404,18 @@ export class RutubeParser {
     private static _regExpUrl = /(http|https):\/\/(?<domain>\w+.\w+)\/play\/embed\/(?<videoId>\w+)/;
     private static _regExpDirectLink = /^.*\s*RESOLUTION=(?<width>\d+)x(?<heigth>\d+)\n(?<url>.*)$/gm;
 
-    public static async getDirectLinks(link: string): Promise<Record<string, string> | null> {
+    public static async getDirectLinks(link: string, signal?: AbortSignal): Promise<Record<string, string> | null> {
         const match = this._regExpUrl.exec(link)?.groups?.videoId ?? null;
 
         if (!match) return null;
 
-        const request = await proxyFetch(`https://${this._baseRutubeDomain}/api/play/options/${match}/?no_404=true&referer&pver=v2`);
+        const request = await proxyFetch(`https://${this._baseRutubeDomain}/api/play/options/${match}/?no_404=true&referer&pver=v2`, { signal });
         const body = await request.json();
         const balancerUrl = body['video_balancer'].default ?? null;
 
         if (!balancerUrl) return null;
 
-        const balancerRequest = await proxyFetch(balancerUrl);
+        const balancerRequest = await proxyFetch(balancerUrl, { signal });
         const balancerBody = await balancerRequest.text();
 
         let directLinkMatch = this._regExpDirectLink.exec(balancerBody);
@@ -456,7 +456,7 @@ export class VKVideoParser {
     private static hashRegExp = /[?&]hash=(?<hash>\w+)/;
     private static _regExpDirectLink = /^.*\s*RESOLUTION=(?<width>\d+)x(?<heigth>\d+)\n(?<url>.*)$/gm;
     
-    public static async getDirectLinks(link: string): Promise<Record<string, string> | null> {
+    public static async getDirectLinks(link: string, signal?: AbortSignal): Promise<Record<string, string> | null> {
         const oid = this.oidRegExp.exec(link)?.groups?.oid ?? null;
         const id = this.idRegExp.exec(link)?.groups?.id ?? null;
         const hash = this.hashRegExp.exec(link)?.groups?.hash ?? null;
@@ -464,17 +464,18 @@ export class VKVideoParser {
         if (!oid || !id || !hash) return null;
 
         const uuid = crypto.randomUUID();
-        const tokenResponse = await proxyFetch(`https://oauth.${this._baseVkDomain}/oauth/get_anonym_token?client_id=51552953&client_secret=qgr0yWwXCrsxA1jnRtRX&device_id=${uuid}`);
+        const tokenResponse = await proxyFetch(`https://oauth.${this._baseVkDomain}/oauth/get_anonym_token?client_id=51552953&client_secret=qgr0yWwXCrsxA1jnRtRX&device_id=${uuid}`, { signal });
 
         const anonymToken: VKVideoTokenResponse = await tokenResponse.json();
 
         const getLinksResponse = await proxyFetch(`https://api.${this._baseVkDomain}/method/video.get`, {
+            signal,
             method: 'POST',
             body: `anonymous_token=${anonymToken.token}&device_id=${uuid}&lang=en&v=5.244&videos=${oid}_${id}_${hash}`,
         });
 
         const getLinksResponseJson = await getLinksResponse.json();
-        const hlsMasterRequest = await proxyFetch(getLinksResponseJson.response.items[0].files.hls);
+        const hlsMasterRequest = await proxyFetch(getLinksResponseJson.response.items[0].files.hls, { signal });
         const vkServerUrl = new URL(hlsMasterRequest.url).host;
 
         const hlsMasterBody = await hlsMasterRequest.text();
@@ -507,8 +508,8 @@ export class VKVideoParser {
 export class OKParser {
     private static _regExpDataOptions = /data-options="(?<content>{.*})"/m;
     private static _regExpDirectLink = /^.*\s*RESOLUTION=(?<width>\d+)x(?<heigth>\d+)\n(?<url>.*)$/gm;
-    public static async getDirectLinks(link: string): Promise<Record<string, string> | null> {
-        const request = await proxyFetch(link);
+    public static async getDirectLinks(link: string, signal?: AbortSignal): Promise<Record<string, string> | null> {
+        const request = await proxyFetch(link, { signal });
         const body = await request.text();
 
         const dataOptionsMatch = this._regExpDataOptions.exec(body)?.groups?.content ?? null;
@@ -520,7 +521,7 @@ export class OKParser {
 
         if (metadataJson.provider != "UPLOADED_ODKL" || metadataJson.isLive) return null;
 
-        const hlsMasterRequest = await proxyFetch(metadataJson.hlsManifestUrl);
+        const hlsMasterRequest = await proxyFetch(metadataJson.hlsManifestUrl, { signal });
         const hlsMasterBody = await hlsMasterRequest.text();
         const okServerUrl = new URL(hlsMasterRequest.url).host;
 
@@ -548,34 +549,35 @@ export class OKParser {
 const PARSERS = [
     {
         test: (url: string) => url.includes('kodik'),
-        parse: (url: string) => KodikParser.getDirectLinks(url)
+        parse: (url: string, signal?: AbortSignal) => KodikParser.getDirectLinks(url, undefined, signal)
     },
     {
         test: (url: string) => url.includes('aniliberty.top') || url.includes('anixart'),
-        parse: (url: string) => AniLibriaParser.getDirectLinks(url)
+        parse: (url: string, signal?: AbortSignal) => AniLibriaParser.getDirectLinks(url, signal)
     },
     {
         test: (url: string) => url.includes('video.sibnet.ru'),
-        parse: async (url: string) => {
-            const link = await SibnetParser.getDirectLink(url);
+        parse: async (url: string, signal?: AbortSignal) => {
+            const link = await SibnetParser.getDirectLink(url, signal);
             return link ? { "default": link } : null;
         }
     },
     {
         test: (url: string) => url.includes('rutube.ru'),
-        parse: (url: string) => RutubeParser.getDirectLinks(url)
+        parse: (url: string, signal?: AbortSignal) => RutubeParser.getDirectLinks(url, signal)
     },
     {
         test: (url: string) => url.includes('vk.com'),
-        parse: (url: string) => VKVideoParser.getDirectLinks(url)
+        parse: (url: string, signal?: AbortSignal) => VKVideoParser.getDirectLinks(url, signal)
     },
     {
         test: (url: string) => url.includes('ok.ru') || url.includes('odnoklassniki.ru'),
-        parse: (url: string) => OKParser.getDirectLinks(url)
+        parse: (url: string, signal?: AbortSignal) => OKParser.getDirectLinks(url, signal)
     }
 ];
 
-export async function extractVideoLinks(url: string): Promise<VideoSources | null> {
+export async function extractVideoLinks(url: string, signal?: AbortSignal): Promise<VideoSources | null> {
+    signal?.throwIfAborted();
     const parser = PARSERS.find(p => p.test(url));
 
     if (!parser) {
@@ -584,7 +586,8 @@ export async function extractVideoLinks(url: string): Promise<VideoSources | nul
     }
 
     try {
-        const links = await parser.parse(url);
+        const links = await parser.parse(url, signal);
+        signal?.throwIfAborted();
         return links ? normalizeVideoSources(links as RawVideoSources) : null;
     } catch (err) {
         console.error("Ошибка при парсинге ссылки:", err);

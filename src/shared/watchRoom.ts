@@ -1,114 +1,53 @@
-export type RoomVisibility = 'private' | 'public';
-
-export type RoomParticipant = {
-    profileId: number;
-    login: string;
-    avatar?: string | null;
-    canControl: boolean;
-};
-
-export type RoomMedia = {
-    releaseId: number;
-    releaseName: string;
-    dubId: number;
-    sourceId: number;
-    episode: number;
-    episodeName: string;
-};
-
-export type WatchRoomState = {
-    roomId: string;
-    joinCode: string;
-    visibility: RoomVisibility;
-    hostId: number;
-    title: string;
-    media: RoomMedia | null;
-    playback: { position: number; paused: boolean; rate: number; updatedAt: number };
-    participants: RoomParticipant[];
-};
-
-export type RoomMessage =
-    | { type: 'join'; participant: Omit<RoomParticipant, 'canControl'> }
-    | { type: 'sync_request' }
-    | { type: 'leave' }
-    | { type: 'set_media'; media: RoomMedia }
-    | { type: 'play' | 'pause' | 'seek'; position: number }
-    | { type: 'set_rate'; position: number; rate: number }
-    | { type: 'grant_control' | 'revoke_control' | 'kick'; profileId: number };
-
-const ROOM_SERVER_URL = (import.meta.env.VITE_ROOM_SERVER_URL || 'http://localhost:8787').replace(/\/$/, '');
-
-export function getRoomServerUrl() {
-    return ROOM_SERVER_URL;
-}
-
-export function getRoomWebSocketUrl(roomId: string) {
-    const url = new URL(`${ROOM_SERVER_URL}/rooms/${roomId}/ws`);
-    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-    return url.toString();
-}
-
-export async function createWatchRoom(input: { title: string; visibility: RoomVisibility; host: Omit<RoomParticipant, 'canControl'> }) {
-    const response = await fetch(`${ROOM_SERVER_URL}/rooms`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(input),
-    });
-    if (!response.ok) throw new Error(`Не удалось создать комнату: ${response.status}`);
-    return response.json() as Promise<{ roomId: string; state: WatchRoomState }>;
-}
-
-export async function getPublicWatchRooms() {
-    const response = await fetch(`${ROOM_SERVER_URL}/rooms`);
-    if (!response.ok) throw new Error(`Не удалось загрузить комнаты: ${response.status}`);
-    return response.json() as Promise<{ rooms: Array<Pick<WatchRoomState, 'roomId' | 'title' | 'hostId' | 'media'> & { participants: number }>; cursor: string | null }>;
-}
-
-export async function resolveWatchRoomCode(code: string) {
-    const response = await fetch(`${ROOM_SERVER_URL}/rooms/code/${encodeURIComponent(code.trim().toUpperCase())}`);
-    if (!response.ok) throw new Error('Комната с таким кодом не найдена');
-    return response.json() as Promise<{ roomId: string }>;
-}
-
-export async function getWatchRoomProfile(profileId: number) {
-    const response = await fetch(`${ROOM_SERVER_URL}/profiles/${profileId}`);
-    if (!response.ok) return null;
-    return response.json() as Promise<{ profile?: { login?: string; avatar?: string | null } }>;
-}
-
-export class WatchRoomSocket {
-    private socket: WebSocket | null = null;
-
-    connect(
-        roomId: string,
-        participant: Omit<RoomParticipant, 'canControl'>,
-        onState: (state: WatchRoomState) => void,
-        onError: (message: string) => void,
-        onKicked?: () => void,
-    ) {
-        this.disconnect();
-        const socket = new WebSocket(getRoomWebSocketUrl(roomId));
-        this.socket = socket;
-        socket.addEventListener('open', () => this.send({ type: 'join', participant }));
-        socket.addEventListener('message', event => {
-            try {
-                const message = JSON.parse(String(event.data)) as { type: string; state?: WatchRoomState; message?: string };
-                if (message.type === 'room_state' && message.state) onState(message.state);
-                if (message.type === 'error' && message.message) onError(message.message);
-                if (message.type === 'kicked') onKicked?.();
-            } catch {
-                onError('Сервер отправил некорректное сообщение');
-            }
-        });
-        socket.addEventListener('error', () => onError('Не удалось подключиться к комнате'));
+import { getStoredUserToken } from './authToken';
+import { parseRoomSession } from './roomSession';
+import type { PublicRoom, RoomVisibility, WatchRoomState, Profile } from './roomProtocol';
+export type { RoomParticipant, RoomVisibility, RoomMedia, WatchRoomState, RoomCommandPayload } from './roomProtocol';
+export { RoomClient } from './roomClient';
+export type { RoomConnectionStatus } from './roomClient';
+const BASE = (import.meta.env.VITE_ROOM_SERVER_URL || 'http://localhost:8787').replace(/\/$/, '');
+let session: {token:string; session:string; expiresAt:number; profile:Profile} | null = null;
+let sessionRequest: {token:string;promise:Promise<string>} | null = null;
+const profileListeners = new Set<() => void>();
+export function subscribeRoomProfile(listener: () => void) { profileListeners.add(listener); return () => { profileListeners.delete(listener); }; }
+export function getAuthenticatedRoomProfile(): Profile | null { return session?.token === getStoredUserToken() ? session.profile : null; }
+function notifyProfile() { for (const listener of profileListeners) listener(); }
+export function getRoomServerUrl() { return BASE; }
+async function responseJson<T>(response:Response):Promise<T> {
+    let body: unknown;
+    try { body = await response.json(); }
+    catch {
+        // Old Workers and upstream gateways may return HTML/text errors. Keep
+        // their status so a permanent404 cannot become an endless reconnect.
+        throw Object.assign(new Error(response.ok ? 'ROOM_INVALID_RESPONSE' : `HTTP ${response.status}`), { status: response.status });
     }
-
-    send(message: RoomMessage) {
-        if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify(message));
+    if(!response.ok) {
+        const error = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+        const message = [error.message, error.error, error.code].find(value => typeof value === 'string');
+        throw Object.assign(new Error(typeof message === 'string' ? message : `HTTP ${response.status}`), { status: response.status });
     }
-
-    disconnect() {
-        this.socket?.close(1000, 'Closed by client');
-        this.socket = null;
-    }
+    return body as T;
 }
+async function authenticate():Promise<string> {
+    const token=getStoredUserToken();
+    if(!token) throw new Error('ROOM_SIGN_IN');
+    if(session?.token===token && session.expiresAt>Date.now()+30000) return session.session;
+    if(sessionRequest?.token===token) return sessionRequest.promise;
+    const promise=(async()=> {
+        const data=parseRoomSession(await responseJson<unknown>(await fetch(`${BASE}/api/v2/session`,{signal:AbortSignal.timeout(10000),method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token})})));
+        // A late response from a previous account must not replace current identity.
+        if (getStoredUserToken() !== token) throw new Error('ROOM_ACCOUNT_CHANGED');
+        session={...data,token};notifyProfile();return data.session;
+    })();
+    sessionRequest={token,promise};
+    try{return await promise;} finally {if(sessionRequest?.promise===promise)sessionRequest=null;}
+}
+async function request<T>(path:string,body?:unknown):Promise<T> {
+    const bearer=await authenticate();
+    const response=await fetch(`${BASE}/api/v2${path}`,{signal:AbortSignal.timeout(10000),method:body===undefined?'GET':'POST',headers:{authorization:`Bearer ${bearer}`,'content-type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)})});
+    if(response.status===401 && session?.session === bearer) { session=null; notifyProfile(); }
+    return responseJson<T>(response);
+}
+export function createWatchRoom(input:{title:string;visibility:RoomVisibility}) {return request<{roomId:string;state:WatchRoomState}>('/rooms',input);}
+export function getPublicWatchRooms(cursor?:string) {return fetch(`${BASE}/api/v2/rooms${cursor?`?cursor=${encodeURIComponent(cursor)}`:''}`, {signal:AbortSignal.timeout(10000)}).then(responseJson<{rooms:PublicRoom[];cursor:string|null}>);}
+export function joinWatchRoom(roomId?:string,code?:string) {return request<{roomId:string;ticket:string}>('/rooms/join',{...(roomId?{roomId}:{}),...(code?{code}: {})});}
+export function getRoomWebSocketUrl(roomId:string,ticket:string) {const url=new URL(`${BASE}/api/v2/rooms/${encodeURIComponent(roomId)}/ws`);url.protocol=url.protocol==='https:'?'wss:':'ws:';url.searchParams.set('ticket',ticket);return url.toString();}

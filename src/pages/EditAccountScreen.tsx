@@ -9,6 +9,7 @@ import PageState from '../components/PageState';
 import { Modal } from '../modals/ModalTemplate';
 import styles from './EditAccountScreen.module.css';
 import { useTranslation } from '../shared/useTranslation';
+import { getAgentProxyUrl } from '../shared/proxy';
 
 type ProfileResponse = {
     code: number;
@@ -110,8 +111,24 @@ async function postAnonymousForm(path: string, values: Record<string, string>): 
     try {
         return await send(targetUrl);
     } catch {
-        return send(`https://kodik-proxy.imnottimaq.workers.dev/agentproxy?url=${encodeURIComponent(targetUrl)}`);
+        return send(getAgentProxyUrl(targetUrl));
     }
+}
+
+async function uploadAvatarRequest(file: File, token: string): Promise<AvatarEditResponse> {
+    const targetUrl = new URL('https://api-s.anixsekai.com/profile/preference/avatar/edit');
+    targetUrl.searchParams.set('token', token);
+
+    const formData = new FormData();
+    formData.append('image', file, file.name);
+    formData.append('name', 'image');
+
+    const proxyUrl = getAgentProxyUrl(targetUrl.toString());
+    const response = await fetch(proxyUrl, { method: 'POST', body: formData });
+    if (!response.ok) throw new Error(`Avatar upload failed: ${response.status}`);
+    const data = await response.json() as AvatarEditResponse;
+    if (data.code !== 0 || !data.avatar) throw new Error(`Avatar upload failed: ${data.code}`);
+    return data;
 }
 
 export default function EditAccountScreen() {
@@ -369,26 +386,7 @@ export default function EditAccountScreen() {
         }
     };
 
-    const uploadAvatar = async (file: File): Promise<AvatarEditResponse> => {
-        const targetUrl = new URL('https://api-s.anixsekai.com/profile/preference/avatar/edit');
-        targetUrl.searchParams.set('token', userToken);
-
-        const send = async (url: string) => {
-            const formData = new FormData();
-            formData.append('image', file, file.name);
-            formData.append('name', 'image');
-
-            const response = await fetch(url, { method: 'POST', body: formData });
-            if (!response.ok) throw new Error(`Avatar upload failed: ${response.status}`);
-            const data = await response.json() as AvatarEditResponse;
-            if (data.code !== 0 || !data.avatar) throw new Error(`Avatar upload failed: ${data.code}`);
-            return data;
-        };
-
-        const proxyUrl = `https://kodik-proxy.imnottimaq.workers.dev/agentproxy?url=${encodeURIComponent(targetUrl.toString())}`;
-
-        return send(proxyUrl);
-    };
+    const uploadAvatar = (file: File) => uploadAvatarRequest(file, userToken);
 
     useEffect(() => () => {
         if (avatarPreview) URL.revokeObjectURL(avatarPreview);
