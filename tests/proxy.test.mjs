@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, rmSync } from 'node:fs';
+import { execSync } from 'node:child_process';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
 import {
     DEFAULT_PROXY_SERVER_URL,
@@ -71,14 +74,17 @@ test('base URLs and trailing slashes normalization', () => {
         // Fallback to VITE_ROOM_SERVER_URL when VITE_PROXY_SERVER_URL is unset
         process.env.VITE_ROOM_SERVER_URL = 'http://room-server:8787/';
         assert.equal(getProxyServerUrl(), 'http://room-server:8787');
+        assert.equal(getMediaProxyUrl(), 'http://room-server:8787');
 
         // Multiple trailing slashes
         process.env.VITE_ROOM_SERVER_URL = 'http://room-server:8787///';
         assert.equal(getProxyServerUrl(), 'http://room-server:8787');
+        assert.equal(getMediaProxyUrl(), 'http://room-server:8787');
 
         // Explicit VITE_PROXY_SERVER_URL overrides VITE_ROOM_SERVER_URL
         process.env.VITE_PROXY_SERVER_URL = 'http://proxy-server:9000//';
         assert.equal(getProxyServerUrl(), 'http://proxy-server:9000');
+        assert.equal(getMediaProxyUrl(), 'http://proxy-server:9000');
 
         // Media proxy trailing slashes
         process.env.VITE_MEDIA_PROXY_URL = 'https://custom-media.example.com///';
@@ -87,6 +93,19 @@ test('base URLs and trailing slashes normalization', () => {
         if (originalProxy !== undefined) process.env.VITE_PROXY_SERVER_URL = originalProxy; else delete process.env.VITE_PROXY_SERVER_URL;
         if (originalRoom !== undefined) process.env.VITE_ROOM_SERVER_URL = originalRoom; else delete process.env.VITE_ROOM_SERVER_URL;
         if (originalMedia !== undefined) process.env.VITE_MEDIA_PROXY_URL = originalMedia; else delete process.env.VITE_MEDIA_PROXY_URL;
+    }
+});
+
+test('proxy helpers safely fall back to default URLs without throwing when process is undefined', () => {
+    const originalProcess = globalThis.process;
+    try {
+        globalThis.process = undefined;
+        assert.equal(getProxyServerUrl(), DEFAULT_PROXY_SERVER_URL);
+        assert.equal(getMediaProxyUrl(), DEFAULT_MEDIA_PROXY_URL);
+        assert.equal(getAgentProxyUrl('https://api-s.anixsekai.com/test'), `${DEFAULT_PROXY_SERVER_URL}/agentproxy?url=https%3A%2F%2Fapi-s.anixsekai.com%2Ftest`);
+        assert.equal(getCorsProxyUrl('https://kodikplayer.com/ftor'), `${DEFAULT_PROXY_SERVER_URL}/corsproxy?url=https%3A%2F%2Fkodikplayer.com%2Fftor`);
+    } finally {
+        globalThis.process = originalProcess;
     }
 });
 
@@ -344,4 +363,83 @@ test('forwarding of Api-Version, Range, and abort signal', async () => {
     assert.equal(loads[1].context.rangeStart, 100);
     assert.equal(loads[1].context.rangeEnd, 500);
     assert.equal(loads[1].context.headers?.Range, 'bytes=100-500');
+});
+
+test('compiled production Vite bundle preserves production worker URLs in browser without process', { timeout: 60000 }, async () => {
+    const testOutDir = 'test-results/dist-proxy-prod';
+    const prodRoomUrl = 'https://anixweb-server.imnottimaq.workers.dev/';
+    const prodBasePath = '/anixweb';
+
+    try {
+        // Build actual production bundle with production BASE_PATH and VITE_ROOM_SERVER_URL
+        execSync(`npx vite build --outDir ${testOutDir}`, {
+            env: {
+                ...process.env,
+                BASE_PATH: prodBasePath,
+                VITE_ROOM_SERVER_URL: prodRoomUrl,
+            },
+            stdio: 'pipe',
+        });
+
+        const assetsDir = join(testOutDir, 'assets');
+        const assetFiles = readdirSync(assetsDir);
+
+        // 1. Verify apiClient chunk in the compiled production bundle
+        const apiClientFile = assetFiles.find(f => f.startsWith('apiClient-') && f.endsWith('.js'));
+        assert.ok(apiClientFile, 'Production build must emit apiClient chunk');
+
+        const apiClientCode = readFileSync(join(assetsDir, apiClientFile), 'utf8');
+        assert.ok(
+            apiClientCode.includes('anixweb-server.imnottimaq.workers.dev'),
+            'Production apiClient bundle must contain statically injected worker URL'
+        );
+
+        // Simulate browser environment where globalThis.process is undefined
+        const originalProcess = globalThis.process;
+        try {
+            globalThis.process = undefined;
+            const chunkUrl = `${pathToFileURL(resolve(join(assetsDir, apiClientFile))).href}?t=${Date.now()}`;
+            const apiClientMod = await import(chunkUrl);
+
+            // apiClient exports: mod.i = getProxyServerUrl, mod.n = getAgentProxyUrl, mod.r = getCorsProxyUrl
+            const proxyBase = apiClientMod.i();
+            assert.equal(
+                proxyBase,
+                'https://anixweb-server.imnottimaq.workers.dev',
+                'getProxyServerUrl must evaluate to production worker URL, not localhost'
+            );
+            assert.notEqual(proxyBase, 'http://localhost:8787', 'getProxyServerUrl must not fallback to localhost');
+
+            const agentUrl = apiClientMod.n('https://api-s.anixsekai.com/profile/1');
+            assert.ok(
+                agentUrl.startsWith('https://anixweb-server.imnottimaq.workers.dev/agentproxy?url='),
+                `Agent proxy URL must use production worker: ${agentUrl}`
+            );
+            assert.ok(!agentUrl.includes('localhost'), 'Agent proxy URL must not contain localhost');
+
+            const corsUrl = apiClientMod.r('https://kodikplayer.com/ftor');
+            assert.ok(
+                corsUrl.startsWith('https://anixweb-server.imnottimaq.workers.dev/corsproxy?url='),
+                `CORS proxy / media helper URL must use production worker: ${corsUrl}`
+            );
+            assert.ok(!corsUrl.includes('localhost'), 'CORS proxy URL must not contain localhost');
+        } finally {
+            globalThis.process = originalProcess;
+        }
+
+        // 2. Verify getRoomServerUrl in index chunk
+        const indexFile = assetFiles.find(f => f.startsWith('index-') && f.endsWith('.js'));
+        assert.ok(indexFile, 'Production build must emit index chunk');
+        const indexCode = readFileSync(join(assetsDir, indexFile), 'utf8');
+        assert.ok(
+            indexCode.includes('anixweb-server.imnottimaq.workers.dev'),
+            'Production index chunk must include worker domain for watchRoom'
+        );
+        assert.ok(
+            !indexCode.includes("`http://localhost:8787`.replace"),
+            'watchRoom BASE URL must not default to localhost in production build'
+        );
+    } finally {
+        rmSync(testOutDir, { recursive: true, force: true });
+    }
 });

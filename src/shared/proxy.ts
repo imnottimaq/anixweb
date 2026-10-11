@@ -25,12 +25,14 @@ export function normalizeTrailingSlashes(url: string): string {
     return url.replace(/\/+$/, '');
 }
 
+const viteEnv = import.meta.env;
+
 export function getProxyServerUrl(): string {
     const proc = (globalThis as unknown as { process?: { env?: Record<string, string | undefined> } }).process;
     const raw = proc?.env?.VITE_PROXY_SERVER_URL
-        || (typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_PROXY_SERVER_URL : undefined)
+        || viteEnv?.VITE_PROXY_SERVER_URL
         || proc?.env?.VITE_ROOM_SERVER_URL
-        || (typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_ROOM_SERVER_URL : undefined)
+        || viteEnv?.VITE_ROOM_SERVER_URL
         || DEFAULT_PROXY_SERVER_URL;
     return normalizeTrailingSlashes(raw);
 }
@@ -38,7 +40,7 @@ export function getProxyServerUrl(): string {
 export function getMediaProxyUrl(): string {
     const proc = (globalThis as unknown as { process?: { env?: Record<string, string | undefined> } }).process;
     const raw = proc?.env?.VITE_MEDIA_PROXY_URL
-        || (typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_MEDIA_PROXY_URL : undefined)
+        || viteEnv?.VITE_MEDIA_PROXY_URL
         || getProxyServerUrl();
     return normalizeTrailingSlashes(raw);
 }
