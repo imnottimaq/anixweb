@@ -1,12 +1,12 @@
 :root, [data-theme="dark"] {
-  --background-color: #161616;
-  --card-bg: #202126;
-  --lighter-background-color: #2a2c33;
-  --text-color: #f4f5f7;
-  --text-secondary: #aeb3bd;
-  --border-color: #383b44;
-  --accent-color: #e5e4df;
-  --lighter-accent-color: #f3f2ee;
+  --background-color: #121316;
+  --card-bg: #181a20;
+  --lighter-background-color: #22242c;
+  --text-color: #f4f5f8;
+  --text-secondary: #9da3af;
+  --border-color: #2c2f3a;
+  --accent-color: #FF6060;
+  --lighter-accent-color: #ff8585;
   --accent-text-color: #121212;
 
   /* Shared layout and component tokens. Existing variables above remain aliases' sources. */
@@ -16,53 +16,111 @@
   --content-max-width: 1180px;
   --content-max-width-wide: 1380px;
   --surface-page: var(--background-color);
-  --surface-card: transparent;
+  --surface-card: var(--card-bg);
   --surface-raised: var(--lighter-background-color);
-  --surface-muted: color-mix(in srgb, var(--text-color) 10%, var(--background-color));
+  --surface-muted: color-mix(in srgb, var(--accent-color) 12%, transparent);
   --surface-border: var(--border-color);
   --surface-border-subtle: color-mix(in srgb, var(--text-color) 10%, transparent);
   --radius-sm: 6px;
-  --radius-control: 9px;
+  --radius-control: 10px;
   --radius-card: 14px;
   --radius-pill: 999px;
   --control-height: 40px;
-  --focus-ring-color: color-mix(in srgb, var(--accent-color) 72%, transparent);
+  --focus-ring-color: color-mix(in srgb, var(--accent-color) 75%, transparent);
   --focus-ring: 2px solid var(--focus-ring-color);
   --focus-ring-offset: 2px;
   --accent-foreground: var(--accent-text-color);
-  --motion-fast: 160ms ease;
-  --motion-normal: 240ms ease;
-  --elevation-low: 0 1px 4px rgb(0 0 0 / 25%);
-  --elevation-card: 0 8px 24px rgb(0 0 0 / 14%);
+  --motion-fast: 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-normal: 240ms cubic-bezier(0.16, 1, 0.3, 1);
+  --elevation-low: 0 2px 8px rgb(0 0 0 / 22%);
+  --elevation-card: 0 10px 24px -4px rgb(0 0 0 / 28%);
+  --elevation-high: 0 20px 48px -8px rgb(0 0 0 / 42%);
 
-  --status-watching: #27ae60;
-  --status-plan: #9b51e0;
-  --status-completed: #2f80ed;
-  --status-hold: #f2994a;
-  --status-dropped: #eb5757;
-  --status-favorite: #ffbf40;
-  --player-controls-background: rgb(0,0,0, 50%)
+  --status-watching: #22c55e;
+  --status-plan: #a855f7;
+  --status-completed: #3b82f6;
+  --status-hold: #f59e0b;
+  --status-dropped: #ef4444;
+  --status-favorite: #fbbf24;
+  --player-controls-background: rgb(0 0 0 / 55%);
 }
 
 [data-theme="light"] {
-  --background-color: #ffffff;
-  --lighter-background-color: #e8e9ed;
-  --text-color: #1d1f24;
-  --text-secondary: #686e7b;
-  --card-bg: #f7f8fa;
-  --border-color: #d5d8df;
+  --background-color: #f7f8fa;
+  --lighter-background-color: #eef1f6;
+  --text-color: #17191e;
+  --text-secondary: #5c6270;
+  --card-bg: #ffffff;
+  --border-color: #dce1eb;
   --accent-color: #FF6060;
-  --accent-text-color: #ffffff;
+  --accent-text-color: #121212;
   --accent-foreground: var(--accent-text-color);
+  --lighter-accent-color: #ff7d7d;
 
-  --lighter-accent-color: #ff8a8a;
-  --status-watching: #6fcf87;
-  --status-plan: #c28ae9;
-  --status-completed: #82a9dc;
-  --status-hold: #f0bf63;
-  --status-dropped: #e77b7b;
-  --status-favorite: #ffca61;
-  --player-controls-background: rgb(0,0,0, 50%)
+  --surface-page: var(--background-color);
+  --surface-card: var(--card-bg);
+  --surface-raised: var(--lighter-background-color);
+  --surface-muted: color-mix(in srgb, var(--accent-color) 10%, transparent);
+  --surface-border: var(--border-color);
+  --surface-border-subtle: color-mix(in srgb, var(--text-color) 8%, transparent);
+  --elevation-low: 0 2px 8px rgb(0 0 0 / 6%);
+  --elevation-card: 0 8px 24px -4px rgb(0 0 0 / 8%);
+  --elevation-high: 0 18px 40px -8px rgb(0 0 0 / 12%);
+
+  --status-watching: #16a34a;
+  --status-plan: #9333ea;
+  --status-completed: #2563eb;
+  --status-hold: #d97706;
+  --status-dropped: #dc2626;
+  --status-favorite: #f59e0b;
+  --player-controls-background: rgb(0 0 0 / 55%);
+}
+
+[data-high-contrast="true"] {
+  --border-color: currentColor;
+  --surface-border: currentColor;
+  --surface-border-subtle: currentColor;
+  --focus-ring-offset: 3px;
+}
+
+[data-high-contrast="true"][data-theme="dark"] {
+  --background-color: #000000;
+  --card-bg: #0a0a0a;
+  --lighter-background-color: #141414;
+  --text-color: #ffffff;
+  --text-secondary: #e6e6e6;
+  --border-color: #ffffff;
+  --surface-border: #ffffff;
+  --accent-color: #ff6b6b;
+  --lighter-accent-color: #ff8f8f;
+  --accent-text-color: #000000;
+  --focus-ring: 3px solid #ffea00;
+}
+
+[data-high-contrast="true"][data-theme="light"] {
+  --background-color: #ffffff;
+  --card-bg: #ffffff;
+  --lighter-background-color: #f5f5f5;
+  --text-color: #000000;
+  --text-secondary: #1a1a1a;
+  --border-color: #000000;
+  --surface-border: #000000;
+  --accent-color: #c90000;
+  --lighter-accent-color: #e60000;
+  --accent-text-color: #ffffff;
+  --focus-ring: 3px solid #0000cc;
+}
+
+[data-compact="true"] {
+  --page-gutter: clamp(10px, 2vw, 20px);
+  --page-gutter-block: 16px;
+  --page-bottom-space: 28px;
+  --control-height: 34px;
+}
+
+[data-compact="true"] h1 {
+  margin: 16px 0;
+  font-size: clamp(28px, 4vw, 42px);
 }
 
 @font-face {
@@ -207,5 +265,18 @@ button, input, select, textarea {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    transform: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  :root {
+    --border-color: ButtonBorder;
+    --surface-border: ButtonBorder;
+    --surface-border-subtle: ButtonBorder;
+    --accent-color: Highlight;
+    --accent-foreground: HighlightText;
+    --accent-text-color: HighlightText;
+    --focus-ring: 2px solid Highlight;
   }
 }

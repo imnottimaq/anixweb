@@ -4,14 +4,26 @@ import { useRoomPresence } from '../shared/contexts/roomContext';
 import { useUser } from '../shared/contexts/userContext';
 import { useTranslation } from '../shared/useTranslation';
 import { roomErrorKey } from '../shared/roomError';
-import type { RoomParticipant, RoomCommandPayload } from '../shared/roomProtocol';
+import type { RoomParticipant, RoomCommandPayload, ReactionEmoji } from '../shared/roomProtocol';
 import RemoteImage from './RemoteImage';
+import RoomChat from './RoomChat';
+import ReactionOverlay from './ReactionOverlay';
+import { REACTION_MAP } from './roomSocialConstants';
 import styles from '../pages/WatchRoomScreen.module.css';
 
-type Confirmation = { type: 'leave' } | { type: 'transfer_host' | 'kick'; participant: RoomParticipant };
+const REACTION_ITEMS: Array<{ emoji: ReactionEmoji; char: string }> = [
+    { emoji: 'heart', char: REACTION_MAP.heart },
+    { emoji: 'laugh', char: REACTION_MAP.laugh },
+    { emoji: 'clap', char: REACTION_MAP.clap },
+    { emoji: 'fire', char: REACTION_MAP.fire },
+    { emoji: 'surprise', char: REACTION_MAP.surprise },
+    { emoji: 'sad', char: REACTION_MAP.sad },
+];
+
+type Confirmation = { type: 'leave' } | { type: 'close_room' } | { type: 'transfer_host' | 'kick'; participant: RoomParticipant };
 
 export default function RoomPanel({ compact = false }: { compact?: boolean }) {
-    const { room, status, error, send, leave, join, activeRoomId, self, serverNow } = useRoomPresence();
+    const { room, status, error, send, leave, closeRoom, join, activeRoomId, self, serverNow, sendReaction } = useRoomPresence();
     const { userId } = useUser();
     const { t } = useTranslation();
     const navigate = useNavigate();
@@ -59,7 +71,10 @@ export default function RoomPanel({ compact = false }: { compact?: boolean }) {
         return () => { document.removeEventListener('pointerdown', dismiss); document.removeEventListener('keydown', dismiss); };
     }, []);
 
-    const closeMenus = () => panel.current?.querySelectorAll('details[open]').forEach(details => details.removeAttribute('open'));
+    const closeMenus = (restoreFocus = false) => panel.current?.querySelectorAll('details[open]').forEach(details => {
+        details.removeAttribute('open');
+        if (restoreFocus) (details.querySelector('summary') as HTMLElement | null)?.focus();
+    });
     const act = async (command: RoomCommandPayload) => {
         if (pending) return;
         setPending(true); setActionError(''); closeMenus();
@@ -79,15 +94,35 @@ export default function RoomPanel({ compact = false }: { compact?: boolean }) {
         setPending(true); setActionError('');
         try {
             if (confirmation.type === 'leave') await exit();
+            else if (confirmation.type === 'close_room') {
+                if (closeRoom) {
+                    await closeRoom();
+                } else {
+                    await send({ type: 'close_room' });
+                }
+                setConfirmation(null);
+                navigate('/together');
+                return;
+            }
             else { await send({ type: confirmation.type, profileId: confirmation.participant.profileId }); setNotice(t('roomUX.actionDone')); }
             setConfirmation(null);
-        } catch (cause) { setActionError(t(roomErrorKey(cause instanceof Error ? cause.message : ''))); }
+        } catch (cause) {
+            const msg = cause instanceof Error ? cause.message : '';
+            if (msg === 'ROOM_CLOSED' || msg === 'ROOM_DISCONNECTED') {
+                setConfirmation(null);
+                navigate('/together');
+                return;
+            }
+            setActionError(t(roomErrorKey(msg)));
+        }
         finally { setPending(false); }
     };
     const confirmTitle = confirmation?.type === 'leave' ? t('roomUX.leaveTitle')
+        : confirmation?.type === 'close_room' ? t('watchRoom.closeRoomTitle')
         : confirmation ? t(confirmation.type === 'kick' ? 'roomUX.kickTitle' : 'roomUX.transferTitle', { login: confirmation.participant.login }) : '';
 
-    return <aside ref={panel} className={`${styles.card} ${styles.panel} ${compact ? styles.compact : ''}`} aria-label={t('watchRoom.room')}>
+    return <aside ref={panel} className={`${styles.card} ${styles.panel} ${compact ? styles.compact : ''}`} aria-label={t('watchRoom.room')}
+        onKeyDown={event => { event.stopPropagation(); if (event.key === 'Escape') closeMenus(true); }}>
         <header className={styles.panelHeader}>
             <h2>{compact ? room?.title ?? t('watchRoom.room') : t('watchRoom.room')}</h2>
             <span className={styles.connection}><i className={`${styles.dot} ${status === 'connected' ? styles.online : ''}`} aria-hidden="true" />{t(`roomV2.status.${status}`)}</span>
@@ -132,17 +167,67 @@ export default function RoomPanel({ compact = false }: { compact?: boolean }) {
                     </details>}
                 </div>)}</div>
             </section>
+            <section className={styles.reactionsSection} aria-label={t('roomSocial.reactions')}>
+                <div className={styles.reactionsBar} role="toolbar" aria-label={t('roomSocial.reactions')} onKeyDown={event => {
+                    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'));
+                    const index = buttons.indexOf(event.target as HTMLButtonElement);
+                    if (index < 0) return;
+                    event.preventDefault();
+                    const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1
+                        : (index + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
+                    buttons[next]?.focus();
+                }}>
+                    {REACTION_ITEMS.map(({ emoji, char }) => (
+                        <button
+                            key={emoji}
+                            type="button"
+                            className={styles.reactionBtn}
+                            title={t(`roomSocial.reaction.${emoji}`)}
+                            aria-label={t(`roomSocial.reaction.${emoji}`)}
+                            disabled={pending || status !== 'connected'}
+                            onClick={() => void sendReaction(emoji).catch(() => {})}
+                        >
+                            <span aria-hidden="true">{char}</span>
+                        </button>
+                    ))}
+                </div>
+            </section>
+            <section className={styles.chatSection} aria-label={t('roomSocial.chat')}>
+                {!compact && <ReactionOverlay compact />}
+                <RoomChat compact={compact} key={room?.roomId ?? 'room-chat'} />
+            </section>
         </>}
         {notice && <p className={styles.success} role="status">{notice}</p>}
         {(actionError || (error && status !== 'replaced')) && <p role="alert" className={styles.inlineError}>{actionError || t(roomErrorKey(error!))}</p>}
-        <footer className={styles.panelFooter}><button type="button" className={styles.leaveButton} disabled={pending} onClick={() => { if (isHost) setConfirmation({ type: 'leave' }); else void exit(); }}>{t('watchRoom.leave')}</button></footer>
+        <footer className={styles.panelFooter} style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+            {isHost && (
+                <button
+                    type="button"
+                    className={styles.closeRoomButton}
+                    disabled={pending || status !== 'connected'}
+                    onClick={() => { closeMenus(); setActionError(''); setConfirmation({ type: 'close_room' }); }}
+                >
+                    {t('watchRoom.closeRoom')}
+                </button>
+            )}
+            <button type="button" className={styles.leaveButton} disabled={pending} onClick={() => { if (isHost) setConfirmation({ type: 'leave' }); else void exit(); }}>{t('watchRoom.leave')}</button>
+        </footer>
         <dialog ref={dialog} className={styles.confirmDialog} aria-labelledby={`${id}-confirm-title`} onClose={() => setConfirmation(null)} onCancel={event => { if (pending) event.preventDefault(); }}>
             <h2 id={`${id}-confirm-title`}>{confirmTitle}</h2>
-            <p>{confirmation && t(confirmation.type === 'leave' ? 'roomUX.leaveHostHint' : confirmation.type === 'kick' ? 'roomUX.kickHint' : 'roomUX.transferHint')}</p>
+            <p>{confirmation && t(
+                confirmation.type === 'leave' ? 'roomUX.leaveHostHint'
+                : confirmation.type === 'close_room' ? 'watchRoom.closeRoomHint'
+                : confirmation.type === 'kick' ? 'roomUX.kickHint' : 'roomUX.transferHint'
+            )}</p>
             {actionError && <p className={styles.inlineError} role="alert">{actionError}</p>}
             <div className={styles.dialogActions}>
                 <button type="button" className={styles.secondary} disabled={pending} onClick={() => setConfirmation(null)} autoFocus>{t('misc.cancel')}</button>
-                <button type="button" className={confirmation?.type === 'kick' || confirmation?.type === 'leave' ? styles.dangerButton : ''} disabled={pending} onClick={() => void confirm()}>{pending ? t('roomUX.working') : t(confirmation?.type === 'leave' ? 'roomUX.confirmLeave' : confirmation?.type === 'kick' ? 'roomUX.confirmKick' : 'roomUX.confirmTransfer')}</button>
+                <button type="button" className={confirmation?.type === 'kick' || confirmation?.type === 'leave' || confirmation?.type === 'close_room' ? styles.dangerButton : ''} disabled={pending} onClick={() => void confirm()}>{pending ? t('roomUX.working') : t(
+                    confirmation?.type === 'leave' ? 'roomUX.confirmLeave'
+                    : confirmation?.type === 'close_room' ? 'watchRoom.confirmClose'
+                    : confirmation?.type === 'kick' ? 'roomUX.confirmKick' : 'roomUX.confirmTransfer'
+                )}</button>
             </div>
         </dialog>
     </aside>;

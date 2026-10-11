@@ -395,73 +395,75 @@ export default function ReleaseScreen(){
                         <button onClick={() => setIsDubScreenOpen(true)} className={styles['watch-btn']}>{t('release.play')}</button>
                     )}
                 </div>
-                <div className={`${styles['grade-container']}`}>
-                    <div className={styles['grade']}>
-                        <p>{t('release.rating')}</p>
-                        <h1>{(animeData.grade ?? 0).toFixed(2)}</h1>
-                        <p>{animeData.vote_count ?? 0} {plural(animeData.vote_count ?? 0, t('release.votes1'), t('release.votes2'), t('release.votes5'))}</p>
+                <div className={styles['ratings-panel']}>
+                    <div className={`${styles['grade-container']}`}>
+                        <div className={styles['grade']}>
+                            <p>{t('release.rating')}</p>
+                            <h1>{(animeData.grade ?? 0).toFixed(2)}</h1>
+                            <p>{animeData.vote_count ?? 0} {plural(animeData.vote_count ?? 0, t('release.votes1'), t('release.votes2'), t('release.votes5'))}</p>
+                        </div>
+                        <div className={styles['grade-bars']}>
+                        {[5,4,3,2,1].map(grade => {
+                            const voteCount = animeData[`vote_${grade}_count` as keyof Anime] || 0
+                            return (
+                                <div key={grade} style={{display:"flex", flexDirection:"row", alignItems: "center", gap: "5px"}}>
+                                    <p style={{margin: 0, minWidth: "12px"}}>{grade}</p>
+                                    <progress value={+voteCount} max={animeData.vote_count || 1}></progress>
+                                </div>
+                            )
+                        })}
+                        </div>
                     </div>
-                    <div className={styles['grade-bars']}>
-                    {[5,4,3,2,1].map(grade => {
-                        const voteCount = animeData[`vote_${grade}_count` as keyof Anime] || 0
-                        return (
-                            <div key={grade} style={{display:"flex", flexDirection:"row", alignItems: "center", gap: "5px"}}>
-                                <p style={{margin: 0, minWidth: "12px"}}>{grade}</p>
-                                <progress value={+voteCount} max={animeData.vote_count || 1}></progress>
-                            </div>
-                        )
-                    })}
+                    <div className={styles['release-rating-control']} aria-label={t('release.yourRating')}>
+                        <div>
+                            {[1, 2, 3, 4, 5].map(value => <button
+                                type="button"
+                                key={value}
+                                disabled={isReleaseVoteLoading}
+                                className={value <= currentVote ? styles['release-rating-selected'] : ''}
+                                onClick={() => void rateRelease(value)}
+                                aria-label={t('release.rateValue', { value })}
+                                title={t('release.ratingOutOfFive', { value })}
+                                    >{value <= currentVote
+                                        ? <svg className={styles['release-rating-filled']} viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.86 5.8 6.4.93-4.63 4.51 1.09 6.37L12 17.4l-5.72 3.01 1.09-6.37L2.74 9.53l6.4-.93L12 2.8Z" /></svg>
+                                        : <svg className={styles['release-rating-outline']} viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.86 5.8 6.4.93-4.63 4.51 1.09 6.37L12 17.4l-5.72 3.01 1.09-6.37L2.74 9.53l6.4-.93L12 2.8Z" /></svg>
+                                    }</button>)}
+                        </div>
+                    </div>
+                    {releaseVoteError && <p className={styles['collection-picker-error']} role="alert">{releaseVoteError}</p>}
+                    <div className={styles['watchlist-info']}>
+                        <WatchlistLine
+                            watching_count={animeData.watching_count}
+                            plan_count={animeData.plan_count}
+                            completed_count={animeData.completed_count}
+                            hold_on_count={animeData.hold_on_count}
+                            dropped_count={animeData.dropped_count}
+                        />
                     </div>
                 </div>
-                <div className={styles['release-rating-control']} aria-label={t('release.yourRating')}>
-                    <div>
-                        {[1, 2, 3, 4, 5].map(value => <button
-                            type="button"
-                            key={value}
-                            disabled={isReleaseVoteLoading}
-                            className={value <= currentVote ? styles['release-rating-selected'] : ''}
-                            onClick={() => void rateRelease(value)}
-                            aria-label={t('release.rateValue', { value })}
-                            title={t('release.ratingOutOfFive', { value })}
-                                >{value <= currentVote
-                                    ? <svg className={styles['release-rating-filled']} viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.86 5.8 6.4.93-4.63 4.51 1.09 6.37L12 17.4l-5.72 3.01 1.09-6.37L2.74 9.53l6.4-.93L12 2.8Z" /></svg>
-                                    : <svg className={styles['release-rating-outline']} viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.86 5.8 6.4.93-4.63 4.51 1.09 6.37L12 17.4l-5.72 3.01 1.09-6.37L2.74 9.53l6.4-.93L12 2.8Z" /></svg>
-                                }</button>)}
-                    </div>
-                </div>
-                {releaseVoteError && <p className={styles['collection-picker-error']} role="alert">{releaseVoteError}</p>}
-                <div className={styles['watchlist-info']}>
-                    <WatchlistLine
-                        watching_count={animeData.watching_count}
-                        plan_count={animeData.plan_count}
-                        completed_count={animeData.completed_count}
-                        hold_on_count={animeData.hold_on_count}
-                        dropped_count={animeData.dropped_count}
-                    />
-                </div>
-                
             </div>
             <div className={styles['release-info']}>
-                <div>
-                    <div className={styles['release-base-info']}>
-                        <h2>{animeData.title_ru}</h2>
-                        <div style={{display: "flex", flexDirection: "row", gap: "10px", alignItems: "center"}}>
-                            <p>{animeData.title_original}</p>
-                            <a className={styles['age-rating']}>{
-                                    ({
-                                        1: "0+",
-                                        2: "6+",
-                                        3: "12+",
-                                        4: "16+",
-                                        5: "18+"
-                                    } as Record<number, string>)[animeData.age_rating] || ""
-                                }</a>
-                        </div>
-                        {animeData.note && <div style={{display:"flex", flexDirection:"row"}}>
-                            <a className={styles['note']}>{animeData.note.replace(/<br\s*\/?>/gi, '\n')}</a>
-                            </div>}
-                        <p>{animeData.description}</p>
+                <div className={styles['release-header']}>
+                    <h2>{animeData.title_ru}</h2>
+                    <div className={styles['release-title-row']}>
+                        <p>{animeData.title_original}</p>
+                        <a className={styles['age-rating']}>{
+                                ({
+                                    1: "0+",
+                                    2: "6+",
+                                    3: "12+",
+                                    4: "16+",
+                                    5: "18+"
+                                } as Record<number, string>)[animeData.age_rating] || ""
+                            }</a>
                     </div>
+                </div>
+                <div className={styles['release-summary']}>
+                    {animeData.note && <div style={{display:"flex", flexDirection:"row"}}>
+                        <a className={styles['note']}>{animeData.note.replace(/<br\s*\/?>/gi, '\n')}</a>
+                        </div>}
+                    <p>{animeData.description}</p>
+                </div>
                     <div className={`${styles['release-details']} ${screenshots.length === 0 ? styles['release-details-no-screenshots'] : ''}`}>
                         <div className={styles['release-media']}>
                             {screenshots.length > 0 && (
@@ -571,7 +573,6 @@ export default function ReleaseScreen(){
                             setCommentsInitialAction(null);
                         }}
                     />}
-                </div>
             </div>
             <Modal
                 isOpen={isCollectionPickerOpen}

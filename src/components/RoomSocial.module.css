@@ -1,0 +1,746 @@
+/* ==========================================================================
+   Room Social Styles: Chat & Live Reaction Overlay
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Room Chat Component
+   -------------------------------------------------------------------------- */
+.chatContainer {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    margin-top: 4px;
+}
+
+.messagesWrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    width: 100%;
+}
+
+.messagesList {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    height: 260px;
+    min-height: 120px;
+    max-height: 280px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 8px 4px 10px 0;
+    box-sizing: border-box;
+    scroll-behavior: smooth;
+}
+
+.compact .messagesList {
+    height: 180px;
+    max-height: 200px;
+    gap: 8px;
+}
+
+.messageRow {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    min-width: 0;
+    padding: 2px 0;
+}
+
+.messageAvatar {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--accent-color, #e5e4df);
+    color: var(--accent-text-color, #121212);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.messageAvatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.messageBody {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+}
+
+.messageHeader {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+}
+
+.messageAuthor {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-color, #f4f5f7);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 150px;
+}
+
+.messageTime {
+    font-size: 10px;
+    color: var(--text-secondary, #aeb3bd);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.messageText {
+    margin: 2px 0 0;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--text-color, #f4f5f7);
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.emptyMessages {
+    display: grid;
+    place-items: center;
+    padding: 30px 10px;
+    text-align: center;
+    color: var(--text-secondary, #aeb3bd);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.newMessagesBadge {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: var(--accent-color, #e5e4df);
+    color: var(--accent-text-color, #121212);
+    border: none;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    white-space: nowrap;
+    animation: badge-appear 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+    transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.newMessagesBadge:hover {
+    transform: translateX(-50%) scale(1.05);
+    filter: brightness(0.95);
+}
+
+@keyframes badge-appear {
+    from {
+        opacity: 0;
+        transform: translate(-50%, 10px);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+}
+
+.chatForm {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+    min-width: 0;
+}
+
+.chatTextarea {
+    width: 100%;
+    min-height: 48px;
+    max-height: 110px;
+    resize: vertical;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color, #383b44);
+    border-radius: var(--radius-control, 9px);
+    background: var(--background-color, #161616);
+    color: var(--text-color, #f4f5f7);
+    font: inherit;
+    font-size: 13px;
+    line-height: 1.4;
+    box-sizing: border-box;
+    transition: border-color 0.15s ease;
+}
+
+.compact .chatTextarea {
+    min-height: 42px;
+    max-height: 90px;
+    font-size: 12px;
+    padding: 6px 8px;
+}
+
+.chatTextarea:focus {
+    outline: var(--focus-ring, 2px solid #e5e4df);
+    outline-offset: 1px;
+    border-color: var(--accent-color, #e5e4df);
+}
+
+.chatTextarea:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.inputFooter {
+    display: flex;
+    flex-wrap: wrap;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.charCounter {
+    font-size: 11px;
+    color: var(--text-secondary, #aeb3bd);
+    user-select: none;
+}
+
+.sendButton {
+    min-height: 32px;
+    padding: 5px 14px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-control, 9px);
+    background: var(--accent-color, #e5e4df);
+    color: var(--accent-text-color, #121212);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 0.15s ease, opacity 0.15s ease;
+}
+
+.sendButton:hover:not(:disabled) {
+    filter: brightness(0.92);
+}
+
+.sendButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.chatError {
+    margin: 4px 0 0;
+    color: var(--status-dropped, #eb5757);
+    font-size: 12px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+/* --------------------------------------------------------------------------
+   Reaction Overlay Component (over Player)
+   -------------------------------------------------------------------------- */
+.reactionOverlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 25;
+}
+
+.reactionBubble {
+    position: absolute;
+    bottom: 90px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(18, 18, 24, 0.88);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+    font-size: 14px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+    animation: floatUpAndFade 3.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    pointer-events: none;
+    user-select: none;
+    will-change: transform, opacity;
+}
+
+.reactionEmoji {
+    font-size: 22px;
+    line-height: 1;
+}
+
+.reactionSender {
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.92);
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@keyframes floatUpAndFade {
+    0% {
+        opacity: 0;
+        transform: translateY(20px) scale(0.8);
+    }
+    12% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    75% {
+        opacity: 1;
+        transform: translateY(-90px) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-130px) scale(0.9);
+    }
+}
+
+@keyframes fadeOnly {
+    0% {
+        opacity: 0;
+    }
+    15% {
+        opacity: 1;
+    }
+    75% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+    }
+}
+
+.compactOverlay {
+    position: relative;
+    height: 40px;
+}
+
+.compactOverlay .reactionBubble {
+    bottom: 4px;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 4px 10px;
+    animation-name: fadeOnly;
+}
+
+.reducedMotion .reactionBubble,
+.reducedMotionItem {
+    animation: fadeOnly 3.5s ease-out forwards;
+    transform: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .messagesList {
+        scroll-behavior: auto;
+    }
+    .newMessagesBadge {
+        animation: none;
+    }
+    .reactionBubble {
+        animation: fadeOnly 3.5s ease-out forwards;
+        transform: none !important;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   Room Attachments (Images, Voice, Modals, Drafts)
+   -------------------------------------------------------------------------- */
+.attachmentWrapper {
+    margin-top: 6px;
+    max-width: 100%;
+}
+
+.attachmentLoadingPlaceholder {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: var(--radius-control, 8px);
+    background: var(--surface-muted, rgba(255, 255, 255, 0.06));
+    color: var(--text-secondary, #aeb3bd);
+    font-size: 12px;
+}
+
+.attachmentSpinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border-color, #383b44);
+    border-top-color: var(--accent-color, #e5e4df);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.attachmentFilename {
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.attachmentErrorPlaceholder {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: var(--radius-control, 8px);
+    background: color-mix(in srgb, var(--status-dropped, #eb5757) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--status-dropped, #eb5757) 30%, transparent);
+    color: var(--status-dropped, #eb5757);
+    font-size: 11px;
+}
+
+.attachmentErrorText {
+    max-width: 200px;
+}
+
+.attachmentRetryButton {
+    background: transparent;
+    border: 1px solid var(--status-dropped, #eb5757);
+    color: var(--status-dropped, #eb5757);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.attachmentRetryButton:hover {
+    background: var(--status-dropped, #eb5757);
+    color: #fff;
+}
+
+.imageAttachmentButton {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    display: block;
+    max-width: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+    line-height: 0;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.imageAttachmentButton:hover {
+    opacity: 0.92;
+    transform: scale(1.01);
+}
+
+.imageAttachmentButton:focus-visible {
+    outline: var(--focus-ring, 2px solid #e5e4df);
+    outline-offset: 2px;
+}
+
+.imageAttachmentThumbnail {
+    max-width: min(280px, 100%);
+    max-height: 200px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid var(--border-color, #383b44);
+    display: block;
+}
+
+.compact .imageAttachmentThumbnail {
+    max-width: min(200px, 100%);
+    max-height: 140px;
+}
+
+/* Image Inspection Modal */
+.imageModalBackdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.imageModalContent {
+    position: relative;
+    max-width: min(900px, 94vw);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--card-bg, #1a1a1f);
+    border: 1px solid var(--border-color, #383b44);
+    border-radius: 12px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+}
+
+.imageModalHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-color, #383b44);
+    background: var(--surface-muted, rgba(255, 255, 255, 0.04));
+    gap: 12px;
+}
+
+.imageModalMeta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.imageModalTitle {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-color, #f4f5f7);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 320px;
+}
+
+.imageModalSize {
+    font-size: 11px;
+    color: var(--text-secondary, #aeb3bd);
+    white-space: nowrap;
+}
+
+.imageModalActions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.imageModalDownload,
+.imageModalClose {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color, #383b44);
+    background: transparent;
+    color: var(--text-color, #f4f5f7);
+    cursor: pointer;
+    font-size: 14px;
+    text-decoration: none;
+    transition: background 0.15s ease;
+}
+
+.imageModalDownload:hover,
+.imageModalClose:hover {
+    background: var(--surface-raised, rgba(255, 255, 255, 0.1));
+}
+
+.imageModalBody {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    overflow: auto;
+    max-height: calc(90vh - 60px);
+}
+
+.imageModalImg {
+    max-width: 100%;
+    max-height: calc(90vh - 84px);
+    object-fit: contain;
+    border-radius: 6px;
+    display: block;
+}
+
+/* Audio Attachment */
+.audioAttachmentContainer {
+    margin-top: 6px;
+    max-width: 100%;
+}
+
+.audioLoadingPlaceholder {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    background: var(--surface-muted, rgba(255, 255, 255, 0.06));
+    color: var(--text-secondary, #aeb3bd);
+    font-size: 12px;
+}
+
+.audioPlayerWrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: min(320px, 100%);
+}
+
+.audioElement {
+    height: 36px;
+    width: 100%;
+    max-width: 280px;
+    border-radius: 6px;
+}
+
+.compact .audioElement {
+    height: 32px;
+    max-width: 220px;
+}
+
+.audioDurationText {
+    font-size: 11px;
+    color: var(--text-secondary, #aeb3bd);
+    white-space: nowrap;
+}
+
+/* Chat Input Attachments Bar & Draft Previews */
+.chatDraftPreview {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    margin-bottom: 6px;
+    border: 1px solid var(--border-color, #383b44);
+    border-radius: var(--radius-control, 9px);
+    background: var(--surface-muted, rgba(255, 255, 255, 0.04));
+}
+
+.draftThumbnail {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 6px;
+    flex-shrink: 0;
+}
+
+.draftMeta {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+}
+
+.draftName {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-color, #f4f5f7);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.draftSize {
+    font-size: 10px;
+    color: var(--text-secondary, #aeb3bd);
+}
+
+.draftRemoveBtn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary, #aeb3bd);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px;
+    border-radius: 4px;
+    line-height: 1;
+    display: grid;
+    place-items: center;
+    transition: color 0.15s ease;
+}
+
+.draftRemoveBtn:hover:not(:disabled) {
+    color: var(--status-dropped, #eb5757);
+}
+
+.chatActionsGroup {
+    display: flex;
+    flex-wrap: wrap;
+    min-width: 0;
+    max-width: 100%;
+    align-items: center;
+    gap: 6px;
+}
+
+.chatActionButton {
+    min-width: 32px;
+    min-height: 32px;
+    padding: 4px 8px;
+    border: 1px solid var(--border-color, #383b44);
+    border-radius: var(--radius-control, 9px);
+    background: var(--surface-muted, rgba(255, 255, 255, 0.06));
+    color: var(--text-color, #f4f5f7);
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.chatActionButton:hover:not(:disabled) {
+    background: var(--surface-raised, rgba(255, 255, 255, 0.12));
+    border-color: var(--accent-color, #e5e4df);
+}
+
+.chatActionButton:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.chatActionButton:focus-visible {
+    outline: var(--focus-ring, 2px solid #e5e4df);
+    outline-offset: 1px;
+}
+
+.closeRoomButton {
+    min-height: 36px;
+    padding: 7px 12px;
+    color: var(--status-dropped, #eb5757);
+    background: color-mix(in srgb, var(--status-dropped, #eb5757) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--status-dropped, #eb5757) 40%, transparent);
+    border-radius: var(--radius-control, 9px);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, filter 0.15s ease;
+}
+
+.closeRoomButton:hover:not(:disabled) {
+    background: var(--status-dropped, #eb5757);
+    color: #fff;
+}
+
+.closeRoomButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+

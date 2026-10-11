@@ -1,0 +1,232 @@
+/* ==========================================================================
+   Voice Recorder Component Styles
+   ========================================================================== */
+
+.container {
+    display: inline-flex;
+    flex-wrap: wrap;
+    max-width: 100%;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+    box-sizing: border-box;
+}
+
+.compact {
+    gap: 6px;
+}
+
+.recordButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 5px 12px;
+    border: 1px solid var(--border-color, #383b44);
+    border-radius: var(--radius-control, 9px);
+    background: var(--background-color, #161616);
+    color: var(--text-color, #f4f5f7);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.compact .recordButton {
+    min-height: 28px;
+    padding: 4px 8px;
+    font-size: 11px;
+}
+
+.recordButton:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--text-secondary, #aeb3bd);
+}
+
+.recordButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.recordingState {
+    display: inline-flex;
+    flex-wrap: wrap;
+    max-width: 100%;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 8px;
+    border: 1px solid rgba(235, 87, 87, 0.4);
+    border-radius: var(--radius-control, 9px);
+    background: rgba(235, 87, 87, 0.1);
+}
+
+.compact .recordingState {
+    gap: 6px;
+    padding: 2px 6px;
+}
+
+.recordingDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--status-dropped, #eb5757);
+    flex-shrink: 0;
+    animation: recordPulse 1.2s infinite ease-in-out;
+}
+
+@keyframes recordPulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.3;
+        transform: scale(0.8);
+    }
+}
+
+.timer {
+    font-size: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: var(--status-dropped, #eb5757);
+    user-select: none;
+    white-space: nowrap;
+}
+
+.compact .timer {
+    font-size: 11px;
+}
+
+.stopButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 26px;
+    padding: 2px 8px;
+    border: 1px solid var(--status-dropped, #eb5757);
+    border-radius: var(--radius-control, 9px);
+    background: var(--status-dropped, #eb5757);
+    color: #ffffff;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 0.15s ease;
+    white-space: nowrap;
+}
+
+.stopButton:hover {
+    filter: brightness(1.1);
+}
+
+.cancelButton,
+.discardButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 26px;
+    padding: 2px 8px;
+    border: 1px solid var(--border-color, #383b44);
+    border-radius: var(--radius-control, 9px);
+    background: transparent;
+    color: var(--text-secondary, #aeb3bd);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+    white-space: nowrap;
+}
+
+.cancelButton:hover:not(:disabled),
+.discardButton:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-color, #f4f5f7);
+}
+
+.cancelButton:disabled,
+.discardButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.previewState {
+    display: inline-flex;
+    flex-wrap: wrap;
+    max-width: 100%;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 4px;
+    border-radius: var(--radius-control, 9px);
+    background: var(--background-color, #161616);
+    border: 1px solid var(--border-color, #383b44);
+}
+
+.compact .previewState {
+    gap: 6px;
+}
+
+.audioPlayer {
+    height: 30px;
+    max-width: 180px;
+    border-radius: var(--radius-control, 9px);
+}
+
+.compact .audioPlayer {
+    max-width: 140px;
+    height: 26px;
+}
+
+.durationBadge {
+    font-size: 11px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    color: var(--text-secondary, #aeb3bd);
+    white-space: nowrap;
+    user-select: none;
+}
+
+.sendButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 26px;
+    padding: 2px 10px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-control, 9px);
+    background: var(--accent-color, #e5e4df);
+    color: var(--accent-text-color, #121212);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 0.15s ease, opacity 0.15s ease;
+    white-space: nowrap;
+}
+
+.sendButton:hover:not(:disabled) {
+    filter: brightness(0.92);
+}
+
+.sendButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.errorBanner {
+    display: block;
+    margin-top: 4px;
+    color: var(--status-dropped, #eb5757);
+    font-size: 11px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}

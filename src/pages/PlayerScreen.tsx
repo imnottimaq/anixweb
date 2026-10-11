@@ -20,10 +20,71 @@ import { useTranslation } from '../shared/useTranslation';
 import { resolveRoomMedia } from '../shared/mediaResolver';
 import { PlaybackBridge } from '../shared/playbackBridge';
 import RoomPanel from '../components/RoomPanel';
+import ReactionOverlay from '../components/ReactionOverlay';
 import { useRoomPresence } from '../shared/contexts/roomContext';
 import { useApi } from '../shared/apiClient';
 import { createUpscalerScope } from '../shared/upscalerScope';
 import { getCorsProxyUrl } from '../shared/proxy';
+import {
+    useEpisodeDownload,
+    isHlsStream,
+    isDirectMp4Stream,
+    formatBytes,
+    sanitizeFilename,
+} from '../shared/player/download';
+
+interface WebKitFullscreenElement extends HTMLElement {
+    webkitRequestFullscreen?: () => Promise<void> | void;
+}
+
+interface WebKitFullscreenVideoElement extends HTMLVideoElement {
+    webkitEnterFullscreen?: () => void;
+    webkitRequestFullscreen?: () => Promise<void> | void;
+}
+
+interface WebKitFullscreenDocument extends Document {
+    webkitFullscreenElement?: Element | null;
+    webkitExitFullscreen?: () => Promise<void> | void;
+}
+
+async function requestFullscreenElement(element: HTMLElement | null, video: HTMLVideoElement | null): Promise<boolean> {
+    try {
+        if (element?.requestFullscreen) {
+            await element.requestFullscreen();
+            return true;
+        }
+        const webkitEl = element as WebKitFullscreenElement | null;
+        if (webkitEl?.webkitRequestFullscreen) {
+            await webkitEl.webkitRequestFullscreen();
+            return true;
+        }
+        const webkitVid = video as WebKitFullscreenVideoElement | null;
+        if (webkitVid && typeof webkitVid.webkitEnterFullscreen === 'function') {
+            webkitVid.webkitEnterFullscreen();
+            return true;
+        }
+        if (webkitVid && typeof webkitVid.webkitRequestFullscreen === 'function') {
+            await webkitVid.webkitRequestFullscreen();
+            return true;
+        }
+    } catch {
+        return false;
+    }
+    return false;
+}
+
+async function exitFullscreenElement(): Promise<void> {
+    try {
+        const doc = document as WebKitFullscreenDocument;
+        if (doc.fullscreenElement && doc.exitFullscreen) {
+            await doc.exitFullscreen();
+        } else if (doc.webkitFullscreenElement && doc.webkitExitFullscreen) {
+            await doc.webkitExitFullscreen();
+        }
+    } catch {
+        // ignore exit error
+    }
+}
 
 import PlayIcon from '../assets/icons/play.svg';
 import PauseIcon from '../assets/icons/pause.svg';
@@ -218,6 +279,12 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     const [streamError, setStreamError] = useState<string | null>(null);
     const promptedEpisodeRef = useRef<string | null>(null);
     const autoplayAttemptedRef = useRef(false);
+    const autoFullscreenTriggeredRef = useRef(false);
+    const autoFullscreenPendingRef = useRef(false);
+    const fullscreenGenerationRef = useRef(0);
+    const wasAutoPausedRef = useRef(false);
+    const windowFocusedRef = useRef(typeof document.hasFocus === 'function' ? document.hasFocus() : true);
+    const downloadDialogRef = useRef<HTMLDivElement>(null);
     const resumePendingRef = useRef(false);
     const loadPlaybackRef = useRef<boolean | null>(null);
     const metadataLoadedRef = useRef(false);
@@ -234,6 +301,17 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     const [webGpuStatus, setWebGpuStatus] = useState<'checking' | 'supported' | 'unsupported'>(() => (
         canUseAnime4KVideo() ? 'checking' : 'unsupported'
     ));
+    const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+    const [downloadSelectedQuality, setDownloadSelectedQuality] = useState<string>('');
+    const isAutoPausingRef = useRef(false);
+    const {
+        status: downloadStatus,
+        progress: downloadProgress,
+        error: downloadError,
+        startDownload,
+        cancelDownload,
+        reset: resetDownload,
+    } = useEpisodeDownload();
     const keybindings = settings.player.keybindings ?? defaultPlayerKeybindings;
 
     const stream = sources[selectedQuality]?.[0];
@@ -247,11 +325,16 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     const episodeKey = String(episodeNumber ?? 'unknown');
     const progressKey = `${animeId}:${episodeKey}`;
     useEffect(() => {
+        const fullscreenGeneration = fullscreenGenerationRef;
         playerClosedRef.current = false;
+        autoFullscreenTriggeredRef.current = false;
+        autoFullscreenPendingRef.current = false;
+        fullscreenGenerationRef.current++;
         return () => {
             playerClosedRef.current = true;
             episodeRequestRef.current += 1;
             episodeChangePendingRef.current = false;
+            fullscreenGeneration.current++;
         };
     }, [progressKey]);
     const currentEpisodeIndex = playerSession.episodes?.findIndex(episode => episode.position === episodeNumber) ?? -1;
@@ -298,11 +381,22 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     }, [roomId, streamError]);
 
     const togglePlayback = useCallback(() => {
+        wasAutoPausedRef.current = false;
+        isAutoPausingRef.current = false;
         const video = videoRef.current;
         if (!video || !canControlRoom) return;
         if (roomId) { sendRoomPlayback(watchRoom?.playback.intent === 'playing' ? 'pause' : 'play', video.currentTime); return; }
+        if (settings.player.autoFullscreen && !autoFullscreenTriggeredRef.current && !autoFullscreenPendingRef.current) {
+            autoFullscreenPendingRef.current = true;
+            const generation = fullscreenGenerationRef.current;
+            void requestFullscreenElement(playerRef.current, video).then(success => {
+                if (generation !== fullscreenGenerationRef.current) return;
+                autoFullscreenPendingRef.current = false;
+                if (success) autoFullscreenTriggeredRef.current = true;
+            });
+        }
         if (video.paused) void video.play(); else video.pause();
-    }, [canControlRoom, roomId, sendRoomPlayback, watchRoom?.playback.intent]);
+    }, [canControlRoom, roomId, sendRoomPlayback, settings.player.autoFullscreen, watchRoom?.playback.intent]);
     const seekTo = useCallback((position: number) => {
         if (!canControlRoom) return;
         if (roomId) { sendRoomPlayback('seek', position); return; }
@@ -341,9 +435,13 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     }, [isPlaying, isPlayerSettingsOpen, resumePromptTime]);
 
     useEffect(() => {
-        const updateFullscreen = () => setIsMaximized(document.fullscreenElement !== null);
+        const updateFullscreen = () => setIsMaximized(Boolean(document.fullscreenElement || (document as WebKitFullscreenDocument).webkitFullscreenElement));
         document.addEventListener('fullscreenchange', updateFullscreen);
-        return () => document.removeEventListener('fullscreenchange', updateFullscreen);
+        document.addEventListener('webkitfullscreenchange', updateFullscreen);
+        return () => {
+            document.removeEventListener('fullscreenchange', updateFullscreen);
+            document.removeEventListener('webkitfullscreenchange', updateFullscreen);
+        };
     }, []);
 
     useEffect(() => {
@@ -376,6 +474,87 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     }, []);
 
     useEffect(() => {
+        if (!settings.player.autoPauseOnTabSwitch || roomId) return;
+
+        const handlePause = () => {
+            const video = videoRef.current;
+            if (roomId || !video || video.paused || resumePromptTime !== null || resumePendingRef.current) return;
+            isAutoPausingRef.current = true;
+            wasAutoPausedRef.current = true;
+            video.pause();
+        };
+
+        const handleResume = () => {
+            const video = videoRef.current;
+            if (roomId || !video || document.hidden || !windowFocusedRef.current || !wasAutoPausedRef.current || resumePromptTime !== null || resumePendingRef.current || video.readyState < 2) return;
+            wasAutoPausedRef.current = false;
+            autoplayAttemptedRef.current = true;
+            void video.play().catch(() => {});
+        };
+
+        const onVisibilityChange = () => {
+            if (document.hidden) {
+                handlePause();
+            } else {
+                handleResume();
+            }
+        };
+
+        const onWindowBlur = () => {
+            windowFocusedRef.current = false;
+            handlePause();
+        };
+
+        const onWindowFocus = () => {
+            windowFocusedRef.current = true;
+            handleResume();
+        };
+
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        window.addEventListener('blur', onWindowBlur);
+        window.addEventListener('focus', onWindowFocus);
+
+        return () => {
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+            window.removeEventListener('blur', onWindowBlur);
+            window.removeEventListener('focus', onWindowFocus);
+        };
+    }, [resumePromptTime, roomId, settings.player.autoPauseOnTabSwitch]);
+
+    useEffect(() => {
+        if (!isDownloadModalOpen) return;
+        const dialog = downloadDialogRef.current;
+        if (!dialog) return;
+        const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        const focusable = () => Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]'));
+        (focusable()[0] ?? dialog).focus();
+        const keydown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                event.preventDefault(); event.stopPropagation();
+                resetDownload(); setIsDownloadModalOpen(false);
+            } else if (event.key === 'Tab') {
+                const items = focusable();
+                const index = items.indexOf(document.activeElement as HTMLElement);
+                if (items.length === 0) { event.preventDefault(); dialog.focus(); }
+                else if (event.shiftKey && index <= 0) { event.preventDefault(); items[items.length - 1].focus(); }
+                else if (!event.shiftKey && (index < 0 || index === items.length - 1)) { event.preventDefault(); items[0].focus(); }
+            }
+        };
+        const containFocus = (event: FocusEvent) => { if (!dialog.contains(event.target as Node)) (focusable()[0] ?? dialog).focus(); };
+        document.addEventListener('keydown', keydown, true);
+        document.addEventListener('focusin', containFocus);
+        return () => {
+            document.removeEventListener('keydown', keydown, true);
+            document.removeEventListener('focusin', containFocus);
+            if (previous?.isConnected) previous.focus();
+        };
+    }, [isDownloadModalOpen, resetDownload]);
+
+    useEffect(() => {
+        return () => { resetDownload(); };
+    }, [progressKey, resetDownload]);
+
+    useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
 
@@ -405,6 +584,8 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
         setStreamError(null);
         setIsBuffering(true);
         autoplayAttemptedRef.current = false;
+        wasAutoPausedRef.current = false;
+        isAutoPausingRef.current = false;
         resumePendingRef.current = false;
         metadataLoadedRef.current = false;
         loadPlaybackRef.current = null;
@@ -653,9 +834,9 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+            if (isDownloadModalOpen || resumePromptTime !== null || event.defaultPrevented || event.isComposing || !event.code || event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
             const target = event.target;
-            if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"]')) return;
+            if (target instanceof HTMLElement && target.closest('button, a, input, textarea, select, [contenteditable], [role="button"], [role="textbox"], [role="listbox"], [role="slider"], [role="menu"], [role="tab"], #watch-room-panel, [data-social-panel]')) return;
 
             const action = Object.entries(keybindings).find(([, code]) => code === event.code)?.[0];
             if (!action) return;
@@ -686,8 +867,8 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                 }
                 case 'toggleMute': video.muted = !video.muted; break;
                 case 'toggleFullscreen':
-                    if (document.fullscreenElement) void document.exitFullscreen();
-                    else void playerRef.current?.requestFullscreen();
+                    if (document.fullscreenElement || (document as WebKitFullscreenDocument).webkitFullscreenElement) void exitFullscreenElement();
+                    else void requestFullscreenElement(playerRef.current, videoRef.current);
                     break;
                 case 'previousEpisode': if (previousEpisode) void changeEpisode(previousEpisode); break;
                 case 'nextEpisode': if (nextEpisode) void changeEpisode(nextEpisode); break;
@@ -699,7 +880,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [changeEpisode, keybindings, nextEpisode, previousEpisode, seekTo, togglePlayback, setSettings, settings.player.showSkipOpeningButton, settings.player.skipOpeningValue, showControls]);
+    }, [changeEpisode, isDownloadModalOpen, resumePromptTime, keybindings, nextEpisode, previousEpisode, seekTo, togglePlayback, setSettings, settings.player.showSkipOpeningButton, settings.player.skipOpeningValue, showControls]);
 
     if (!stream) return <div className={styles.overlay} role="dialog" aria-modal="true" aria-label={t('player.ariaLabel')}>
         <div className={styles.player}>
@@ -718,6 +899,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     return (
         <div className={styles.overlay} role="dialog" aria-modal="true" aria-label={t('player.ariaLabel')}>
             <div className={styles.player} ref={playerRef} onPointerMove={showControls} onPointerDown={showControls}>
+                {Boolean(roomId && watchRoom?.roomId === roomId) && <ReactionOverlay />}
                 <div className={`${styles['player-controls']} ${!areControlsVisible ? styles['player-controls-hidden'] : ''}`}>
                     <div className={styles['playback-buttons']}>
                         <div className={styles['top-bar']}>
@@ -885,10 +1067,26 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                             </div>}
                         </div>
                         <button
+                            type="button"
+                            className={`${styles['action-btn']} ${isDownloadModalOpen ? styles['action-btn-active'] : ''}`}
+                            onClick={() => {
+                                setIsDownloadModalOpen(isOpen => !isOpen);
+                                setDownloadSelectedQuality(selectedQuality);
+                            }}
+                            aria-label={t('roadmap.player.download')}
+                            title={t('roadmap.player.download')}
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="7 10 12 15 17 10" />
+                                <line x1="12" y1="15" x2="12" y2="3" />
+                            </svg>
+                        </button>
+                        <button
                             className={styles['action-btn']}
                             onClick={() => {
-                                if (document.fullscreenElement !== null) void document.exitFullscreen();
-                                else void playerRef.current?.requestFullscreen();
+                                if (document.fullscreenElement !== null || (document as WebKitFullscreenDocument).webkitFullscreenElement) void exitFullscreenElement();
+                                else void requestFullscreenElement(playerRef.current, videoRef.current);
                             }}
                         >
                             <img src={isMaximized ? CompressIcon : ExpandIcon} alt="" />
@@ -931,6 +1129,10 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                             return;
                         }
                         if (autoplayAttemptedRef.current) return;
+                        if (settings.player.autoPauseOnTabSwitch && (document.hidden || !windowFocusedRef.current)) {
+                            wasAutoPausedRef.current = loadPlaybackRef.current !== false;
+                            return;
+                        }
                         autoplayAttemptedRef.current = true;
                         if (loadPlaybackRef.current === false) {
                             event.currentTarget.pause();
@@ -940,10 +1142,27 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                             void event.currentTarget.play().catch(error => console.error('Не удалось автоматически запустить серию:', error));
                         }
                     }}
-                    onPlay={() => setIsPlaying(true)}
+                    onPlay={() => {
+                        setIsPlaying(true);
+                        if (settings.player.autoFullscreen && !autoFullscreenTriggeredRef.current && !autoFullscreenPendingRef.current && !document.fullscreenElement && !(document as WebKitFullscreenDocument).webkitFullscreenElement && playerRef.current) {
+                            autoFullscreenPendingRef.current = true;
+                            const generation = fullscreenGenerationRef.current;
+                            void requestFullscreenElement(playerRef.current, videoRef.current).then(success => {
+                                if (generation !== fullscreenGenerationRef.current) return;
+                                autoFullscreenPendingRef.current = false;
+                                if (success) autoFullscreenTriggeredRef.current = true;
+                            });
+                        }
+                    }}
                     onPlaying={() => { setIsBuffering(false); bridgeRef.current?.synchronize(); }}
                     onSeeked={() => bridgeRef.current?.synchronize()}
-                    onPause={() => setIsPlaying(false)}
+                    onPause={() => {
+                        setIsPlaying(false);
+                        if (!isAutoPausingRef.current) {
+                            wasAutoPausedRef.current = false;
+                        }
+                        isAutoPausingRef.current = false;
+                    }}
                     playsInline
                     className={styles.video}
                     onEnded={() => {
@@ -1025,6 +1244,137 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                         </div>
                     </div>
                 </div>}
+                {isDownloadModalOpen && (
+                    <div ref={downloadDialogRef} tabIndex={-1} className={styles['download-modal-overlay']} role="dialog" aria-modal="true" aria-label={t('roadmap.player.downloadModalTitle')}>
+                        <div className={styles['download-card']}>
+                            <div className={styles['download-header']}>
+                                <h3>{t('roadmap.player.downloadModalTitle')}</h3>
+                                <button
+                                    type="button"
+                                    className={styles['download-close-btn']}
+                                    onClick={() => {
+                                        resetDownload();
+                                        setIsDownloadModalOpen(false);
+                                    }}
+                                    aria-label={t('roadmap.player.downloadClose')}
+                                >×</button>
+                            </div>
+                            <p className={styles['download-meta']}>{animeName} · {episodeName || t('player.episodeTitle', { number: episodeNumber })}</p>
+                            <p>{t('roadmap.player.downloadLimit')}</p>
+
+                            <div className={styles['download-section-title']}>{t('roadmap.player.downloadSelectQuality')}</div>
+                            <div className={styles['download-qualities']}>
+                                {qualities.map(q => {
+                                    const qStream = sources[q]?.[0];
+                                    const isDirect = qStream ? isDirectMp4Stream(qStream) : false;
+                                    const currentQ = downloadSelectedQuality || selectedQuality;
+                                    const isSelected = currentQ === q;
+
+                                    return (
+                                        <button
+                                            key={q}
+                                            type="button"
+                                            className={`${styles['download-quality-chip']} ${isSelected ? styles.selected : ''}`}
+                                            onClick={() => {
+                                                setDownloadSelectedQuality(q);
+                                                resetDownload();
+                                            }}
+                                        >
+                                            <span>{q}p</span>
+                                            <span className={isDirect ? styles['download-badge-mp4'] : styles['download-badge-hls']}>
+                                                {isDirect ? 'MP4' : qStream && isHlsStream(qStream) ? 'HLS' : '—'}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {(() => {
+                                const activeQ = downloadSelectedQuality || selectedQuality;
+                                const activeStream = sources[activeQ]?.[0];
+                                const isHls = activeStream ? isHlsStream(activeStream) : false;
+                                const isDirect = activeStream ? isDirectMp4Stream(activeStream) : false;
+
+                                if (downloadStatus === 'downloading') {
+                                    return (
+                                        <div className={styles['download-progress-wrap']}>
+                                            <div className={styles['download-progress-bar']}>
+                                                <div className={styles['download-progress-fill']} style={{ width: `${downloadProgress.percent}%` }} />
+                                            </div>
+                                            <div className={styles['download-progress-text']}>
+                                                <span>{downloadProgress.total > 0 ? `${downloadProgress.percent}%` : t('roadmap.player.downloadStatusConnecting')}</span>
+                                                <span>{formatBytes(downloadProgress.loaded)} / {downloadProgress.total > 0 ? formatBytes(downloadProgress.total) : '…'}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                if (downloadStatus === 'completed') {
+                                    return <div className={styles['download-status-complete']}>{t('roadmap.player.downloadStatusComplete')}</div>;
+                                }
+
+                                if (downloadStatus === 'error') {
+                                    return <div className={styles['download-status-error']}>{downloadError || t('roadmap.player.downloadStatusError')}</div>;
+                                }
+
+                                if (downloadStatus === 'cancelled') {
+                                    return <div className={styles['download-warning']}>{t('roadmap.player.downloadStatusCancelled')}</div>;
+                                }
+
+                                if (isHls && !isDirect) {
+                                    return <div className={styles['download-warning']}>{t('roadmap.player.downloadHlsUnsupported')}</div>;
+                                }
+
+                                return null;
+                            })()}
+
+                            <div className={styles['download-actions']}>
+                                {downloadStatus === 'downloading' ? (
+                                    <button type="button" className={styles['download-btn-secondary']} onClick={cancelDownload}>
+                                        {t('roadmap.player.downloadCancel')}
+                                    </button>
+                                ) : (
+                                    <>
+                                        <button
+                                            type="button"
+                                            className={styles['download-btn-secondary']}
+                                            onClick={() => {
+                                                resetDownload();
+                                                setIsDownloadModalOpen(false);
+                                            }}
+                                        >
+                                            {t('roadmap.player.downloadClose')}
+                                        </button>
+                                        {(() => {
+                                            const activeQ = downloadSelectedQuality || selectedQuality;
+                                            const activeStream = sources[activeQ]?.[0];
+                                            const isDirect = activeStream ? isDirectMp4Stream(activeStream) : false;
+
+                                            if (isDirect && downloadStatus !== 'completed') {
+                                                return (
+                                                    <button
+                                                        type="button"
+                                                        className={styles['download-btn-primary']}
+                                                        onClick={() => {
+                                                            if (!activeStream) return;
+                                                            const epNum = episodeNumber !== undefined ? episodeNumber : 1;
+                                                            const rawName = `${animeName} - Ep ${epNum} (${activeQ}p).mp4`;
+                                                            const filename = sanitizeFilename(rawName);
+                                                            void startDownload({ stream: activeStream, filename });
+                                                        }}
+                                                    >
+                                                        {t('roadmap.player.downloadStart')}
+                                                    </button>
+                                                );
+                                            }
+                                            return null;
+                                        })()}
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

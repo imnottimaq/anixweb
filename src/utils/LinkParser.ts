@@ -1,5 +1,5 @@
-import type { VideoSources, VideoStreamType } from '../shared/types/video';
-import { getCorsProxyUrl } from '../shared/proxy';
+import type { VideoSources, VideoStreamType } from '../shared/types/video.ts';
+import { getCorsProxyUrl } from '../shared/proxy.ts';
 
 /*
     LinkParser.ts взят из AnixartJS(https://github.com/theDesConnet/AnixartJS)
@@ -9,15 +9,25 @@ import { getCorsProxyUrl } from '../shared/proxy';
  * Парсер различных источников
  */
 
-/**
- * KodikParser
- * Парсер источника Kodik
- * Большая часть кода основана на KodikWrapper (https://github.com/thedvxchsquad/kodikwrapper/blob/master/src/video-links.ts)
- */
+export function getUpstreamUrl(response: Response, fallbackUrl: string): string {
+    const upstream = response.headers.get('x-upstream-url');
+    if (upstream) {
+        try {
+            const parsed = new URL(upstream);
+            if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+                return parsed.toString();
+            }
+        } catch {
+            // Malformed header, fallback
+        }
+    }
+    return fallbackUrl;
+}
 
-/**
- * Качество
- */
+export function resolvePlaylistEntry(entry: string, baseUpstreamUrl: string): string {
+    const trimmed = entry.trim();
+    return new URL(trimmed, baseUpstreamUrl).toString();
+}
 
 export async function proxyFetch(targetUrl: string, options?: RequestInit) {
     const proxiedUrl = getCorsProxyUrl(targetUrl);
@@ -99,16 +109,40 @@ export class KodikParser {
     private static _baseKodikDomain = 'kodikplayer.com'
     private static _endpointUrl = '/ftor';
 
+    private static checkHost(url: string) {
+        let parsed: URL;
+        try {
+            parsed = new URL(url);
+        } catch {
+            throw new Error(`Invalid URL provided to KodikParser: "${url}"`);
+        }
+        const hostname = parsed.hostname.toLowerCase();
+        const valid = hostname === 'kodikplayer.com' || hostname.endsWith('.kodikplayer.com') ||
+                      hostname === 'kodik.info' || hostname.endsWith('.kodik.info') ||
+                      hostname === 'kodik.biz' || hostname.endsWith('.kodik.biz') ||
+                      hostname === 'kodik.cc' || hostname.endsWith('.kodik.cc');
+        if (!valid) {
+            throw new Error(`Unsupported host "${hostname}" for KodikParser.`);
+        }
+    }
+
     public static async getLatestLink(url: string, signal?: AbortSignal): Promise<string | null> {
+        this.checkHost(url);
         const endpointUrlRegex = new RegExp(/url:atob\((?<encodedPath>[^"]+)\)/is);
         const appPlayerPathRegex = new RegExp(/src="(?<path>\/assets\/js\/app\.player_single\..*?\.js)"/is);
 
-        const playerResponse = await (await proxyFetch(url, { signal })).text();
+        const playerFetch = await proxyFetch(url, { signal });
+        if (!playerFetch.ok) return null;
+        const playerResponse = await playerFetch.text();
         const appPlayerPath = playerResponse.match(appPlayerPathRegex)?.groups?.path;
 
         if (!appPlayerPath) return null;
 
-        const appPlayerResponse = await (await proxyFetch(`https://${new URL(url).host}${appPlayerPath}`, { signal })).text();
+        const appPlayerBase = getUpstreamUrl(playerFetch, url);
+        const appPlayerUrl = new URL(appPlayerPath, appPlayerBase).toString();
+        const appPlayerFetch = await proxyFetch(appPlayerUrl, { signal });
+        if (!appPlayerFetch.ok) return null;
+        const appPlayerResponse = await appPlayerFetch.text();
         const latestEndpoint = appPlayerResponse.match(endpointUrlRegex)?.groups?.encodedPath;
 
         if (!latestEndpoint) return null;
@@ -117,7 +151,10 @@ export class KodikParser {
     }
 
     public static async getDirectLinks(url: string, endpointPath: string = this._endpointUrl, signal?: AbortSignal): Promise<KodikVideoLinks | null> {
-        const urlResponse = await (await proxyFetch(url, { signal })).text();
+        this.checkHost(url);
+        const urlFetch = await proxyFetch(url, { signal });
+        if (!urlFetch.ok) return null;
+        const urlResponse = await urlFetch.text();
 
         const paramsMatch = urlResponse.match(/var\s+urlParams\s*=\s*(['"])(?<params>.*?)\1/is);
         const urlParams = JSON.parse(paramsMatch?.groups?.params || "{}") as Record<string, string>;
@@ -146,6 +183,8 @@ export class KodikParser {
             },
             body: new URLSearchParams(requestBody).toString()
         });
+
+        if (!directLinksResponse.ok) return null;
 
         const contentType = directLinksResponse.headers.get("content-type");
         
@@ -179,9 +218,6 @@ export class KodikParser {
  * Парсер источника Libria
  */
 
-/**
- * Тайтл
- */
 export interface AniLibriaAnime {
     id: number,
     type: {
@@ -249,9 +285,6 @@ export interface AniLibriaAnime {
     episodes: AniLibriaEpisode[]
 }
 
-/**
- * Жанр
- */
 export interface AniLibriaGenre {
     id: number,
     name: string,
@@ -266,9 +299,6 @@ export interface AniLibriaGenre {
     total_releases: number
 }
 
-/**
- * Участник Anilibria
- */
 export interface AniLibriaMember {
     id: string,
     role: {
@@ -279,9 +309,6 @@ export interface AniLibriaMember {
     user: unknown
 }
 
-/**
- * Эпизод
- */
 export interface AniLibriaEpisode {
     id: string,
     name: string | null,
@@ -316,18 +343,12 @@ export interface AniLibriaEpisode {
     name_english: string | null
 }
 
-/**
- * Возвращаемый обьект
- */
 export interface AniLibriaReturnObject {
     [key: string]: {
         src: string
     }
 }
 
-/**
- * Класс парсера анилибрии
- */
 export class AniLibriaParser {
     private static _baseAniLibriaDomain = 'aniliberty.top'
     private static _endpointUrl = '/api/v1/anime/releases'
@@ -335,16 +356,36 @@ export class AniLibriaParser {
     public static idPattern = /id=(?<id>\d+)/;
     public static episodePattern = /ep=(?<ep>\d+)/;
 
+    private static checkHost(link: string) {
+        let parsed: URL;
+        try {
+            parsed = new URL(link);
+        } catch {
+            throw new Error(`Invalid URL provided to AniLibriaParser: "${link}"`);
+        }
+        const hostname = parsed.hostname.toLowerCase();
+        const valid = hostname === 'aniliberty.top' || hostname.endsWith('.aniliberty.top') ||
+                      hostname === 'anilibria.top' || hostname.endsWith('.anilibria.top') ||
+                      hostname === 'anixart.tv' || hostname.endsWith('.anixart.tv');
+        if (!valid) {
+            throw new Error(`Unsupported host "${hostname}" for AniLibriaParser.`);
+        }
+    }
+
     public static async getDirectLinks(link: string, signal?: AbortSignal): Promise<AniLibriaReturnObject | null> {
+        this.checkHost(link);
         const id = this.idPattern.exec(link)?.groups?.id;
         const episode = this.episodePattern.exec(link)?.groups?.ep;
 
+        if (!id || typeof episode !== 'string') return null;
+
         const request = await fetch(`https://${this._baseAniLibriaDomain}${this._endpointUrl}/${id}`, { signal });
+        if (!request.ok) return null;
 
         const body = await request.json() as AniLibriaAnime;
 
-        if (!body || typeof episode != 'string') return null;
-        const ep = body.episodes.find(e => e.ordinal == parseInt(episode!)) ?? null;
+        if (!body) return null;
+        const ep = body.episodes?.find(e => e.ordinal === parseInt(episode)) ?? null;
         
         if (ep) {
             return {
@@ -373,14 +414,34 @@ export class SibnetParser {
 
     public static srcMatch = new RegExp(/src: (".*?")/);
 
+    private static checkHost(link: string) {
+        let parsed: URL;
+        try {
+            parsed = new URL(link);
+        } catch {
+            throw new Error(`Invalid URL provided to SibnetParser: "${link}"`);
+        }
+        const hostname = parsed.hostname.toLowerCase();
+        if (hostname !== 'video.sibnet.ru' && hostname !== 'sibnet.ru' && !hostname.endsWith('.sibnet.ru')) {
+            throw new Error(`Unsupported host "${hostname}" for SibnetParser. Expected video.sibnet.ru.`);
+        }
+    }
+
     public static async getDirectLink(link: string, signal?: AbortSignal): Promise<string | null> {
+        this.checkHost(link);
         const request = await proxyFetch(link, { signal });
+        if (!request.ok) return null;
 
         const body = await request.text();
         const match = this.srcMatch.exec(body);
 
         if (match) {
-            const srcRequest = await proxyFetch(`https://${this._baseSibnetDomain}${match[1].replace(/"/g, '')}`, {
+            const rawPath = match[1].replace(/"/g, '');
+            const targetUrl = rawPath.startsWith('http')
+                ? rawPath
+                : `https://${this._baseSibnetDomain}${rawPath.startsWith('/') ? '' : '/'}${rawPath}`;
+
+            const srcRequest = await proxyFetch(targetUrl, {
                 signal,
                 headers: {
                     host: this._baseSibnetDomain,
@@ -388,7 +449,9 @@ export class SibnetParser {
                 }
             });
 
-            return srcRequest.url ?? null;
+            if (!srcRequest.ok) return null;
+
+            return getUpstreamUrl(srcRequest, targetUrl);
         }
 
         return null;
@@ -401,41 +464,59 @@ export class SibnetParser {
  */
 export class RutubeParser {
     private static _baseRutubeDomain = 'rutube.ru';
-    private static _regExpUrl = /(http|https):\/\/(?<domain>\w+.\w+)\/play\/embed\/(?<videoId>\w+)/;
-    private static _regExpDirectLink = /^.*\s*RESOLUTION=(?<width>\d+)x(?<heigth>\d+)\n(?<url>.*)$/gm;
+    private static _regExpUrl = /(http|https):\/\/(?<domain>\w+\.\w+)\/play\/embed\/(?<videoId>\w+)/;
+    private static _regExpDirectLink = /^.*\s*RESOLUTION=(?<width>\d+)x(?<heigth>\d+)\r?\n(?<url>.*)$/gm;
+
+    private static checkHost(link: string) {
+        let parsed: URL;
+        try {
+            parsed = new URL(link);
+        } catch {
+            throw new Error(`Invalid URL provided to RutubeParser: "${link}"`);
+        }
+        const hostname = parsed.hostname.toLowerCase();
+        if (hostname !== 'rutube.ru' && !hostname.endsWith('.rutube.ru')) {
+            throw new Error(`Unsupported host "${hostname}" for RutubeParser. Expected rutube.ru.`);
+        }
+    }
 
     public static async getDirectLinks(link: string, signal?: AbortSignal): Promise<Record<string, string> | null> {
+        this.checkHost(link);
         const match = this._regExpUrl.exec(link)?.groups?.videoId ?? null;
 
         if (!match) return null;
 
         const request = await proxyFetch(`https://${this._baseRutubeDomain}/api/play/options/${match}/?no_404=true&referer&pver=v2`, { signal });
+        if (!request.ok) return null;
+
         const body = await request.json();
-        const balancerUrl = body['video_balancer'].default ?? null;
+        const balancerUrl = body['video_balancer']?.default ?? null;
 
         if (!balancerUrl) return null;
 
         const balancerRequest = await proxyFetch(balancerUrl, { signal });
+        if (!balancerRequest.ok) return null;
+
+        const upstreamUrl = getUpstreamUrl(balancerRequest, balancerUrl);
         const balancerBody = await balancerRequest.text();
 
+        this._regExpDirectLink.lastIndex = 0;
         let directLinkMatch = this._regExpDirectLink.exec(balancerBody);
 
-        if (directLinkMatch?.length == 0) return null;
+        if (!directLinkMatch) return null;
 
         const directLinks: Record<string, string> = {};
 
-        do {
-            const width = directLinkMatch?.groups?.width ?? null;
-            const heigth = directLinkMatch?.groups?.heigth ?? null;
-            const url = directLinkMatch?.groups?.url ?? null;
+        while (directLinkMatch) {
+            const heigth = directLinkMatch.groups?.heigth ?? null;
+            const url = directLinkMatch.groups?.url?.trim() ?? null;
 
-            if (!width || !heigth || !url) break;
-
-            directLinks[`${heigth}`] = url;
+            if (heigth && url) {
+                directLinks[`${heigth}`] = resolvePlaylistEntry(url, upstreamUrl);
+            }
             directLinkMatch = this._regExpDirectLink.exec(balancerBody);
         }
-        while (directLinkMatch);
-        return directLinks;
+        return Object.keys(directLinks).length > 0 ? directLinks : null;
     }
 }
 
@@ -454,9 +535,23 @@ export class VKVideoParser {
     private static oidRegExp = /[?&]oid=(?<oid>(-|)\d+)/;
     private static idRegExp = /[?&]id=(?<id>(-|)\d+)/;
     private static hashRegExp = /[?&]hash=(?<hash>\w+)/;
-    private static _regExpDirectLink = /^.*\s*RESOLUTION=(?<width>\d+)x(?<heigth>\d+)\n(?<url>.*)$/gm;
+    private static _regExpDirectLink = /^.*\s*RESOLUTION=(?<width>\d+)x(?<heigth>\d+)\r?\n(?<url>.*)$/gm;
     
+    private static checkHost(link: string) {
+        let parsed: URL;
+        try {
+            parsed = new URL(link);
+        } catch {
+            throw new Error(`Invalid URL provided to VKVideoParser: "${link}"`);
+        }
+        const hostname = parsed.hostname.toLowerCase();
+        if (hostname !== 'vk.com' && !hostname.endsWith('.vk.com')) {
+            throw new Error(`Unsupported host "${hostname}" for VKVideoParser. Expected vk.com.`);
+        }
+    }
+
     public static async getDirectLinks(link: string, signal?: AbortSignal): Promise<Record<string, string> | null> {
+        this.checkHost(link);
         const oid = this.oidRegExp.exec(link)?.groups?.oid ?? null;
         const id = this.idRegExp.exec(link)?.groups?.id ?? null;
         const hash = this.hashRegExp.exec(link)?.groups?.hash ?? null;
@@ -465,6 +560,7 @@ export class VKVideoParser {
 
         const uuid = crypto.randomUUID();
         const tokenResponse = await proxyFetch(`https://oauth.${this._baseVkDomain}/oauth/get_anonym_token?client_id=51552953&client_secret=qgr0yWwXCrsxA1jnRtRX&device_id=${uuid}`, { signal });
+        if (!tokenResponse.ok) return null;
 
         const anonymToken: VKVideoTokenResponse = await tokenResponse.json();
 
@@ -473,31 +569,35 @@ export class VKVideoParser {
             method: 'POST',
             body: `anonymous_token=${anonymToken.token}&device_id=${uuid}&lang=en&v=5.244&videos=${oid}_${id}_${hash}`,
         });
+        if (!getLinksResponse.ok) return null;
 
         const getLinksResponseJson = await getLinksResponse.json();
-        const hlsMasterRequest = await proxyFetch(getLinksResponseJson.response.items[0].files.hls, { signal });
-        const vkServerUrl = new URL(hlsMasterRequest.url).host;
+        const masterUrl = getLinksResponseJson.response?.items?.[0]?.files?.hls;
+        if (!masterUrl) return null;
 
+        const hlsMasterRequest = await proxyFetch(masterUrl, { signal });
+        if (!hlsMasterRequest.ok) return null;
+
+        const upstreamUrl = getUpstreamUrl(hlsMasterRequest, masterUrl);
         const hlsMasterBody = await hlsMasterRequest.text();
 
+        this._regExpDirectLink.lastIndex = 0;
         let directLinkMatch = this._regExpDirectLink.exec(hlsMasterBody);
 
-        if (directLinkMatch?.length == 0) return null;
+        if (!directLinkMatch) return null;
 
         const directLinks: Record<string, string> = {};
 
-        do {
-            const width = directLinkMatch?.groups?.width ?? null;
-            const heigth = directLinkMatch?.groups?.heigth ?? null;
-            const url = directLinkMatch?.groups?.url ?? null;
+        while (directLinkMatch) {
+            const heigth = directLinkMatch.groups?.heigth ?? null;
+            const url = directLinkMatch.groups?.url?.trim() ?? null;
 
-            if (!width || !heigth || !url) break;
-
-            directLinks[`${heigth}`] = `https://${vkServerUrl}${url}`;
+            if (heigth && url) {
+                directLinks[`${heigth}`] = resolvePlaylistEntry(url, upstreamUrl);
+            }
             directLinkMatch = this._regExpDirectLink.exec(hlsMasterBody);
         }
-        while (directLinkMatch);
-        return directLinks;
+        return Object.keys(directLinks).length > 0 ? directLinks : null;
     }
 }
 
@@ -507,42 +607,70 @@ export class VKVideoParser {
  */
 export class OKParser {
     private static _regExpDataOptions = /data-options="(?<content>{.*})"/m;
-    private static _regExpDirectLink = /^.*\s*RESOLUTION=(?<width>\d+)x(?<heigth>\d+)\n(?<url>.*)$/gm;
+    private static _regExpDirectLink = /^.*\s*RESOLUTION=(?<width>\d+)x(?<heigth>\d+)\r?\n(?<url>.*)$/gm;
+
+    private static checkHost(link: string) {
+        let parsed: URL;
+        try {
+            parsed = new URL(link);
+        } catch {
+            throw new Error(`Invalid URL provided to OKParser: "${link}"`);
+        }
+        const hostname = parsed.hostname.toLowerCase();
+        if (hostname !== 'ok.ru' && !hostname.endsWith('.ok.ru') &&
+            hostname !== 'odnoklassniki.ru' && !hostname.endsWith('.odnoklassniki.ru')) {
+            throw new Error(`Unsupported host "${hostname}" for OKParser. Expected ok.ru or odnoklassniki.ru.`);
+        }
+    }
+
     public static async getDirectLinks(link: string, signal?: AbortSignal): Promise<Record<string, string> | null> {
+        this.checkHost(link);
         const request = await proxyFetch(link, { signal });
+        if (!request.ok) return null;
+
         const body = await request.text();
 
         const dataOptionsMatch = this._regExpDataOptions.exec(body)?.groups?.content ?? null;
         if (!dataOptionsMatch) return null;
 
-        const dataOptions = dataOptionsMatch.replace(/&quot;/g, "\"").replace(/\\\\u0026/g, "&")
-        const dataOptionsJson = JSON.parse(dataOptions);
-        const metadataJson = JSON.parse(dataOptionsJson.flashvars.metadata);
+        const dataOptions = dataOptionsMatch.replace(/&quot;/g, "\"").replace(/\\\\u0026/g, "&");
+        let dataOptionsJson: { flashvars?: { metadata?: string } };
+        let metadataJson: { provider?: string; isLive?: boolean; hlsManifestUrl?: string };
+        try {
+            dataOptionsJson = JSON.parse(dataOptions);
+            metadataJson = JSON.parse(dataOptionsJson.flashvars?.metadata || "{}");
+        } catch {
+            return null;
+        }
 
-        if (metadataJson.provider != "UPLOADED_ODKL" || metadataJson.isLive) return null;
+        if (metadataJson.provider !== "UPLOADED_ODKL" || metadataJson.isLive) return null;
 
-        const hlsMasterRequest = await proxyFetch(metadataJson.hlsManifestUrl, { signal });
+        const manifestUrl = metadataJson.hlsManifestUrl;
+        if (!manifestUrl) return null;
+
+        const hlsMasterRequest = await proxyFetch(manifestUrl, { signal });
+        if (!hlsMasterRequest.ok) return null;
+
+        const upstreamUrl = getUpstreamUrl(hlsMasterRequest, manifestUrl);
         const hlsMasterBody = await hlsMasterRequest.text();
-        const okServerUrl = new URL(hlsMasterRequest.url).host;
 
+        this._regExpDirectLink.lastIndex = 0;
         let directLinkMatch = this._regExpDirectLink.exec(hlsMasterBody);
 
-        if (directLinkMatch?.length == 0) return null;
+        if (!directLinkMatch) return null;
 
         const directLinks: Record<string, string> = {};
 
-        do {
-            const width = directLinkMatch?.groups?.width ?? null;
-            const heigth = directLinkMatch?.groups?.heigth ?? null;
-            const url = directLinkMatch?.groups?.url ?? null;
+        while (directLinkMatch) {
+            const heigth = directLinkMatch.groups?.heigth ?? null;
+            const url = directLinkMatch.groups?.url?.trim() ?? null;
 
-            if (!width || !heigth || !url) break;
-
-            directLinks[`${heigth}`] = `https://${okServerUrl}${url}`;
+            if (heigth && url) {
+                directLinks[`${heigth}`] = resolvePlaylistEntry(url, upstreamUrl);
+            }
             directLinkMatch = this._regExpDirectLink.exec(hlsMasterBody);
         }
-        while (directLinkMatch);
-        return directLinks;
+        return Object.keys(directLinks).length > 0 ? directLinks : null;
     }
 }
 
@@ -552,7 +680,7 @@ const PARSERS = [
         parse: (url: string, signal?: AbortSignal) => KodikParser.getDirectLinks(url, undefined, signal)
     },
     {
-        test: (url: string) => url.includes('aniliberty.top') || url.includes('anixart'),
+        test: (url: string) => url.includes('aniliberty.top') || url.includes('anilibria.top') || url.includes('anixart'),
         parse: (url: string, signal?: AbortSignal) => AniLibriaParser.getDirectLinks(url, signal)
     },
     {

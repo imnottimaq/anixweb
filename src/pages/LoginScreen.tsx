@@ -21,6 +21,7 @@ export default function LoginScreen() {
             <h2>{t('auth.loginTitle')}</h2>
             <form className={styles['form-container']} onSubmit={async event => {
                 event.preventDefault();
+                if (isLoading) return;
                 setIsLoading(true);
                 setError('');
                 try { await handleLogin(username, password, setUserToken, setUserId); }

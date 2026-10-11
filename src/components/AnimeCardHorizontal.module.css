@@ -1,21 +1,29 @@
 .card {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   width: 100%;
   min-width: 0;
-  padding: 8px;
-  border: 1px solid transparent;
-  border-radius: 12px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--surface-border) 60%, transparent);
+  border-radius: var(--radius-card);
   box-sizing: border-box;
   color: var(--text-color);
+  background: color-mix(in srgb, var(--surface-card) 40%, transparent);
   text-decoration: none;
   text-align: left;
-  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+  transition: background-color var(--motion-normal), border-color var(--motion-normal), transform var(--motion-normal), box-shadow var(--motion-normal);
 }
 
 .card:hover {
-  border-color: var(--border-color);
-  background: transparent;
+  border-color: color-mix(in srgb, var(--accent-color) 45%, var(--border-color));
+  background: var(--surface-card);
+  transform: translateY(-2px);
+  box-shadow: var(--elevation-card);
+}
+
+.card:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .poster {
@@ -23,12 +31,13 @@
   flex: 0 0 138px;
   aspect-ratio: 75 / 106;
   overflow: hidden;
-  border-radius: 0.5rem;
-  background: transparent;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--text-color) 6%, var(--card-bg));
+  box-shadow: var(--elevation-low);
 }
 
 .compact .poster { flex-basis: 117px; }
-.compact .anime-title { font-size: 18px; }
+.compact .anime-title { font-size: 17px; }
 .compact .anime-description { -webkit-line-clamp: 3; }
 
 .poster img {
@@ -39,14 +48,23 @@
   transition: opacity 180ms ease;
 }
 
+.card:hover .poster img {
+  transform: scale(1.03);
+}
+
 .poster-loading::before {
   content: '';
   position: absolute;
   z-index: 1;
   inset: 0;
-  background: transparent;
-  background-size: 220% 100%;
-  animation: poster-shimmer 1.25s ease-in-out infinite;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--text-color) 6%, var(--card-bg)) 0%,
+    color-mix(in srgb, var(--text-color) 14%, var(--card-bg)) 50%,
+    color-mix(in srgb, var(--text-color) 6%, var(--card-bg)) 100%
+  );
+  background-size: 200% 100%;
+  animation: poster-shimmer 1.4s ease-in-out infinite;
 }
 
 .poster-loading img { opacity: 0; }
@@ -56,14 +74,18 @@
   position: absolute;
   right: 0;
   bottom: 0;
-  width: 100%;
-  padding: 5px 4px;
+  left: 0;
+  padding: 5px 6px;
   box-sizing: border-box;
   color: #fff;
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 700;
-  line-height: 1;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
   text-align: center;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: 0 -2px 8px rgb(0 0 0 / 25%);
 }
 
 .anime-title {
@@ -71,25 +93,30 @@
   margin: 1px 0 0;
   overflow: hidden;
   color: var(--text-color);
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   line-height: 1.25;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  transition: color var(--motion-fast);
+}
+
+.card:hover .anime-title {
+  color: var(--accent-color);
 }
 
 .info { display: flex; flex: 1 1 auto; flex-direction: column; gap: 6px; min-width: 0; }
-.anime-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin: 0; color: color-mix(in srgb, var(--text-color) 65%, transparent); font-size: 15px; line-height: 1.25; }
-.anime-rating { display: inline-flex; align-items: center; gap: 3px; margin-left: 3px; color: var(--text-color); font-weight: 700; }
-.anime-rating img { width: 17px; height: 17px; }
-.anime-description { display: -webkit-box; margin: 0; overflow: hidden; color: color-mix(in srgb, var(--text-color) 68%, transparent); font-size: 15px; line-height: 1.4; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
-.comment-activity { margin: auto 0 0; color: var(--text-secondary); font-size: 13px; line-height: 1.2; }
+.anime-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0; color: var(--text-secondary); font-size: 13.5px; line-height: 1.25; }
+.anime-rating { display: inline-flex; align-items: center; gap: 4px; margin-left: 2px; color: var(--status-favorite); font-weight: 700; }
+.anime-rating img { width: 15px; height: 15px; }
+.anime-description { display: -webkit-box; margin: 0; overflow: hidden; color: color-mix(in srgb, var(--text-color) 72%, transparent); font-size: 13.5px; line-height: 1.4; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
+.comment-activity { margin: auto 0 0; color: var(--text-secondary); font-size: 12.5px; line-height: 1.2; }
 
-.status-watching { background-color: var(--status-watching); }
-.status-plan { background-color: var(--status-plan); }
-.status-completed { background-color: var(--status-completed); }
-.status-hold { background-color: var(--status-hold); }
-.status-dropped { background-color: var(--status-dropped); }
+.status-watching { background-color: var(--status-watching); color: #121212; }
+.status-plan { background-color: var(--status-plan); color: #ffffff; }
+.status-completed { background-color: var(--status-completed); color: #ffffff; }
+.status-hold { background-color: var(--status-hold); color: #121212; }
+.status-dropped { background-color: var(--status-dropped); color: #ffffff; }
 
 @keyframes poster-shimmer {
   from { background-position: 100% 0; }

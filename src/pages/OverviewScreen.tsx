@@ -6,18 +6,21 @@ import PageState from '../components/PageState';
 import { PageLayout } from '../components/PageLayout';
 import RemoteImage from '../components/RemoteImage';
 import { useApi } from '../shared/apiClient';
-import { useUser } from '../shared/contexts/userContext';
-import type { Anime, Comment, DiscoverInteresting, PagedResponse } from '../shared/types/api';
+import type { Anime, DiscoverInteresting, PagedResponse } from '../shared/types/api';
 import leftArrowIcon from '../assets/icons/left-arrow.svg';
 import rightArrowIcon from '../assets/icons/right-arrow.svg';
 import styles from './OverviewScreen.module.css';
 import { useAsyncLoad } from '../shared/useAsyncLoad';
 import { useTranslation } from '../shared/useTranslation';
 
-type DiscoverComment = Omit<Comment, 'release'> & {
-    release?: { id: number; title_ru: string; title_original?: string } | null;
-    parent_comment_id?: number | null;
-};
+import {
+    resolveCommentReleases,
+    getCommentReleaseDisplayTitle,
+    extractReleaseId,
+    type DiscoverCommentItem,
+} from '../shared/discover/commentTitle';
+
+type DiscoverComment = DiscoverCommentItem;
 
 type OverviewData = {
     interesting: DiscoverInteresting[];
@@ -32,18 +35,14 @@ const EMPTY_DATA: OverviewData = {
     interesting: [], recommendations: [], watching: [], discussing: [], comments: [], failedSections: 0,
 };
 
-let overviewCache: { token: string; data: OverviewData } | null = null;
 
 export default function OverviewScreen() {
     const api = useApi();
     const { t, language } = useTranslation();
-    const { userToken } = useUser();
     const navigate = useNavigate();
     const [activeInterestingIndex, setActiveInterestingIndex] = useState(0);
 
     const { data = EMPTY_DATA, isLoading, error, reload } = useAsyncLoad(signal => {
-        if (overviewCache?.token === userToken) return Promise.resolve(overviewCache.data);
-
         const get = <T,>(path: string) => api.get<PagedResponse<T>>(path, { signal });
 
         const promise = Promise.allSettled([
@@ -66,12 +65,11 @@ export default function OverviewScreen() {
                 comments: resolveCommentReleases(getContent(comments)),
                 failedSections,
             };
-            overviewCache = { token: userToken, data: result };
             return result;
         });
 
         return promise;
-    }, [api, userToken], { initialData: overviewCache?.token === userToken ? overviewCache.data : EMPTY_DATA });
+    }, [api], { initialData: EMPTY_DATA });
 
     const visibleInterestingIndex = data.interesting.length > 0
         ? activeInterestingIndex % data.interesting.length
@@ -82,6 +80,7 @@ export default function OverviewScreen() {
         {!isLoading && Boolean(error) && <PageState status="error" message={t('overview.error')} onRetry={reload} />}
 
         {!isLoading && !error && <>
+            {data.failedSections > 0 && <div className={styles.partialError} role="alert"><span>{t('roadmap.discover.overview.partialError')}</span><button type="button" onClick={reload}>{t('page.retry')}</button></div>}
             {(data.interesting.length > 0 || data.discussing.length > 0) && <div className={styles.topLayout}>
                 {data.interesting.length > 0 && <section className={styles.featured}>
                     <SectionTitle title={t('overview.interesting')} />
@@ -113,14 +112,14 @@ export default function OverviewScreen() {
             </div>}
 
             <nav className={styles.quickActions} aria-label={t('overview.quickAria')}>
-                <button type="button" className={`${styles.quickAction} ${styles.quickActionPopular}`} onClick={() => navigate('/filter', { state: { filter: { sort: 3 }, autoSearch: true } })}>
+                <Link to="/popular" className={`${styles.quickAction} ${styles.quickActionPopular}`}>
                     <span className={styles.quickActionIcon} aria-hidden="true" />
                     <span>{t('overview.popular')}</span>
-                </button>
-                <button type="button" className={`${styles.quickAction} ${styles.quickActionSchedule}`} onClick={() => navigate('/filter', { state: { filter: { status_id: 2 }, autoSearch: true } })}>
+                </Link>
+                <Link to="/schedule" className={`${styles.quickAction} ${styles.quickActionSchedule}`}>
                     <span className={styles.quickActionIcon} aria-hidden="true" />
                     <span>{t('overview.schedule')}</span>
-                </button>
+                </Link>
                 <button type="button" className={`${styles.quickAction} ${styles.quickActionFilter}`} onClick={() => navigate('/filter')}>
                     <span className={styles.quickActionIcon} aria-hidden="true" />
                     <span>{t('overview.filter')}</span>
@@ -137,7 +136,7 @@ export default function OverviewScreen() {
                     ? <div className={styles.posterRail}>
                         {data.recommendations.map(anime => <AnimeCard key={anime.id} anime={anime} />)}
                     </div>
-                    : <p className={styles.recommendationsEmpty}>{t('overview.rateMore')}</p>}
+                    : data.failedSections === 0 ? <p className={styles.recommendationsEmpty}>{t('overview.rateMore')}</p> : null}
             </section>
 
             {data.watching.length > 0 && <section className={styles.section}>
@@ -163,30 +162,6 @@ function getContent<T>(result: PromiseSettledResult<PagedResponse<T>>): T[] {
     return result.status === 'fulfilled' ? result.value.content ?? [] : [];
 }
 
-function resolveCommentReleases(comments: DiscoverComment[]): DiscoverComment[] {
-    const commentsById = new Map(comments.map(comment => [comment.id, comment]));
-
-    const getRelease = (comment: DiscoverComment, checked = new Set<number>()): DiscoverComment['release'] => {
-        if (comment.release) return comment.release;
-        if (!comment.parent_comment_id || checked.has(comment.id)) return null;
-
-        checked.add(comment.id);
-        const parent = commentsById.get(comment.parent_comment_id);
-        return parent ? getRelease(parent, checked) : null;
-    };
-
-    return comments.map((comment, index) => {
-        if (comment.release) return comment;
-
-        const parentRelease = getRelease(comment);
-        if (parentRelease) return { ...comment, release: parentRelease };
-
-        const previousRelease = comments.slice(0, index).reverse()
-            .find(previous => previous.release)?.release ?? null;
-        return { ...comment, release: previousRelease };
-    });
-}
-
 function SectionTitle({ title, description }: { title: string; description?: string }) {
     return <div className={styles.sectionTitle}>
         <h2>{title}</h2>
@@ -210,15 +185,21 @@ function FeaturedItem({ item }: { item: DiscoverInteresting }) {
 }
 
 function CommentPreview({ comment, language }: { comment: DiscoverComment; language: 'russian' | 'english' }) {
-    const releaseId = Number(comment.release?.id);
-    const canOpenRelease = Number.isInteger(releaseId) && releaseId > 0;
+    const releaseId = extractReleaseId(comment);
+    const releaseTitle = getCommentReleaseDisplayTitle(comment, language);
+    const canOpenRelease = typeof releaseId === 'number' && releaseId > 0;
     const content = <>
         <RemoteImage className={styles.commentAvatar} src={comment.profile.avatar} alt="" />
         <span className={styles.commentBody}>
-            <span><b>{comment.profile.login}</b>{comment.release && <> · {language === 'english' ? comment.release.title_original || comment.release.title_ru : comment.release.title_ru}</>}</span>
+            <span>
+                <b>{comment.profile.login}</b>
+                {releaseTitle && <> · {releaseTitle}</>}
+            </span>
             <span className={styles.commentMessage}>{comment.message}</span>
         </span>
-        {comment.vote_count > 0 && <em className={styles.commentRating}>{comment.vote_count}</em>}
+        {typeof comment.vote_count === 'number' && comment.vote_count > 0 && (
+            <em className={styles.commentRating}>{comment.vote_count}</em>
+        )}
     </>;
 
     return canOpenRelease

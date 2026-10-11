@@ -1,3 +1,4 @@
+import { releaseMenuAttributes } from '../shared/contexts/releaseActionsContext';
 import { Link } from 'react-router-dom';
 import { type Anime } from '../shared/types/api';
 import styles from './ReleaseCard.module.css';
@@ -60,5 +61,5 @@ export default function ReleaseCard(props: ReleaseCardProps) {
 
     const releaseId = isRelated ? props.anime.id : props.id;
 
-    return <Link to={`/anime/${releaseId}`} className={styles.link}>{content}</Link>;
+    return <Link {...(isRelated ? releaseMenuAttributes(props.anime) : {})} to={`/anime/${releaseId}`} className={styles.link}>{content}</Link>;
 }

@@ -1,3 +1,4 @@
+import { releaseMenuAttributes, useReleaseAnime } from '../shared/contexts/releaseActionsContext';
 import { Link } from "react-router-dom";
 import { useState } from 'react';
 import styles from "./AnimeCardHorizontal.module.css"
@@ -13,7 +14,8 @@ export interface AnimeCardProps {
   compact?: boolean;
 }
 
-export default function AnimeCardHorizontal({ anime, compact = false }: AnimeCardProps) {
+export default function AnimeCardHorizontal({ anime: originalAnime, compact = false }: AnimeCardProps) {
+  const anime = useReleaseAnime(originalAnime);
   const { settings } = useSettings();
   const { t, selectPlural } = useTranslation();
   const listStatus = profileListStatus[anime.profile_list_status as 0 | 1 | 2 | 3 | 4 | 5];
@@ -24,7 +26,7 @@ export default function AnimeCardHorizontal({ anime, compact = false }: AnimeCar
     : anime.title_ru;
 
   return (
-    <Link to={`/anime/${anime.id}`} state={{partialAnime: anime}} key={anime.id} className={`${styles.card} ${compact ? styles.compact : ''}`}>
+    <Link {...releaseMenuAttributes(anime)} to={`/anime/${anime.id}`} state={{partialAnime: anime}} key={anime.id} className={`${styles.card} ${compact ? styles.compact : ''}`}>
       <div className={`${styles.poster} ${isImageLoaded ? styles['poster-loaded'] : styles['poster-loading']}`}>
         <RemoteImage
           src={anime.image}

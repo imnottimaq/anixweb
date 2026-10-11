@@ -4,7 +4,7 @@ import RootLayout from './RootLayout';
 import RouteLoader from '../components/RouteLoader';
 
 import { HomepageScreen, OverviewScreen, FavoritesScreen, ReleaseScreen, PlayerScreen, FranchiseScreen,
-    AccountScreen, EditAccountScreen, LoginScreen, RecoverScreen, NewAccountScreen, RandomAnime, SettingsScreen,
+    PopularScreen, ScheduleScreen, AccountScreen, EditAccountScreen, LoginScreen, RecoverScreen, NewAccountScreen, RandomAnime, SettingsScreen,
     NotificationsScreen, NotificationSettingsScreen, ReleaseNotificationSettingsScreen, WatchRoomScreen, FilterSearchScreen,
     CollectionScreen, CollectionsScreen, FriendsPage
  } from './components';
@@ -24,6 +24,8 @@ export const router = createBrowserRouter([
     children: [
     { index: true, element: lazyPage(<HomepageScreen />) },
     { path: 'overview', element: lazyPage(<OverviewScreen />) },
+    { path: 'popular', element: lazyPage(<PopularScreen />) },
+    { path: 'schedule', element: lazyPage(<ScheduleScreen />) },
     { path: 'filter', element: lazyPage(<FilterSearchScreen />) },
     { path: 'favorites', element: lazyPage(<FavoritesScreen />) },
     { path: 'favorites/:profileId', element: lazyPage(<FavoritesScreen />) },

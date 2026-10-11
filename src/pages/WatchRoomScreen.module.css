@@ -96,7 +96,13 @@
 .menuActions { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 40; display: grid; width: 220px; padding: 5px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--lighter-background-color); box-shadow: 0 12px 32px #0003; }
 .card .menuActions button { padding: 10px; text-align: left; background: transparent; color: var(--text-color); font-size: 13px; font-weight: 400; }
 .card .menuActions button:hover:not(:disabled) { background: var(--surface-muted); }
-.card .dangerText { color: var(--status-dropped); }
+.reactionsSection { margin: 16px 0 10px; padding-top: 14px; border-top: 1px solid var(--border-color); }
+.reactionsBar { display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
+.card .reactionBtn { flex: 1; min-width: 36px; min-height: 36px; padding: 6px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border-color); border-radius: var(--radius-control, 9px); background: var(--surface-muted); color: var(--text-color); font-size: 18px; line-height: 1; cursor: pointer; transition: transform .15s ease, background .15s ease, border-color .15s ease; }
+.card .reactionBtn:hover:not(:disabled) { transform: scale(1.1); background: var(--surface-raised); border-color: var(--accent-color); }
+.card .reactionBtn:active:not(:disabled) { transform: scale(0.95); }
+.card .reactionBtn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+.chatSection { margin-top: 12px; display: flex; flex-direction: column; min-width: 0; }
 .panelFooter { display: flex; justify-content: flex-end; border-top: 1px solid var(--border-color); margin-top: 18px; padding-top: 14px; }
 .card .leaveButton { min-height: 36px; padding: 7px 12px; color: var(--status-dropped); background: transparent; border-color: color-mix(in srgb, var(--status-dropped) 30%, transparent); font-size: 13px; }
 .waiting { padding: 14px; margin: 0 0 18px; border: 1px solid color-mix(in srgb, var(--status-hold) 35%, transparent); border-radius: 10px; background: color-mix(in srgb, var(--status-hold) 8%, transparent); }

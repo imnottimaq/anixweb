@@ -1,0 +1,174 @@
+.page {
+    width: min(1440px, 100%);
+    box-sizing: border-box;
+    min-height: 100%;
+    padding: 34px var(--page-gutter) 70px;
+}
+
+.tabNav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 28px;
+}
+
+.tabButton {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-pill);
+    color: var(--text-color);
+    background: color-mix(in srgb, var(--surface-card) 60%, transparent);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color var(--motion-fast), color var(--motion-fast), border-color var(--motion-fast), transform var(--motion-fast), box-shadow var(--motion-fast);
+}
+
+.tabButton:hover {
+    border-color: color-mix(in srgb, var(--accent-color) 40%, var(--border-color));
+    background: var(--surface-raised);
+    transform: translateY(-1px);
+}
+
+.tabButton:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-ring-offset);
+}
+
+.activeTab {
+    border-color: var(--accent-color);
+    color: var(--accent-foreground);
+    background: var(--accent-color);
+    font-weight: 700;
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--accent-color) 35%, transparent);
+}
+
+.activeTab:hover {
+    background: var(--lighter-accent-color);
+    border-color: var(--lighter-accent-color);
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: var(--radius-pill);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    background: color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.activeTab .badge {
+    background: color-mix(in srgb, var(--accent-foreground) 24%, transparent);
+}
+
+.todayIndicator {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: var(--radius-pill);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
+    background: color-mix(in srgb, var(--surface-page) 85%, transparent);
+    color: var(--text-color);
+}
+
+.activeTab .todayIndicator {
+    background: #ffffff;
+    color: #e04848;
+}
+
+.tabPanel {
+    min-width: 0;
+}
+
+.allDaysContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 36px;
+}
+
+.daySection {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.daySectionHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--surface-border-subtle);
+}
+
+.daySectionHeader h2 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    font-size: clamp(18px, 1.8vw, 22px);
+    font-weight: 700;
+}
+
+.todayBadge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: var(--radius-pill);
+    font-size: 12px;
+    font-weight: 600;
+    background: #ff5252;
+    color: #fff;
+}
+
+.dayCount {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 18px;
+}
+
+.horizontalGrid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+}
+
+.singleDayContainer {
+    min-width: 0;
+}
+
+@media (max-width: 680px) {
+    .page {
+        padding: 24px var(--page-gutter) 48px;
+    }
+
+    .tabNav {
+        gap: 6px;
+    }
+
+    .tabButton {
+        padding: 7px 11px;
+        font-size: 13px;
+    }
+
+    .grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 12px;
+    }
+
+    .horizontalGrid {
+        grid-template-columns: 1fr;
+    }
+}

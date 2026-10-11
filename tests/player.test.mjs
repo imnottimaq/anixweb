@@ -4,6 +4,7 @@ import test from 'node:test';
 import ts from 'typescript';
 import { createUpscalerScope } from '../src/shared/upscalerScope.ts';
 import { PlaybackBridge } from '../src/shared/playbackBridge.ts';
+import { isHlsStream, isDirectMp4Stream, formatBytes, sanitizeFilename } from '../src/shared/player/download.ts';
 
 // Execute the actual component and its event/effect callbacks with deterministic
 // hook, media and socket doubles. No DOM layout, CDN or GPU driver is simulated.
@@ -20,7 +21,9 @@ function collect(node) {
     ts.forEachChild(node, collect);
 }
 collect(component);
-const code = ts.transpileModule(component.getText(ast), {
+const fullscreenHelpers = ast.statements.filter(node => ts.isFunctionDeclaration(node)
+    && ['requestFullscreenElement', 'exitFullscreenElement'].includes(node.name?.text));
+const code = ts.transpileModule([...fullscreenHelpers, component].map(node => node.getText(ast)).join('\n'), {
     compilerOptions: { target: ts.ScriptTarget.ES2023, jsx: ts.JsxEmit.React },
 }).outputText;
 const sources = { '1080': [{ src: 'high.mp4', type: 'video/mp4' }], '720': [{ src: 'low.mp4', type: 'video/mp4' }] };
@@ -30,6 +33,24 @@ const room = overrides => ({ roomId: 'room', hostId: 99, syncEpoch: 1, media, pa
 function harness(options = {}) {
     const state = {}, refs = {}, effects = [], navigation = [], sessions = [], saved = [], sockets = [];
     let stateIndex = 0, refIndex = 0, tree, sessionCleared = false;
+    const eventTarget = () => {
+        const listeners = new Map();
+        return {
+            addEventListener(type, listener) { if (!listeners.has(type)) listeners.set(type, new Set()); listeners.get(type).add(listener); },
+            removeEventListener(type, listener) { listeners.get(type)?.delete(listener); },
+            dispatch(type, event = {}) { for (const listener of [...(listeners.get(type) ?? [])]) listener(event); },
+        };
+    };
+    const documentDouble = { ...eventTarget(), hidden: false, fullscreenElement: null, title: 'Test', hasFocus: () => true };
+    const windowDouble = { ...eventTarget(), innerWidth: 1280, innerHeight: 720, setInterval: () => 1,
+        clearInterval() {}, setTimeout: () => 1, clearTimeout() {}, requestAnimationFrame: () => 1, cancelAnimationFrame() {} };
+    const downloadCalls = [];
+    class HTMLElementDouble { closest() { return null; } }
+    // Keep the hook boundary deterministic without folding nested React hooks
+    // into the component's hook-name inventory or starting actual downloads.
+    const downloadDouble = { status: 'idle', progress: {loaded:0,total:0,percent:0}, error: null, unsupportedReason: null,
+        startDownload: async args => { downloadCalls.push({type:'start',args}); },
+        cancelDownload: () => downloadCalls.push({type:'cancel'}), reset: () => downloadCalls.push({type:'reset'}) };
     const video = {
         currentTime: 0, duration: 1500, videoWidth: 1920, videoHeight: 1080,
         paused: true, ended: false, seeking: false, buffered: {length:1,start:()=>0,end:()=>1500}, error: null, readyState: 0, playbackRate: 1, playCalls: 0,
@@ -62,7 +83,9 @@ function harness(options = {}) {
         useSettings: () => ({ settings, setSettings: fn => Object.assign(settings, fn(settings)) }),
         useTranslation: () => ({ t: key => key }), useUser: () => ({ userToken: '', userId: 7 }),
         useApi: () => ({ get: async () => ({ code: 0 }) }), useRoomPresence: () => ({ room: options.roomId ? (options.room ?? room()) : null, self: options.self ?? null, status: 'connected', send: async payload => sockets.push(payload), serverNow: () => 0 }),
-        PlaybackBridge, RoomPanel: () => null,
+        PlaybackBridge, RoomPanel: () => null, ReactionOverlay: () => null,
+        useEpisodeDownload: () => downloadDouble, isHlsStream, isDirectMp4Stream, formatBytes, sanitizeFilename,
+        createUpscalerScope,
         canUseAnime4KVideo: () => false, isSafariBrowser: () => false, WatchRoomSocket: Socket, getRoomParticipant: () => ({}),
         getWatchProgress: () => ({ '1': { '1': 120, '2': 90 } }),
         saveWatchProgress: (...args) => saved.push(args),
@@ -71,12 +94,14 @@ function harness(options = {}) {
         Hls: { isSupported: () => false }, HLS_MIME_TYPE: 'application/x-mpegURL',
         ASPECT_RATIOS: { original: null, '16:9': 16 / 9 }, PLAYBACK_RATES: [1, 1.5],
         defaultPlayerKeybindings: {}, styles: {}, formatTime: String,
-        window: { innerWidth: 1280, innerHeight: 720, setInterval: () => 1, clearInterval() {}, setTimeout: () => 1 },
+        window: windowDouble, document: documentDouble,
+        HTMLElement: HTMLElementDouble,
         React: { createElement: (tag, props, ...children) => ({ tag, props: { ...props, children } }) },
     };
     for (const name of ['Play','Pause','Prev','Next','Back','Skip','Expand','Compress','Settings','VolumeMax','VolumeMute']) env[name + 'Icon'] = name;
     // The component's imports are explicit test doubles; its body is unchanged.
-    const run = new Function(...Object.keys(env), code + '\nreturn PlayerContent;')(...Object.values(env));
+    const compiled = new Function(...Object.keys(env), code + '\nreturn {PlayerContent, requestFullscreenElement, exitFullscreenElement};')(...Object.values(env));
+    const run = compiled.PlayerContent;
     function render() {
         stateIndex = refIndex = 0;
         effects.length = 0;
@@ -97,6 +122,9 @@ function harness(options = {}) {
     };
     render();
     return { state, refs, video, settings, props, render, find, effect, effects, navigation, sessions, saved, sockets,
+        document: documentDouble, window: windowDouble, download: downloadDouble, downloadCalls,
+        requestFullscreen: compiled.requestFullscreenElement, exitFullscreen: compiled.exitFullscreenElement,
+        HTMLElement: HTMLElementDouble,
         get sessionCleared() { return sessionCleared; },
         event(name) { find(node => node.tag === 'video').props[name]({ currentTarget: video }); },
     };
@@ -118,6 +146,121 @@ test('initial playback starts once when no progress needs a decision', () => {
     const h = harness(); h.settings.content.rememberEpisodeTime = false;
     h.effect('setCurrentTime(0)'); h.event('onLoadedMetadata'); h.event('onCanPlay'); h.event('onCanPlay');
     assert.equal(h.video.playCalls, 1);
+});
+
+test('Alt-Tab pauses once and resumes once across paired focus and visibility events', () => {
+    const h = harness(); h.settings.player.autoPauseOnTabSwitch = true;
+    h.video.paused = false; h.video.readyState = 3;
+    const cleanup = h.effect('settings.player.autoPauseOnTabSwitch');
+    h.window.dispatch('blur');
+    h.document.hidden = true; h.document.dispatch('visibilitychange');
+    assert.equal(h.video.paused, true);
+    h.document.hidden = false; h.document.dispatch('visibilitychange');
+    h.window.dispatch('focus');
+    assert.equal(h.video.paused, false); assert.equal(h.video.playCalls, 1);
+    cleanup(); h.window.dispatch('blur');
+    assert.equal(h.video.paused, false, 'unmount removes focus listeners');
+});
+
+test('manual pause stays paused when focus returns', () => {
+    const h = harness(); h.settings.player.autoPauseOnTabSwitch = true;
+    h.state.isBuffering = false; h.state.isPlaying = true; h.render();
+    h.effect('settings.player.autoPauseOnTabSwitch');
+    h.video.paused = false;
+    h.find(node => node.tag === 'button' && node.props['aria-label'] === 'player.pause').props.onClick();
+    h.window.dispatch('blur');
+    h.document.hidden = true; h.document.dispatch('visibilitychange');
+    h.document.hidden = false; h.document.dispatch('visibilitychange');
+    h.window.dispatch('focus');
+    assert.equal(h.video.paused, true); assert.equal(h.video.playCalls, 0);
+});
+
+test('room playback ignores local Alt-Tab pause settings', () => {
+    const h = harness({roomId:'room'}); h.settings.player.autoPauseOnTabSwitch = true;
+    h.video.paused = false; h.effect('settings.player.autoPauseOnTabSwitch');
+    h.window.dispatch('blur');
+    h.document.hidden = true; h.document.dispatch('visibilitychange');
+    h.document.hidden = false; h.window.dispatch('focus');
+    assert.equal(h.video.paused, false); assert.equal(h.video.playCalls, 0);
+    assert.deepEqual(h.sockets, []);
+});
+
+test('fullscreen helpers report standard rejection and support WebKit entry and exit', async () => {
+    const h = harness();
+    assert.equal(await h.requestFullscreen({requestFullscreen:async () => {throw new Error('Gesture required');}}, h.video), false);
+    let entries = 0, exits = 0;
+    assert.equal(await h.requestFullscreen({webkitRequestFullscreen:async () => {entries++;}}, h.video), true);
+    assert.equal(entries, 1);
+    h.document.webkitFullscreenElement = {};
+    h.document.webkitExitFullscreen = async () => {exits++;};
+    await h.exitFullscreen(); assert.equal(exits, 1);
+    let nativeEntries = 0;
+    assert.equal(await h.requestFullscreen(null, {webkitEnterFullscreen:() => {nativeEntries++;}}), true);
+    assert.equal(nativeEntries, 1);
+});
+
+test('focus loss during loading defers initial autoplay until focus returns', () => {
+    const h = harness(); h.settings.player.autoPauseOnTabSwitch=true; h.settings.content.rememberEpisodeTime=false;
+    h.effect('setCurrentTime(0)'); h.effect('settings.player.autoPauseOnTabSwitch');
+    h.window.dispatch('blur'); h.video.readyState=3;
+    h.event('onLoadedMetadata'); h.event('onCanPlay');
+    assert.equal(h.video.playCalls,0); assert.equal(h.video.paused,true);
+    h.window.dispatch('focus'); h.event('onCanPlay');
+    assert.equal(h.video.playCalls,1);
+    h.state.isBuffering=false; h.state.isPlaying=true; h.render();
+    h.find(node=>node.tag==='button'&&node.props['aria-label']==='player.pause').props.onClick();
+    h.window.dispatch('blur'); h.window.dispatch('focus');
+    assert.equal(h.video.paused,true); assert.equal(h.video.playCalls,1);
+});
+
+test('auto fullscreen rejection permits gesture retry and quality reload does not re-enter', async () => {
+    const h = harness(); h.settings.player.autoFullscreen=true;
+    let attempts=0;
+    h.refs.playerRef.current={requestFullscreen:async ()=>{if (++attempts===1) throw new Error('Denied');}};
+    h.effect('playerClosedRef.current = false');
+    h.event('onPlay'); await Promise.resolve(); await Promise.resolve();
+    assert.equal(h.refs.autoFullscreenTriggeredRef.current,false);
+    h.event('onPause'); h.state.isBuffering=false; h.render();
+    h.find(node=>node.tag==='button'&&node.props['aria-label']==='player.play').props.onClick();
+    await Promise.resolve(); await Promise.resolve();
+    assert.equal(attempts,2); assert.equal(h.refs.autoFullscreenTriggeredRef.current,true);
+    h.effect('setCurrentTime(0)'); h.event('onPlay');
+    assert.equal(attempts,2,'successful episode attempt survives a quality source reload');
+});
+
+test('global player hotkeys ignore interactive targets, consumed keys, IME and empty codes', () => {
+    const h=harness(); h.settings.player.keybindings={togglePlayback:'Space'}; h.render();
+    const cleanup=h.effect('const handleKeyDown');
+    const target=new h.HTMLElement(); target.closest=()=>({});
+    const key={code:'Space',target,preventDefault(){}};
+    h.window.dispatch('keydown',key);
+    target.closest=()=>null;
+    h.window.dispatch('keydown',{...key,defaultPrevented:true});
+    h.window.dispatch('keydown',{...key,isComposing:true});
+    h.window.dispatch('keydown',{...key,code:''});
+    assert.equal(h.video.playCalls,0);
+    h.window.dispatch('keydown',key); assert.equal(h.video.playCalls,1);
+    cleanup(); h.state.isDownloadModalOpen=true; h.render(); h.effect('const handleKeyDown');
+    h.window.dispatch('keydown',key); assert.equal(h.video.playCalls,1);
+});
+
+test('download dialog focuses inside, wraps Tab, handles Escape and restores its trigger', () => {
+    const h=harness(); h.state.isDownloadModalOpen=true; h.render();
+    const focusNode=()=>{const node=new h.HTMLElement();node.isConnected=true;node.focus=()=>{h.document.activeElement=node;};return node;};
+    const trigger=focusNode(), first=focusNode(), last=focusNode();
+    h.document.activeElement=trigger;
+    h.refs.downloadDialogRef.current={querySelectorAll:()=>[first,last],contains:node=>[first,last].includes(node),focus(){}};
+    const cleanup=h.effect('dialog.querySelectorAll');
+    assert.equal(h.document.activeElement,first);
+    let prevented=false;
+    h.document.dispatch('keydown',{key:'Tab',shiftKey:true,preventDefault(){prevented=true;}});
+    assert.equal(prevented,true); assert.equal(h.document.activeElement,last);
+    h.document.dispatch('keydown',{key:'Tab',preventDefault(){}});
+    assert.equal(h.document.activeElement,first);
+    h.document.dispatch('keydown',{key:'Escape',preventDefault(){},stopPropagation(){}});
+    assert.equal(h.state.isDownloadModalOpen,false);
+    assert.deepEqual(h.downloadCalls,[{type:'reset'}]);
+    cleanup(); assert.equal(h.document.activeElement,trigger);
 });
 
 for (const paused of [true, false]) test(`manual quality change preserves time and paused=${paused}`, () => {

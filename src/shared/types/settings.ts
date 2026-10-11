@@ -30,6 +30,22 @@ export const defaultPlayerKeybindings: PlayerKeybindings = {
     skipOpening: 'KeyS',
 };
 
+export interface CustomColorSettings {
+    enabled: boolean;
+    accentColor: string;
+    backgroundColor: string;
+    textColor: string;
+    autoTextColor: boolean;
+}
+
+export const defaultCustomColors: CustomColorSettings = {
+    enabled: false,
+    accentColor: '#FF6060',
+    backgroundColor: '#161616',
+    textColor: '#f4f5f7',
+    autoTextColor: true,
+};
+
 export interface AppSettings {
     player: {
         defaultQuality: 'auto'| '1080' | '720' | '480' | '360';
@@ -39,6 +55,8 @@ export interface AppSettings {
         qualityUpgradeMode: 'weak' | 'medium' | 'strong';
         showSkipOpeningButton: boolean;
         skipOpeningValue: number; // in seconds
+        autoFullscreen: boolean;
+        autoPauseOnTabSwitch: boolean;
         keybindings: PlayerKeybindings;
     },
     content: {
@@ -53,13 +71,16 @@ export interface AppSettings {
         proxyImages: boolean;
     }
     appearance:{
-        theme: 'light' | 'dark';
+        theme: 'system' | 'light' | 'dark';
+        highContrast: boolean;
+        compactMode: boolean;
+        customColors: CustomColorSettings;
         language: 'russian' | 'english';
         defaultCardType: 'vertical' | 'horizontal';
     }
     notifications:{
         recieveNotifications: boolean;
-        notificationsType: 'all' | 'selected_lists' | 'selected_releases' | null 
+        notificationsType: null | 'all' | 'selected_lists' | 'selected_releases'
         selectedLists: string[] | null;
         selectedDubs: Dub[] | null;
         selectedReleases: Anime[] | null;
@@ -79,6 +100,8 @@ export const defaultAppSettings:AppSettings = {
         qualityUpgradeMode: 'medium',
         showSkipOpeningButton: true,
         skipOpeningValue: 84,
+        autoFullscreen: false,
+        autoPauseOnTabSwitch: false,
         keybindings: defaultPlayerKeybindings,
     },
     content:{
@@ -93,7 +116,10 @@ export const defaultAppSettings:AppSettings = {
         proxyImages: false,
     },
     appearance:{
-        theme: 'light',
+        theme: 'system',
+        highContrast: false,
+        compactMode: false,
+        customColors: defaultCustomColors,
         language: 'russian',
         defaultCardType: 'vertical'
     },

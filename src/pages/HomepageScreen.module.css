@@ -110,37 +110,47 @@
 }
 
 .side-panel {
-  width: 15vw;
+  width: clamp(170px, 16vw, 210px);
   position: sticky;
-  gap:5px;
-  top: 64px;
+  gap: 6px;
+  top: calc(var(--app-header-height, 64px) + 16px);
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 32px);
+  height: fit-content;
 }
 
 .side-panel button {
-  padding: 20px;
+  padding: 12px 16px;
   text-align: left;
-  font-size: large;
+  font-size: 15px;
+  font-weight: 600;
   appearance: none;
   color: var(--text-color);
-  border-radius: 1rem;
-  border: 0;
+  border-radius: var(--radius-control);
+  border: 1px solid transparent;
   background-color: transparent;
+  cursor: pointer;
+  transition: background-color var(--motion-fast), color var(--motion-fast), border-color var(--motion-fast), box-shadow var(--motion-fast);
+}
+
+.side-panel button:hover {
+  background-color: color-mix(in srgb, var(--surface-card) 80%, transparent);
+  border-color: var(--surface-border-subtle);
 }
 
 .side-panel button.active {
   color: var(--accent-foreground);
   background-color: var(--accent-color);
-}
-
-.side-panel button:hover {
-  background-color: var(--lighter-background-color);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent-color) 35%, transparent);
 }
 
 .side-panel button:hover.active {
   background-color: var(--lighter-accent-color);
+}
+
+.side-panel button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .content {

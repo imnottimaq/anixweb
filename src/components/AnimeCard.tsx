@@ -1,3 +1,4 @@
+import { releaseMenuAttributes, useReleaseAnime } from '../shared/contexts/releaseActionsContext';
 import { Link } from "react-router-dom";
 import { useState } from 'react';
 import styles from "./AnimeCard.module.css"
@@ -10,7 +11,8 @@ import { useTranslation } from '../shared/useTranslation';
 
 export interface AnimeCardProps { anime: Anime; }
 
-export default function AnimeCard({ anime }: AnimeCardProps) {
+export default function AnimeCard({ anime: originalAnime }: AnimeCardProps) {
+  const anime = useReleaseAnime(originalAnime);
   const { settings } = useSettings();
   const { t } = useTranslation();
   const listStatus = profileListStatus[anime.profile_list_status as 0 | 1 | 2 | 3 | 4 | 5];
@@ -21,7 +23,7 @@ export default function AnimeCard({ anime }: AnimeCardProps) {
     : anime.title_ru;
 
   return (
-    <Link to={`/anime/${anime.id}`} state={{partialAnime: anime}} key={anime.id} className={styles.card}>
+    <Link {...releaseMenuAttributes(anime)} to={`/anime/${anime.id}`} state={{partialAnime: anime}} key={anime.id} className={styles.card}>
       <div className={`${styles.poster} ${isImageLoaded ? styles['poster-loaded'] : styles['poster-loading']}`}>
         <RemoteImage
           src={anime.image}

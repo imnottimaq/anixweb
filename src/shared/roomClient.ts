@@ -1,7 +1,7 @@
-import { parseServerMessage, type RoomCommandPayload, type WatchRoomState } from './roomProtocol.ts';
+import { parseServerMessage, type RoomCommandPayload, type WatchRoomState, type RoomReaction } from './roomProtocol.ts';
 export type RoomConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'replaced' | 'error';
 export type RoomTerminalReason = 'kicked' | 'session_replaced' | 'room_closed' | 'unavailable';
-type Callbacks = { state(state: WatchRoomState): void; status(status: RoomConnectionStatus): void; error(error: string | null): void; terminal?(reason: RoomTerminalReason): void };
+type Callbacks = { state(state: WatchRoomState): void; status(status: RoomConnectionStatus): void; error(error: string | null): void; terminal?(reason: RoomTerminalReason): void; reaction?(reaction: RoomReaction): void };
 type TransportOptions = { ticket(roomId: string, code?: string): Promise<{roomId:string; ticket:string}>; url(roomId:string,ticket:string):string; socket?(url:string):WebSocket; monotonic?():number; wall?():number; random?():number };
 
 // One instance belongs to RoomProvider; navigation never owns this connection.
@@ -17,7 +17,7 @@ export class RoomClient {
     private revision = -1;
     private mediaVersion = 0;
     private connected = false;
-    private pending = new Map<string, {resolve():void; reject(error:Error):void; timer:ReturnType<typeof setTimeout>}>();
+    private pending = new Map<string, {resolve():void; reject(error:Error):void; timer:ReturnType<typeof setTimeout>; type?: string}>();
     private pings = new Map<string, number>();
     private serverAnchor: {server:number; monotonic:number} | null = null;
     private bestRtt = Infinity;
@@ -25,6 +25,8 @@ export class RoomClient {
     private options: TransportOptions;
     constructor(options:TransportOptions, callbacks:Callbacks) { this.options=options; this.callbacks=callbacks; }
     setTerminalHandler(callback: (reason: RoomTerminalReason) => void) { this.callbacks.terminal = callback; }
+    setStatusHandler(callback: (status: RoomConnectionStatus) => void) { this.callbacks.status = callback; }
+    setReactionHandler(callback: (reaction: RoomReaction) => void) { this.callbacks.reaction = callback; }
     private now() { return this.options.monotonic?.() ?? performance.now(); }
     serverNow() { return this.serverAnchor ? this.serverAnchor.server + this.now()-this.serverAnchor.monotonic : (this.options.wall?.() ?? Date.now()); }
     async connect(roomId:string,code?:string) {
@@ -65,7 +67,18 @@ export class RoomClient {
                     } else if(message.type==='pong') {
                         const start=this.pings.get(message.requestId); this.pings.delete(message.requestId);
                         if(start!==undefined) { const rtt=this.now()-start; if(rtt<=this.bestRtt) { this.bestRtt=rtt; this.serverAnchor={server:message.serverTime+rtt/2,monotonic:this.now()}; } }
+                    } else if(message.type==='reaction') {
+                        this.callbacks.reaction?.(message.reaction);
                     } else {
+                        if (message.type === 'room_closed') {
+                            for (const [cmdId, p] of this.pending) {
+                                if (p.type === 'close_room') {
+                                    clearTimeout(p.timer);
+                                    p.resolve();
+                                    this.pending.delete(cmdId);
+                                }
+                            }
+                        }
                         this.disconnect(); this.callbacks.status(message.type==='session_replaced'?'replaced':'error');
                         this.callbacks.error(message.type==='session_replaced'?'ROOM_REPLACED':message.type==='kicked'?'ROOM_KICKED':'ROOM_CLOSED'); this.callbacks.terminal?.(message.type);
                     }
@@ -97,11 +110,21 @@ export class RoomClient {
         const commandId=crypto.randomUUID();
         return new Promise((resolve,reject)=> {
             const timer=setTimeout(()=> { this.pending.delete(commandId); reject(new Error('COMMAND_TIMEOUT')); },10000);
-            this.pending.set(commandId,{resolve,reject,timer});
+            this.pending.set(commandId,{resolve,reject,timer,type:payload.type});
             this.socket!.send(JSON.stringify({...payload,commandId,mediaVersion:this.mediaVersion}));
         });
     }
-    private rejectPending() { for(const pending of this.pending.values()) {clearTimeout(pending.timer);pending.reject(new Error('ROOM_DISCONNECTED'));} this.pending.clear(); }
+    private rejectPending() {
+        for(const pending of this.pending.values()) {
+            clearTimeout(pending.timer);
+            if (pending.type === 'close_room') {
+                pending.resolve();
+            } else {
+                pending.reject(new Error('ROOM_DISCONNECTED'));
+            }
+        }
+        this.pending.clear();
+    }
     private clearTimers() { if(this.heartbeat) clearInterval(this.heartbeat);if(this.handshake) clearTimeout(this.handshake);this.heartbeat=null;this.handshake=null;this.pings.clear(); }
     disconnect() {
         this.generation++; this.connected=false; if(this.retry) clearTimeout(this.retry); this.retry=null;this.clearTimers();this.rejectPending();

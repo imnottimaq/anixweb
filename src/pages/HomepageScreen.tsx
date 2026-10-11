@@ -194,6 +194,11 @@ export default function HomepageScreen() {
                         aria-selected={activePage === page}
                         className={activePage === page ? styles.active : ''}
                         onClick={() => setActivePage(page)}
+                        onContextMenu={page === 'my' ? (e) => {
+                            e.preventDefault();
+                            setIsFilterModalOpen(true);
+                        } : undefined}
+                        title={page === 'my' ? t('home.myTabHint') : undefined}
                     >
                         {t(buttonText)}
                     </button>
@@ -207,7 +212,6 @@ export default function HomepageScreen() {
                     </div>
                 ) : (
                     <>
-                        {activePage === 'my' && <button type="button" className={styles['configure-button']} onClick={() => setIsFilterModalOpen(true)}>{t('misc.changeFilters')}</button>}
                         {filterError && <div className={styles['filter-error']} role="alert"><span>{filterError}</span><button type="button" onClick={() => { setFilterError(null); setRetryVersion(version => version + 1); }}>{t('page.retry')}</button></div>}
                         {!filterError && !activeTab.isLoading && activeTab.releases.length === 0 && <p className={styles['filter-empty']}>{t('search.empty')}</p>}
                         <div className={`${styles['releases-grid']} ${settings.appearance.defaultCardType === 'horizontal' ? styles['horizontal-grid'] : ''}`}>

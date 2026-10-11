@@ -1,0 +1,11 @@
+.menu {position:fixed; z-index:1200; width:260px; max-width:calc(100vw - 16px); max-height:calc(100dvh - 16px); overflow-y:auto; box-sizing:border-box; padding:6px; border:1px solid var(--border-color); border-radius:12px; background:var(--background-color); color:var(--text-color); box-shadow:0 12px 40px #0003;}
+.title {margin:4px 8px 8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-secondary); font-size:12px;}
+.menu button, .menu a {display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; min-height:40px; padding:8px 10px; box-sizing:border-box; border:0; border-radius:7px; background:transparent; color:inherit; font:inherit; font-size:14px; text-align:left; text-decoration:none; cursor:pointer;}
+.menu button:hover:not(:disabled), .menu a:hover, .menu button:focus-visible, .menu a:focus-visible {outline:none; background:var(--lighter-background-color);}
+.menu button:disabled {opacity:.5; cursor:default;}
+.submenu {margin:2px 6px 6px; padding:4px 0; border-block:1px solid var(--border-color);}
+.submenu button {justify-content:flex-start;}
+.submenu button > span {width:14px; flex-shrink:0; color:var(--accent-color);}
+.note, .error {margin:8px; font-size:13px; line-height:1.4;}
+.note {color:var(--text-secondary);}
+.error {color:var(--status-dropped, #d33);}

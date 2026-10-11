@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useReleaseChanges } from '../shared/contexts/releaseActionsContext';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import AnimeCard from '../components/AnimeCard';
 import AnimeCardHorizontal from '../components/AnimeCardHorizontal';
@@ -107,6 +108,12 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
         setSearchScope(isProfileFavorites ? { type: 'releases' } : SEARCH_SCOPES[activePage]);
         return () => setSearchScope({ type: 'releases' });
     }, [activePage, isProfileFavorites, setSearchScope]);
+
+    useReleaseChanges(useCallback(() => {
+        if (isProfileFavorites) return;
+        sortVersionRef.current += 1;
+        setTabs(createTabs());
+    }, [isProfileFavorites]));
 
     const handleSortChange = (nextSort: ReleaseSort) => {
         if (nextSort === sort) return;

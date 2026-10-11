@@ -29,7 +29,6 @@
     border: 3px solid color-mix(in srgb, var(--text-color) 22%, transparent);
     border-top-color: var(--accent-color);
     border-radius: 50%;
-    box-shadow: 0 0 22px color-mix(in srgb, var(--accent-color) 34%, transparent);
     animation: loader-spin 780ms linear infinite;
 }
 
@@ -58,10 +57,14 @@
 }
 
 .note {
-    padding: 10px 10px;
+    padding: 12px 16px;
     white-space: pre-line;
-    background-color: var(--lighter-background-color);
-    border-radius: 0.7rem;
+    background: color-mix(in srgb, var(--surface-card) 70%, transparent);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-control);
+    color: var(--text-secondary);
+    font-size: 13.5px;
+    line-height: 1.5;
 }
 
 .release-base-info p {
@@ -75,8 +78,9 @@
     max-width: 100%;
     aspect-ratio: 430 / 606;
     overflow: hidden;
-    border-radius: 0.5rem;
-    background: color-mix(in srgb, var(--text-color) 10%, var(--background-color));
+    border-radius: var(--radius-card);
+    background: color-mix(in srgb, var(--text-color) 8%, var(--card-bg));
+    box-shadow: var(--elevation-card);
 }
 
 .poster {
@@ -112,12 +116,14 @@
 }
 
 .age-rating {
-    display: inline;
-    padding: 1px 3px;
-    border: 1px solid black;
-    border-radius: 0.3rem;
-    background-color: black;
-    color: white;
+    display: inline-block;
+    padding: 2px 6px;
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-raised);
+    color: var(--text-color);
+    font-size: 12px;
+    font-weight: 700;
 }
 
 .grade-bars{
@@ -380,37 +386,62 @@
     flex: 1 1 auto;
     min-width: 0;
     cursor: pointer;
-    padding: 10px 2px;
+    padding: 11px 18px;
     border: 0;
-    border-radius: 2rem;
+    border-radius: var(--radius-pill);
     appearance: none;
     background-color: var(--accent-color);
-    color: var(--background-color);
+    color: var(--accent-foreground);
+    font-size: 14.5px;
+    font-weight: 700;
+    box-shadow: var(--elevation-low);
+    transition: background-color var(--motion-fast), transform var(--motion-fast), box-shadow var(--motion-fast);
+}
+
+.watch-btn:hover {
+    background-color: var(--lighter-accent-color);
+    transform: translateY(-1px);
+    box-shadow: var(--elevation-card);
 }
 
 .watch-btn-soon {
     cursor: default;
     color: var(--text-color);
     background: var(--lighter-background-color);
+    box-shadow: none;
+}
+
+.watch-btn-soon:hover {
+    background: var(--lighter-background-color);
+    transform: none;
+    box-shadow: none;
 }
 
 .release-quick-action {
     display: grid;
-    width: 34px;
-    min-width: 34px;
-    height: 34px;
-    padding: 7px;
-    border: 2px solid var(--border-color);
-    border-radius: .35rem;
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+    padding: 8px;
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-control);
     place-items: center;
     cursor: pointer;
     color: var(--text-color);
-    background: var(--background-color);
+    background: color-mix(in srgb, var(--surface-card) 60%, transparent);
+    transition: background-color var(--motion-fast), border-color var(--motion-fast), transform var(--motion-fast);
+}
+
+.release-quick-action:hover {
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+    background: color-mix(in srgb, var(--accent-color) 10%, var(--surface-card));
+    transform: translateY(-1px);
 }
 
 .release-quick-actions {
     display: flex;
-    gap: 7px;
+    gap: 8px;
     margin-left: auto;
 }
 
@@ -782,7 +813,112 @@
 .comment-success { color: var(--status-watching); }
 .empty-comments { color: color-mix(in srgb, var(--text-color) 65%, transparent); }
 
-@media (max-width: 540px) {
+.ratings-panel {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.release-header {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.release-title-row {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.release-summary {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+@media (max-width: 768px) {
+    .body {
+        flex-direction: column;
+        padding-left: 0;
+        gap: 14px;
+        align-items: stretch;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .side-panel {
+        display: contents;
+    }
+
+    .release-info {
+        display: contents;
+    }
+
+    .release-header {
+        order: 1;
+        width: 100%;
+        margin-bottom: 2px;
+    }
+
+    .release-header h2 {
+        font-size: clamp(20px, 5.5vw, 26px);
+        margin: 0 0 6px;
+        line-height: 1.25;
+    }
+
+    .release-title-row {
+        gap: 8px;
+    }
+
+    .poster-wrapper {
+        order: 2;
+        width: clamp(140px, 42vw, 175px);
+        max-width: 175px;
+        margin: 0 auto;
+    }
+
+    .action-panel {
+        order: 3;
+        width: 100%;
+        max-width: 360px;
+        height: 40px;
+        margin: 6px auto 0;
+    }
+
+    .watch-actions {
+        order: 4;
+        width: 100%;
+        max-width: 360px;
+        margin: 6px auto 0;
+    }
+
+    .watch-btn {
+        width: 100%;
+        min-height: 42px;
+    }
+
+    .release-summary {
+        order: 5;
+        width: 100%;
+        margin-top: 8px;
+    }
+
+    .ratings-panel {
+        order: 6;
+        width: 100%;
+        max-width: 360px;
+        margin: 14px auto 0;
+    }
+
+    .release-details {
+        order: 7;
+        width: 100%;
+        flex-direction: column;
+    }
+
     .screenshot-track {
         grid-template-columns: 1fr;
     }
@@ -791,12 +927,29 @@
         display: none;
     }
 
-    .release-details {
-        flex-direction: column;
-    }
-
     .release-facts {
         min-width: 0;
+        width: 100%;
     }
 
+    .also-recommend {
+        order: 8;
+        width: 100%;
+    }
+
+    .comments-section {
+        order: 9;
+        width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .loading-overlay::before {
+        animation: none;
+    }
+
+    .loading-overlay > span {
+        animation: none;
+        opacity: 1;
+    }
 }

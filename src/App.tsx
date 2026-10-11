@@ -1,56 +1,51 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RouterProvider } from 'react-router-dom';
 import { router } from './app/router';
-import { type AppSettings, defaultAppSettings, defaultPlayerKeybindings } from './shared/types/settings';
+import { type AppSettings, defaultAppSettings } from './shared/types/settings';
 import { UserContext } from './shared/contexts/userContext';
 import { SettingsContext } from './shared/contexts/settingsContext';
 import { SearchContext, type SearchScope } from './shared/contexts/searchContext';
 import { getStoredUserToken, setStoredUserToken } from './shared/authToken';
 import { saveRoomIdentity } from './shared/roomParticipant';
+import { isAutoSyncAccountEnabled, loadAccountSettings } from './shared/cloudSettings';
 import RoomProvider from './shared/contexts/RoomProvider';
+import { normalizeLegacySettings } from './shared/settingsNormalizer';
 
-import { htmlLanguageByLanguage, isLanguage } from './shared/locale';
+import { htmlLanguageByLanguage } from './shared/locale';
 
 function App() {
   const [userToken, setUserTokenState] = useState<string>(getStoredUserToken);
   const [userId, setUserIdState] = useState<number>(() => +(localStorage.getItem('user_id') || ""));
-  const [settings, setSettings] = useState<AppSettings>(() => {
+  const [settings, setSettingsState] = useState<AppSettings>(() => {
     const saved = localStorage.getItem('app_settings');
-
     if (!saved) return defaultAppSettings;
 
     try {
       const parsed = JSON.parse(saved);
-
-      const appearance = { ...defaultAppSettings.appearance, ...parsed.appearance };
-      if (!isLanguage(appearance.language)) appearance.language = defaultAppSettings.appearance.language;
-
-      return {
-        ...defaultAppSettings,
-        ...parsed,
-        player: {
-          ...defaultAppSettings.player,
-          ...parsed.player,
-          keybindings: { ...defaultPlayerKeybindings, ...parsed.player?.keybindings },
-        },
-        content: { ...defaultAppSettings.content, ...parsed.content },
-        appearance,
-        notifications: { ...defaultAppSettings.notifications, ...parsed.notifications },
-      };
+      return normalizeLegacySettings(parsed);
     } catch {
       return defaultAppSettings;
     }
   });
+
+  const localEditCountRef = useRef(0);
+  const setSettings: React.Dispatch<React.SetStateAction<AppSettings>> = useCallback((action) => {
+    localEditCountRef.current += 1;
+    setSettingsState(action);
+  }, []);
+
   const [searchScope, setSearchScope] = useState<SearchScope>({ type: 'releases' });
   useEffect(() => {
     localStorage.setItem('app_settings', JSON.stringify(settings));
-    document.documentElement.lang = htmlLanguageByLanguage[settings.appearance.language];
+    const lang = settings.appearance.language;
+    document.documentElement.lang = htmlLanguageByLanguage[lang] || ((lang as string) === 'ukrainian' ? 'uk' : 'en');
   }, [settings]);
 
   useEffect(() => {
     if (!userToken) return;
 
     let isCancelled = false;
+    const currentSessionToken = userToken;
 
     const loadCurrentProfileId = async () => {
       try {
@@ -64,6 +59,32 @@ function App() {
           localStorage.setItem('user_id', String(profileId));
           if (data.profile?.login) {
             saveRoomIdentity({ id: profileId, login: data.profile.login, avatar: data.profile.avatar });
+          }
+
+          if (isAutoSyncAccountEnabled()) {
+            const editCountAtStart = localEditCountRef.current;
+            const tokenAtStart = currentSessionToken;
+            const profileIdAtStart = profileId;
+
+            loadAccountSettings(userToken, profileId)
+              .then(({ payload }) => {
+                if (isCancelled) return;
+                // If local settings were edited or user session changed while in-flight, ignore
+                if (
+                  localEditCountRef.current !== editCountAtStart ||
+                  userToken !== tokenAtStart ||
+                  profileId !== profileIdAtStart
+                ) {
+                  return;
+                }
+                setSettingsState(previous => normalizeLegacySettings(payload.settings, previous));
+                if (payload.my_filters && typeof payload.my_filters === 'object') {
+                  localStorage.setItem('my_filters', JSON.stringify(payload.my_filters));
+                }
+              })
+              .catch(() => {
+                // Ignore if no saved settings exist yet
+              });
           }
         }
       } catch (error) {
@@ -92,7 +113,7 @@ function App() {
     }
   }, []);
 
-  const settingsValue = useMemo(() => ({ settings, setSettings }), [settings]);
+  const settingsValue = useMemo(() => ({ settings, setSettings }), [settings, setSettings]);
   const userValue = useMemo(() => ({ userToken, setUserToken, userId, setUserId }), [userToken, setUserToken, userId, setUserId]);
   const searchValue = useMemo(() => ({ searchScope, setSearchScope }), [searchScope]);
 
