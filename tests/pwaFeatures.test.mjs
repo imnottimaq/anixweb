@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
 import { join } from 'node:path';
 
@@ -136,13 +137,47 @@ test('icons exist with exact dimensions and proper formatting', () => {
 });
 
 test('Vite build succeeds for root base path and subpath /anixweb/', { timeout: 60000 }, () => {
-    // Build root base path
-    execSync('npx vite build', { env: { ...process.env, BASE_PATH: '/' }, stdio: 'pipe' });
-    const rootHtml = readFileSync('dist/index.html', 'utf8');
-    assert.ok(rootHtml.includes('manifest.webmanifest'), 'Built root HTML includes manifest');
+    const rootOutDir = mkdtempSync(join(tmpdir(), 'anixweb-pwa-root-')).replace(/\\/g, '/');
+    const subpathOutDir = mkdtempSync(join(tmpdir(), 'anixweb-pwa-subpath-')).replace(/\\/g, '/');
 
-    // Build subpath base path
-    execSync('npx vite build', { env: { ...process.env, BASE_PATH: '/anixweb/' }, stdio: 'pipe' });
-    const subpathHtml = readFileSync('dist/index.html', 'utf8');
-    assert.ok(subpathHtml.includes('/anixweb/'), 'Built subpath HTML uses /anixweb/ base');
+    // Regression sentinel: verify pre-existing dist is not overwritten or deleted by isolated test builds
+    const hadDist = existsSync('dist');
+    const sentinelName = `.test-isolation-sentinel-${Date.now()}`;
+    const sentinelPath = join('dist', sentinelName);
+    if (!hadDist) {
+        mkdirSync('dist', { recursive: true });
+    }
+    const sentinelToken = `sentinel-token-${Date.now()}`;
+    writeFileSync(sentinelPath, sentinelToken, 'utf8');
+
+    try {
+        // Build root base path
+        execSync(`npx vite build --outDir "${rootOutDir}" --emptyOutDir`, {
+            env: { ...process.env, BASE_PATH: '/' },
+            stdio: 'pipe',
+        });
+        const rootHtml = readFileSync(join(rootOutDir, 'index.html'), 'utf8');
+        assert.ok(rootHtml.includes('manifest.webmanifest'), 'Built root HTML includes manifest');
+
+        // Build subpath base path
+        execSync(`npx vite build --outDir "${subpathOutDir}" --emptyOutDir`, {
+            env: { ...process.env, BASE_PATH: '/anixweb/' },
+            stdio: 'pipe',
+        });
+        const subpathHtml = readFileSync(join(subpathOutDir, 'index.html'), 'utf8');
+        assert.ok(subpathHtml.includes('/anixweb/'), 'Built subpath HTML uses /anixweb/ base');
+
+        // Sentinel assertion: pre-existing dist must remain intact
+        assert.ok(existsSync(sentinelPath), 'Pre-existing dist sentinel must not be wiped by Vite builds');
+        assert.equal(readFileSync(sentinelPath, 'utf8'), sentinelToken, 'Sentinel content in dist must remain untouched');
+    } finally {
+        if (existsSync(sentinelPath)) {
+            rmSync(sentinelPath, { force: true });
+        }
+        if (!hadDist && existsSync('dist')) {
+            rmSync('dist', { recursive: true, force: true });
+        }
+        rmSync(rootOutDir, { recursive: true, force: true });
+        rmSync(subpathOutDir, { recursive: true, force: true });
+    }
 });
