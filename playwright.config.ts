@@ -13,7 +13,7 @@ export default defineConfig({
     trace: 'off',
   },
   webServer: {
-    command: 'npx vite --port 5180 --strictPort',
+    command: 'npx vite --host 127.0.0.1 --port 5180 --strictPort',
     url: 'http://127.0.0.1:5180',
     reuseExistingServer: !process.env.CI,
     timeout: 30000,
