@@ -1,15 +1,24 @@
 import { getStoredUserToken } from './authToken';
 import { parseRoomSession } from './roomSession';
+import { getCandidateProfileId } from './roomParticipant';
+import { resolveCandidateProfileId } from './profileIdentity';
 import type { PublicRoom, RoomVisibility, WatchRoomState, Profile } from './roomProtocol';
 export type { RoomParticipant, RoomVisibility, RoomMedia, WatchRoomState, RoomCommandPayload } from './roomProtocol';
 export { RoomClient } from './roomClient';
 export type { RoomConnectionStatus } from './roomClient';
 const BASE = (import.meta.env.VITE_ROOM_SERVER_URL || 'http://localhost:8787').replace(/\/$/, '');
-let session: {token:string; session:string; expiresAt:number; profile:Profile} | null = null;
-let sessionRequest: {token:string;promise:Promise<string>} | null = null;
+let session: {token:string; profileId:number; session:string; expiresAt:number; profile:Profile} | null = null;
+let sessionRequest: {token:string; profileId:number; promise:Promise<string>} | null = null;
 const profileListeners = new Set<() => void>();
 export function subscribeRoomProfile(listener: () => void) { profileListeners.add(listener); return () => { profileListeners.delete(listener); }; }
-export function getAuthenticatedRoomProfile(): Profile | null { return session?.token === getStoredUserToken() ? session.profile : null; }
+export function getAuthenticatedRoomProfile(): Profile | null {
+    const currentToken = getStoredUserToken();
+    const currentCandidateId = getCandidateProfileId();
+    if (session?.token === currentToken && (!currentCandidateId || session.profileId === currentCandidateId)) {
+        return session.profile;
+    }
+    return null;
+}
 function notifyProfile() { for (const listener of profileListeners) listener(); }
 export function getRoomServerUrl() { return BASE; }
 async function responseJson<T>(response:Response):Promise<T> {
@@ -30,15 +39,17 @@ async function responseJson<T>(response:Response):Promise<T> {
 async function authenticate():Promise<string> {
     const token=getStoredUserToken();
     if(!token) throw new Error('ROOM_SIGN_IN');
-    if(session?.token===token && session.expiresAt>Date.now()+30000) return session.session;
-    if(sessionRequest?.token===token) return sessionRequest.promise;
+    const profileId = await resolveCandidateProfileId();
+    if(!profileId) throw new Error('ROOM_IDENTITY_REQUIRED');
+    if(session?.token===token && session.profileId===profileId && session.expiresAt>Date.now()+30000) return session.session;
+    if(sessionRequest?.token===token && sessionRequest.profileId===profileId) return sessionRequest.promise;
     const promise=(async()=> {
-        const data=parseRoomSession(await responseJson<unknown>(await fetch(`${BASE}/api/v2/session`,{signal:AbortSignal.timeout(10000),method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token})})));
+        const data=parseRoomSession(await responseJson<unknown>(await fetch(`${BASE}/api/v2/session`,{signal:AbortSignal.timeout(10000),method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token, profileId})})));
         // A late response from a previous account must not replace current identity.
-        if (getStoredUserToken() !== token) throw new Error('ROOM_ACCOUNT_CHANGED');
-        session={...data,token};notifyProfile();return data.session;
+        if (getStoredUserToken() !== token || getCandidateProfileId() !== profileId) throw new Error('ROOM_ACCOUNT_CHANGED');
+        session={...data,token,profileId};notifyProfile();return data.session;
     })();
-    sessionRequest={token,promise};
+    sessionRequest={token,profileId,promise};
     try{return await promise;} finally {if(sessionRequest?.promise===promise)sessionRequest=null;}
 }
 async function request<T>(path:string,body?:unknown):Promise<T> {

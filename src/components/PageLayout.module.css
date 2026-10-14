@@ -43,7 +43,7 @@
     transform: translateX(2px) rotate(45deg);
 }
 
-.backButton:hover { border-color: var(--accent-color); color: var(--accent-color); }
+.backButton:hover { border-color: var(--surface-border); color: var(--text-color); background: var(--surface-card); }
 .backButton:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
 
 .state {

@@ -60,39 +60,21 @@ test('theme color calculations produce correct contrast and luminance', () => {
     assert.equal(lightResult.isDark, false);
     assert.equal(lightResult.textColor, '#1d1f24');
 
-    // Accent button text contrast - verifies higher contrast candidate is chosen
-    assert.equal(getAccentTextColor('#ffff00'), '#121212'); // bright yellow needs dark text
-    assert.equal(getAccentTextColor('#101010'), '#ffffff'); // dark needs light text
+    // Accent button text policy: user white policy
+    assert.equal(getAccentTextColor('#ffff00'), '#ffffff');
+    assert.equal(getAccentTextColor('#101010'), '#ffffff');
 
     // Test contrast ratio calculations
     const coralContrastWithWhite = getContrastRatio('#FF6060', '#ffffff');
     const coralContrastWithDark = getContrastRatio('#FF6060', '#121212');
     assert.ok(coralContrastWithDark > 6.0, `Expected dark contrast > 6.0, got ${coralContrastWithDark}`);
     assert.ok(coralContrastWithWhite < 3.2, `Expected white contrast < 3.2, got ${coralContrastWithWhite}`);
-    assert.equal(getAccentTextColor('#FF6060'), '#121212'); // Default coral brand
+    assert.equal(getAccentTextColor('#FF6060'), '#ffffff'); // Default coral brand with user white text policy
 
-    // Presets contrast verification
-    const expectedPresetTextColors = {
-        '#FF6060': '#121212', // Коралловый
-        '#6366F1': '#ffffff', // Индиго
-        '#A855F7': '#121212', // Фиолетовый (contrast with dark: 4.73:1 passes AA vs white 3.95:1 fails)
-        '#10B981': '#121212', // Изумрудный
-        '#F59E0B': '#121212', // Янтарный
-        '#0EA5E9': '#121212', // Голубой
-        '#EC4899': '#121212', // Розовый
-        '#e5e4df': '#121212', // Классический серый
-    };
-
+    // Presets contrast verification under user white text policy
     for (const preset of ACCENT_COLOR_PRESETS) {
-        const expected = expectedPresetTextColors[preset.color];
-        if (expected) {
-            const actual = getAccentTextColor(preset.color);
-            assert.equal(actual, expected, `Preset ${preset.label} (${preset.color}) expected ${expected}, got ${actual}`);
-            const chosenContrast = getContrastRatio(preset.color, actual);
-            const otherCandidate = actual === '#121212' ? '#ffffff' : '#121212';
-            const otherContrast = getContrastRatio(preset.color, otherCandidate);
-            assert.ok(chosenContrast >= otherContrast, `Preset ${preset.label} chosen contrast (${chosenContrast}) should be >= ${otherContrast}`);
-        }
+        const actual = getAccentTextColor(preset.color);
+        assert.equal(actual, '#ffffff', `Preset ${preset.label} (${preset.color}) expected white text`);
     }
 
     // Presets exist

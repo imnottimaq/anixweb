@@ -46,7 +46,7 @@
     min-width: 18px;
     height: 18px;
     padding: 0 4px;
-    border-radius: 999px;
+    border-radius: 4px;
     place-items: center;
     color: inherit;
     background: color-mix(in srgb, currentColor 16%, transparent);

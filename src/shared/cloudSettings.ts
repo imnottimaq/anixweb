@@ -2,6 +2,7 @@ import type { AppSettings } from './types/settings';
 import type { Filter } from './types/api';
 import { getProxyServerUrl } from './proxy.ts';
 import { parseImportedSettings, type CloudSettingsPayload } from './settingsNormalizer.ts';
+import { getCandidateProfileId } from './roomParticipant.ts';
 
 export type { CloudSettingsPayload };
 
@@ -63,13 +64,17 @@ export function validateSettingsPayload(data: unknown): CloudSettingsPayload {
 // Account-Bound Sync (Server)
 // -------------------------------------------------------------------------
 
-async function getAccountSession(userToken: string): Promise<string | null> {
+async function getAccountSession(userToken: string, userId?: number): Promise<string | null> {
     try {
+        const candidateId = (userId && Number.isSafeInteger(userId) && userId > 0)
+            ? userId
+            : getCandidateProfileId();
+        if (!candidateId) return null;
         const serverUrl = getProxyServerUrl();
         const res = await fetch(`${serverUrl}/api/v2/session`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: userToken }),
+            body: JSON.stringify({ token: userToken, profileId: candidateId }),
             signal: AbortSignal.timeout(6000),
         });
         if (!res.ok) return null;
@@ -94,7 +99,7 @@ export async function saveAccountSettings(
         my_filters: myFilters ?? null,
     };
 
-    const session = await getAccountSession(userToken);
+    const session = await getAccountSession(userToken, userId);
     if (!session) {
         throw new Error('Failed to obtain server session');
     }
@@ -125,10 +130,9 @@ export async function saveAccountSettings(
 
 export async function loadAccountSettings(
     userToken: string,
-    _userId?: number,
+    userId?: number,
 ): Promise<{ payload: CloudSettingsPayload; source?: 'server' }> {
-    void _userId;
-    const session = await getAccountSession(userToken);
+    const session = await getAccountSession(userToken, userId);
     if (!session) {
         throw new Error('Failed to obtain server session');
     }

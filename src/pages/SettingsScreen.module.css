@@ -377,7 +377,7 @@
 .select button.active{
     border-color: var(--lighter-accent-color);
     background-color: var(--lighter-accent-color);
-    color: var(--background-color)
+    color: var(--accent-foreground);
 }
 
 .action-setting {
@@ -603,9 +603,9 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 9px 18px;
+    padding: 8px 16px;
     border: 1px solid var(--surface-border);
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-sm, 6px);
     background: color-mix(in srgb, var(--surface-card) 60%, transparent);
     color: var(--text-color);
     font: inherit;
@@ -613,21 +613,21 @@
     font-weight: 600;
     cursor: pointer;
     white-space: nowrap;
-    transition: color var(--motion-fast), background-color var(--motion-fast), border-color var(--motion-fast), box-shadow var(--motion-fast), transform var(--motion-fast);
+    transition: color var(--motion-fast), background-color var(--motion-fast), border-color var(--motion-fast);
 }
 
 .tab-button:hover {
     color: var(--text-color);
     background: var(--surface-raised);
-    border-color: color-mix(in srgb, var(--accent-color) 40%, var(--border-color));
-    transform: translateY(-1px);
+    border-color: var(--border-color);
+    transform: none;
 }
 
 .tab-button.active {
     color: var(--accent-foreground);
     background: var(--accent-color);
     border-color: var(--accent-color);
-    box-shadow: 0 4px 14px color-mix(in srgb, var(--accent-color) 35%, transparent);
+    box-shadow: none;
 }
 
 .tab-button:focus-visible {

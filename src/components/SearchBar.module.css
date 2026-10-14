@@ -216,9 +216,9 @@
 }
 
 .collection-result:hover {
-    border-color: color-mix(in srgb, var(--accent-color) 58%, transparent);
-    background: color-mix(in srgb, var(--accent-color) 10%, var(--background-color));
-    transform: translateY(-1px);
+    border-color: var(--border-color);
+    background: var(--lighter-background-color);
+    transform: none;
 }
 
 .collection-result > img {
@@ -293,9 +293,9 @@
 }
 
 .profile-result:hover {
-    border-color: color-mix(in srgb, var(--accent-color) 58%, transparent);
-    background: color-mix(in srgb, var(--accent-color) 10%, var(--background-color));
-    transform: translateY(-1px);
+    border-color: var(--border-color);
+    background: var(--lighter-background-color);
+    transform: none;
 }
 
 .profile-result > img,
@@ -310,7 +310,7 @@
 .profile-avatar-placeholder {
     display: grid;
     place-items: center;
-    color: var(--background-color);
+    color: var(--accent-foreground);
     background: var(--accent-color);
     font-weight: 800;
 }

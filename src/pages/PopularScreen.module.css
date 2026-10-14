@@ -13,22 +13,22 @@
 }
 
 .tabButton {
-    padding: 8px 18px;
+    padding: 8px 16px;
     border: 1px solid var(--surface-border);
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-sm, 6px);
     color: var(--text-color);
     background: color-mix(in srgb, var(--surface-card) 60%, transparent);
     font: inherit;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    transition: background-color var(--motion-fast), color var(--motion-fast), border-color var(--motion-fast), transform var(--motion-fast), box-shadow var(--motion-fast);
+    transition: background-color var(--motion-fast), color var(--motion-fast), border-color var(--motion-fast);
 }
 
 .tabButton:hover {
-    border-color: color-mix(in srgb, var(--accent-color) 40%, var(--border-color));
+    border-color: var(--border-color);
     background: var(--surface-raised);
-    transform: translateY(-1px);
+    transform: none;
 }
 
 .tabButton:focus-visible {
@@ -41,7 +41,7 @@
     color: var(--accent-foreground);
     background: var(--accent-color);
     font-weight: 700;
-    box-shadow: 0 4px 14px color-mix(in srgb, var(--accent-color) 35%, transparent);
+    box-shadow: none;
 }
 
 .activeTab:hover {

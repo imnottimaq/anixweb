@@ -35,6 +35,7 @@ export const roomUXRussian = {
     'roomUX.errorClosed': 'Комната закрыта. Можно создать новую.', 'roomUX.errorKicked': 'Ведущий исключил вас из комнаты.',
     'roomUX.errorMissing': 'Комната не найдена. Проверьте приглашение или создайте новую.',
     'roomUX.errorAuth': 'Не удалось проверить аккаунт Anixart. Попробуйте ещё раз позже.',
+    'roomUX.errorSignIn': 'Войдите в аккаунт Anixart заново и повторите попытку.',
     'roomUX.errorPermissions': 'У вас нет права выполнить это действие.',
     'roomUX.errorGeneric': 'Связь с комнатой потеряна. Подключение будет восстановлено автоматически.',
 };
@@ -75,6 +76,7 @@ export const roomUXEnglish: Record<keyof typeof roomUXRussian, string> = {
     'roomUX.errorClosed': 'This room has closed. You can create a new one.', 'roomUX.errorKicked': 'The host removed you from this room.',
     'roomUX.errorMissing': 'Room not found. Check the invitation or create a new room.',
     'roomUX.errorAuth': 'Could not verify your Anixart account. Try again later.',
+    'roomUX.errorSignIn': 'Sign in to your Anixart account again and retry.',
     'roomUX.errorPermissions': 'You do not have permission to perform this action.',
     'roomUX.errorGeneric': 'Connection lost. Reconnecting automatically.',
 };

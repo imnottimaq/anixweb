@@ -1,4 +1,4 @@
-import { saveRoomIdentity } from './roomParticipant';
+import { getCandidateProfileId, getStoredRoomIdentity, saveRoomIdentity } from './roomParticipant';
 
 type SearchProfile = { id: number; login: string; avatar?: string | null };
 
@@ -17,4 +17,20 @@ export async function resolveAndStoreProfileIdentity(login: string): Promise<num
     if (!profile?.id || !profile.login) return null;
     saveRoomIdentity({ id: profile.id, login: profile.login, avatar: profile.avatar ?? null });
     return profile.id;
+}
+
+export async function resolveCandidateProfileId(): Promise<number | null> {
+    const existing = getCandidateProfileId();
+    if (existing) return existing;
+
+    // Prefer existing ID storage; a login search may only locate a candidate if needed
+    const stored = getStoredRoomIdentity();
+    if (stored?.login && typeof stored.login === 'string' && stored.login.trim()) {
+        const candidateId = await resolveAndStoreProfileIdentity(stored.login.trim());
+        if (candidateId && Number.isSafeInteger(candidateId) && candidateId > 0) {
+            return candidateId;
+        }
+    }
+
+    return null;
 }

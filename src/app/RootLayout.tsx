@@ -85,8 +85,6 @@ function RootLayoutContent() {
         <nav ref={navigationRef} id="primary-navigation" className={`${styles.navigation} ${isMenuOpen ? styles.open : ''}`} aria-label={t('nav.primary')} onClick={() => setIsMenuOpen(false)}>
           <NavLink to="/" end className={navClassName}>{t('nav.home')}</NavLink>
           <NavLink to="/overview" className={navClassName}>{t('nav.overview')}</NavLink>
-          <NavLink to="/popular" className={navClassName}>{t('roadmap.discover.nav.popular')}</NavLink>
-          <NavLink to="/schedule" className={navClassName}>{t('roadmap.discover.nav.schedule')}</NavLink>
           <NavLink to="/favorites" className={navClassName}>{t('nav.favorites')}</NavLink>
           <NavLink to="/account" className={navClassName}>{t('nav.account')}</NavLink>
           <NavLink to="/collections" className={navClassName}>{t('nav.collections')}</NavLink>

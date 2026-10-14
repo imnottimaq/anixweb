@@ -10,7 +10,7 @@ import { defaultAppSettings } from '../../src/shared/types/settings';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DESKTOP_VIEWPORT = { width: 1440, height: 900 };
+const DESKTOP_VIEWPORT = { width: 1920, height: 1080 };
 const MOBILE_VIEWPORT = { width: 390, height: 844 };
 
 const FIXTURES_DIR = path.resolve(__dirname, '../fixtures/images');
@@ -92,6 +92,9 @@ async function setupApiMocks(page: Page) {
     if (path.startsWith('/filter/')) {
       return route.fulfill({ json: createPagedResponse([mockAnime1, mockAnime2]) });
     }
+    if (path.includes('/favorite') || path.includes('/profile/list/all/') || path.includes('/collectionFavorite') || path.includes('/history')) {
+      return route.fulfill({ json: createPagedResponse([mockAnime1, mockAnime2]) });
+    }
     if (path === '/release/101' || path === `/release/${mockAnimeDetail.id}`) {
       return route.fulfill({ json: { code: 0, release: mockAnimeDetail } });
     }
@@ -126,12 +129,13 @@ async function waitForPosterLoaded(page: Page) {
 test.describe('Design Inspection Screenshots', () => {
   test.setTimeout(90000);
 
-  test('Capture Desktop 1440 Dark and Light views', async ({ page }) => {
+  test('Capture Desktop 1920 Dark and Light views with computed style verifications', async ({ page }) => {
     await page.setViewportSize(DESKTOP_VIEWPORT);
     await setupApiMocks(page);
 
     // 1. Home Desktop Dark
     await seedStorageState(page, {
+      isLoggedIn: true,
       onboarded: true,
       settings: { ...defaultAppSettings, appearance: { ...defaultAppSettings.appearance, theme: 'dark' } },
     });
@@ -139,28 +143,96 @@ test.describe('Design Inspection Screenshots', () => {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await expect(page.getByRole('link', { name: new RegExp(mockAnime1.title_ru, 'i') })).toBeVisible();
     await waitForPosterLoaded(page);
+
+    // Verify logo wordmark font is Varela Round
+    const logoText = page.locator('header a[class*="nav-logo-block"] p');
+    await expect(logoText).toBeVisible();
+    const logoFont = await logoText.evaluate(el => window.getComputedStyle(el).fontFamily);
+    expect(logoFont.toLowerCase()).toContain('varela round');
+
+    // Verify header navigation: Overview available, Popular & Schedule absent
+    const nav = page.locator('header nav#primary-navigation');
+    await expect(nav.getByRole('link', { name: /Обзор|Overview/i })).toBeVisible();
+    expect(await nav.getByRole('link', { name: /Популярное|Popular/i }).count()).toBe(0);
+    expect(await nav.getByRole('link', { name: /Расписание|Schedule/i }).count()).toBe(0);
+
+    // Verify Home sidebar typography
+    const homeSidebarBtn = page.locator('div[class*="side-panel"] button').first();
+    await expect(homeSidebarBtn).toBeVisible();
+    const homeSidebarStyle = await homeSidebarBtn.evaluate(el => {
+      const cs = window.getComputedStyle(el);
+      return {
+        fontSize: cs.fontSize,
+        fontWeight: cs.fontWeight,
+        lineHeight: cs.lineHeight,
+        paddingTop: cs.paddingTop,
+        paddingRight: cs.paddingRight,
+        paddingBottom: cs.paddingBottom,
+        paddingLeft: cs.paddingLeft,
+      };
+    });
+    expect(homeSidebarStyle.fontSize).toBe('15px');
+    expect(homeSidebarStyle.fontWeight).toBe('400');
+    expect(homeSidebarStyle.lineHeight).toBe('21px');
+    expect(homeSidebarStyle.paddingTop).toBe('13px');
+    expect(homeSidebarStyle.paddingRight).toBe('15px');
+
+    // Verify card hover neutral (no accent glow/border)
+    const animeCard = page.locator('a[class*="card"]').first();
+    await animeCard.hover();
+    const hoverBorder = await animeCard.evaluate(el => window.getComputedStyle(el).borderColor);
+    const hoverShadow = await animeCard.evaluate(el => window.getComputedStyle(el).boxShadow);
+    expect(hoverBorder).not.toBe('rgb(255, 96, 96)');
+    expect(hoverShadow).toBe('none');
+
+    await page.screenshot({ path: 'test-results/style-revert-home-desktop-dark.png', animations: 'disabled' });
     await page.screenshot({ path: 'test-results/design-home-desktop-dark.png', animations: 'disabled' });
 
     // 2. Home Desktop Light
     await switchTheme(page, 'light');
     await expect(page.getByRole('link', { name: new RegExp(mockAnime1.title_ru, 'i') })).toBeVisible();
     await waitForPosterLoaded(page);
+    await page.screenshot({ path: 'test-results/style-revert-home-desktop-light.png', animations: 'disabled' });
     await page.screenshot({ path: 'test-results/design-home-desktop-light.png', animations: 'disabled' });
 
-    // 3. Switch back to dark for Overview
+    // 3. Favorites Desktop Light & Dark (with matching sidebar check)
+    await page.goto('/favorites');
+    await waitForPosterLoaded(page);
+    await page.screenshot({ path: 'test-results/style-revert-favorites-desktop-light.png', animations: 'disabled' });
+
     await switchTheme(page, 'dark');
+    await waitForPosterLoaded(page);
+    await page.screenshot({ path: 'test-results/style-revert-favorites-desktop-dark.png', animations: 'disabled' });
+    const favSidebarBtn = page.locator('div[class*="side-panel"] button').first();
+    await expect(favSidebarBtn).toBeVisible();
+    const favSidebarStyle = await favSidebarBtn.evaluate(el => {
+      const cs = window.getComputedStyle(el);
+      return {
+        fontSize: cs.fontSize,
+        fontWeight: cs.fontWeight,
+        lineHeight: cs.lineHeight,
+        paddingTop: cs.paddingTop,
+        paddingRight: cs.paddingRight,
+        paddingBottom: cs.paddingBottom,
+        paddingLeft: cs.paddingLeft,
+      };
+    });
+    expect(favSidebarStyle).toEqual(homeSidebarStyle);
+
+    // 4. Overview Desktop Dark
     await page.goto('/overview');
     await expect(page.getByText('Интересное')).toBeVisible();
     await waitForPosterLoaded(page);
     await page.screenshot({ path: 'test-results/design-overview-desktop-dark.png', animations: 'disabled' });
 
-    // 4. Release Desktop Dark
+    // 5. Release Desktop Dark
     await page.goto('/anime/101');
     await expect(page.getByRole('heading', { name: mockAnimeDetail.title_ru })).toBeVisible();
     await waitForPosterLoaded(page);
+    await page.screenshot({ path: 'test-results/style-revert-release-desktop-dark.png', animations: 'disabled' });
     await page.screenshot({ path: 'test-results/design-release-desktop-dark.png', animations: 'disabled' });
 
-    // 5. Dub Picker Modal Desktop Dark
+    // 6. Dub Picker Modal Desktop Dark
     await page.getByRole('button', { name: /Воспроизвести|Play/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByText(mockEpisodes[0].name)).toBeVisible();
@@ -168,31 +240,43 @@ test.describe('Design Inspection Screenshots', () => {
     await page.screenshot({ path: 'test-results/design-dub-picker-desktop-dark.png', animations: 'disabled' });
     await page.getByRole('button', { name: /Закрыть|Close/i }).click();
 
-    // 6. Release Desktop Light
+    // 7. Release Desktop Light
     await switchTheme(page, 'light');
     await expect(page.getByRole('heading', { name: mockAnimeDetail.title_ru })).toBeVisible();
     await waitForPosterLoaded(page);
+    await page.screenshot({ path: 'test-results/style-revert-release-desktop-light.png', animations: 'disabled' });
     await page.screenshot({ path: 'test-results/design-release-desktop-light.png', animations: 'disabled' });
 
-    // 7. Dub Picker Modal Desktop Light
-    await page.getByRole('button', { name: /Воспроизвести|Play/i }).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
-    await expect(page.getByText(mockEpisodes[0].name)).toBeVisible();
-    await page.waitForTimeout(250);
-    await page.screenshot({ path: 'test-results/design-dub-picker-desktop-light.png', animations: 'disabled' });
-    await page.getByRole('button', { name: /Закрыть|Close/i }).click();
+    // 8. Settings Desktop Light
+    await page.goto('/settings');
+    await expect(page.getByRole('tab', { name: /Внешний вид|Appearance/i })).toBeVisible();
+    await page.screenshot({ path: 'test-results/style-revert-settings-desktop-light.png', animations: 'disabled' });
 
-    // 8. Settings Desktop Dark
+    // 9. Settings Desktop Dark & rectangular tabs + white accent label check
     await switchTheme(page, 'dark');
     await page.goto('/settings');
     await expect(page.getByRole('tab', { name: /Внешний вид|Appearance/i })).toBeVisible();
+    const activeTab = page.locator('button[class*="tab-button"].active, button[class*="tab-button"][aria-selected="true"]').first();
+    await expect(activeTab).toBeVisible();
+    const activeTabStyle = await activeTab.evaluate(el => {
+      const cs = window.getComputedStyle(el);
+      return {
+        color: cs.color,
+        borderRadius: parseFloat(cs.borderRadius),
+      };
+    });
+    expect(activeTabStyle.color).toBe('rgb(255, 255, 255)');
+    expect(activeTabStyle.borderRadius).toBeLessThanOrEqual(10);
+
+    await page.screenshot({ path: 'test-results/style-revert-settings-desktop-dark.png', animations: 'disabled' });
     await page.screenshot({ path: 'test-results/design-settings-desktop-dark.png', animations: 'disabled' });
   });
 
-  test('Capture Mobile 390 Dark views', async ({ page }) => {
+  test('Capture Mobile 390 Dark views and check release overflow', async ({ page }) => {
     await page.setViewportSize(MOBILE_VIEWPORT);
     await setupApiMocks(page);
     await seedStorageState(page, {
+      isLoggedIn: true,
       onboarded: true,
       settings: { ...defaultAppSettings, appearance: { ...defaultAppSettings.appearance, theme: 'dark' } },
     });
@@ -201,6 +285,7 @@ test.describe('Design Inspection Screenshots', () => {
     await page.goto('/');
     await expect(page.getByRole('link', { name: new RegExp(mockAnime1.title_ru, 'i') })).toBeVisible();
     await waitForPosterLoaded(page);
+    await page.screenshot({ path: 'test-results/style-revert-home-mobile-dark.png', animations: 'disabled' });
     await page.screenshot({ path: 'test-results/design-home-mobile-dark.png', animations: 'disabled' });
 
     // 2. Navigation Mobile Dark (Drawer Open)
@@ -210,14 +295,35 @@ test.describe('Design Inspection Screenshots', () => {
     await page.screenshot({ path: 'test-results/design-navigation-mobile-dark.png', animations: 'disabled' });
     await page.keyboard.press('Escape');
 
-    // 3. Release Mobile Dark - Viewport capture and Full-page capture to inspect complete hierarchy
+    // 3. Favorites Mobile Dark
+    await page.goto('/favorites');
+    await waitForPosterLoaded(page);
+    await page.screenshot({ path: 'test-results/style-revert-favorites-mobile-dark.png', animations: 'disabled' });
+
+    // 4. Release Mobile Dark - Viewport capture and Full-page capture to inspect complete hierarchy
     await page.goto('/anime/101');
     await expect(page.getByRole('heading', { name: mockAnimeDetail.title_ru })).toBeVisible();
     await waitForPosterLoaded(page);
+    await page.screenshot({ path: 'test-results/style-revert-release-mobile-dark.png', animations: 'disabled' });
     await page.screenshot({ path: 'test-results/design-release-mobile-dark.png', animations: 'disabled' });
     await page.screenshot({ path: 'test-results/design-release-mobile-fullpage.png', fullPage: true, animations: 'disabled' });
 
-    // 4. Dub Picker Modal Mobile Dark
+    // Release 390px and 360px overflow checks
+    for (const vp of [{ width: 390, height: 844 }, { width: 360, height: 740 }]) {
+      await page.setViewportSize(vp);
+      await page.goto('/anime/101');
+      await expect(page.getByRole('heading', { name: mockAnimeDetail.title_ru })).toBeVisible();
+      await expect(page.getByRole('button', { name: /Воспроизвести|Play/i })).toBeVisible();
+      const hasHorizontalOverflow = await page.evaluate(() => {
+        return document.documentElement.scrollWidth > window.innerWidth ||
+               document.body.scrollWidth > window.innerWidth;
+      });
+      expect(hasHorizontalOverflow).toBe(false);
+    }
+
+    // 5. Dub Picker Modal Mobile Dark
+    await page.setViewportSize(MOBILE_VIEWPORT);
+    await page.goto('/anime/101');
     await page.getByRole('button', { name: /Воспроизвести|Play/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByText(mockEpisodes[0].name)).toBeVisible();
@@ -225,9 +331,10 @@ test.describe('Design Inspection Screenshots', () => {
     await page.screenshot({ path: 'test-results/design-dub-picker-mobile-dark.png', animations: 'disabled' });
     await page.getByRole('button', { name: /Закрыть|Close/i }).click();
 
-    // 5. Settings Mobile Dark
+    // 6. Settings Mobile Dark
     await page.goto('/settings');
     await expect(page.getByRole('tab', { name: /Внешний вид|Appearance/i })).toBeVisible();
+    await page.screenshot({ path: 'test-results/style-revert-settings-mobile-dark.png', animations: 'disabled' });
     await page.screenshot({ path: 'test-results/design-settings-mobile-dark.png', animations: 'disabled' });
   });
 });

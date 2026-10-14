@@ -219,8 +219,8 @@ test('mobile navigation fits the viewport, restores focus and opens the schedule
   const toggle = page.getByRole('button', { name: 'Menu', exact: true });
   const navigation = page.getByRole('navigation', { name: 'Primary navigation' });
   await toggle.click();
-  await expect(navigation.getByRole('link', { name: 'Popular', exact: true })).toBeVisible();
-  await expect(navigation.getByRole('link', { name: 'Schedule', exact: true })).toBeVisible();
+  await expect(navigation.getByRole('link', { name: 'Popular', exact: true })).toHaveCount(0);
+  await expect(navigation.getByRole('link', { name: 'Schedule', exact: true })).toHaveCount(0);
   expect(await navigation.evaluate(element => {
     const rect = element.getBoundingClientRect();
     return rect.left >= 0 && rect.right <= innerWidth && rect.bottom <= innerHeight;
@@ -230,9 +230,10 @@ test('mobile navigation fits the viewport, restores focus and opens the schedule
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await expect(toggle).toBeFocused();
   await toggle.click();
-  await navigation.getByRole('link', { name: 'Schedule', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Release Schedule', exact: true })).toBeVisible();
+  await navigation.getByRole('link', { name: 'Overview', exact: true }).click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await page.getByRole('link', { name: 'Schedule', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Release Schedule', exact: true })).toBeVisible();
   const monday = page.getByRole('tab', { name: /^Monday/ });
   await monday.click();
   await monday.press('ArrowRight');

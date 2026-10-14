@@ -182,11 +182,11 @@
 .selectedReleases button {
     max-width: 100%;
     padding: 5px 8px;
-    border: 1px solid color-mix(in srgb, var(--accent-color) 55%, var(--border-color));
-    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm, 6px);
     cursor: pointer;
     color: var(--text-color);
-    background: color-mix(in srgb, var(--accent-color) 9%, var(--background-color));
+    background: var(--lighter-background-color);
     font: inherit;
     font-size: 12px;
 }
@@ -237,7 +237,7 @@
 }
 
 .collection:hover {
-    border-color: color-mix(in srgb, var(--accent-color) 46%, var(--border-color));
+    border-color: var(--border-color);
 }
 
 .poster {
@@ -307,7 +307,7 @@
     font-weight: 700;
 }
 
-.creator:hover { color: var(--accent-color); }
+.creator:hover { color: var(--text-color); }
 
 .creator img {
     width: 21px;

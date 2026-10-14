@@ -1,24 +1,24 @@
 .card {
   display: flex;
-  gap: 14px;
+  gap: 12px;
   width: 100%;
   min-width: 0;
-  padding: 10px;
-  border: 1px solid color-mix(in srgb, var(--surface-border) 60%, transparent);
-  border-radius: var(--radius-card);
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
   box-sizing: border-box;
   color: var(--text-color);
-  background: color-mix(in srgb, var(--surface-card) 40%, transparent);
+  background: transparent;
   text-decoration: none;
   text-align: left;
-  transition: background-color var(--motion-normal), border-color var(--motion-normal), transform var(--motion-normal), box-shadow var(--motion-normal);
+  transition: background-color 160ms ease, border-color 160ms ease;
 }
 
 .card:hover {
-  border-color: color-mix(in srgb, var(--accent-color) 45%, var(--border-color));
-  background: var(--surface-card);
-  transform: translateY(-2px);
-  box-shadow: var(--elevation-card);
+  border-color: var(--border-color);
+  background: transparent;
+  transform: none;
+  box-shadow: none;
 }
 
 .card:focus-visible {
@@ -31,13 +31,13 @@
   flex: 0 0 138px;
   aspect-ratio: 75 / 106;
   overflow: hidden;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--text-color) 6%, var(--card-bg));
-  box-shadow: var(--elevation-low);
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
 }
 
 .compact .poster { flex-basis: 117px; }
-.compact .anime-title { font-size: 17px; }
+.compact .anime-title { font-size: 18px; }
 .compact .anime-description { -webkit-line-clamp: 3; }
 
 .poster img {
@@ -49,7 +49,7 @@
 }
 
 .card:hover .poster img {
-  transform: scale(1.03);
+  transform: none;
 }
 
 .poster-loading::before {
@@ -57,14 +57,9 @@
   position: absolute;
   z-index: 1;
   inset: 0;
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--text-color) 6%, var(--card-bg)) 0%,
-    color-mix(in srgb, var(--text-color) 14%, var(--card-bg)) 50%,
-    color-mix(in srgb, var(--text-color) 6%, var(--card-bg)) 100%
-  );
-  background-size: 200% 100%;
-  animation: poster-shimmer 1.4s ease-in-out infinite;
+  background: transparent;
+  background-size: 220% 100%;
+  animation: poster-shimmer 1.25s ease-in-out infinite;
 }
 
 .poster-loading img { opacity: 0; }
@@ -102,7 +97,7 @@
 }
 
 .card:hover .anime-title {
-  color: var(--accent-color);
+  color: var(--text-color);
 }
 
 .info { display: flex; flex: 1 1 auto; flex-direction: column; gap: 6px; min-width: 0; }

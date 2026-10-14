@@ -1,13 +1,13 @@
 :root, [data-theme="dark"] {
-  --background-color: #121316;
-  --card-bg: #181a20;
-  --lighter-background-color: #22242c;
-  --text-color: #f4f5f8;
-  --text-secondary: #9da3af;
-  --border-color: #2c2f3a;
+  --background-color: #161616;
+  --card-bg: #202126;
+  --lighter-background-color: #2a2c33;
+  --text-color: #f4f5f7;
+  --text-secondary: #aeb3bd;
+  --border-color: #383b44;
   --accent-color: #FF6060;
   --lighter-accent-color: #ff8585;
-  --accent-text-color: #121212;
+  --accent-text-color: #ffffff;
 
   /* Shared layout and component tokens. Existing variables above remain aliases' sources. */
   --page-gutter: clamp(14px, 3vw, 28px);
@@ -16,63 +16,63 @@
   --content-max-width: 1180px;
   --content-max-width-wide: 1380px;
   --surface-page: var(--background-color);
-  --surface-card: var(--card-bg);
+  --surface-card: transparent;
   --surface-raised: var(--lighter-background-color);
-  --surface-muted: color-mix(in srgb, var(--accent-color) 12%, transparent);
+  --surface-muted: color-mix(in srgb, var(--text-color) 10%, var(--background-color));
   --surface-border: var(--border-color);
   --surface-border-subtle: color-mix(in srgb, var(--text-color) 10%, transparent);
   --radius-sm: 6px;
-  --radius-control: 10px;
-  --radius-card: 14px;
+  --radius-control: 6px;
+  --radius-card: 8px;
   --radius-pill: 999px;
   --control-height: 40px;
   --focus-ring-color: color-mix(in srgb, var(--accent-color) 75%, transparent);
   --focus-ring: 2px solid var(--focus-ring-color);
   --focus-ring-offset: 2px;
   --accent-foreground: var(--accent-text-color);
-  --motion-fast: 160ms cubic-bezier(0.16, 1, 0.3, 1);
-  --motion-normal: 240ms cubic-bezier(0.16, 1, 0.3, 1);
-  --elevation-low: 0 2px 8px rgb(0 0 0 / 22%);
-  --elevation-card: 0 10px 24px -4px rgb(0 0 0 / 28%);
+  --motion-fast: 160ms ease;
+  --motion-normal: 240ms ease;
+  --elevation-low: 0 1px 4px rgb(0 0 0 / 25%);
+  --elevation-card: 0 8px 24px rgb(0 0 0 / 14%);
   --elevation-high: 0 20px 48px -8px rgb(0 0 0 / 42%);
 
-  --status-watching: #22c55e;
-  --status-plan: #a855f7;
-  --status-completed: #3b82f6;
-  --status-hold: #f59e0b;
-  --status-dropped: #ef4444;
-  --status-favorite: #fbbf24;
+  --status-watching: #27ae60;
+  --status-plan: #9b51e0;
+  --status-completed: #2f80ed;
+  --status-hold: #f2994a;
+  --status-dropped: #eb5757;
+  --status-favorite: #ffbf40;
   --player-controls-background: rgb(0 0 0 / 55%);
 }
 
 [data-theme="light"] {
-  --background-color: #f7f8fa;
-  --lighter-background-color: #eef1f6;
-  --text-color: #17191e;
-  --text-secondary: #5c6270;
-  --card-bg: #ffffff;
-  --border-color: #dce1eb;
+  --background-color: #ffffff;
+  --lighter-background-color: #e8e9ed;
+  --text-color: #1d1f24;
+  --text-secondary: #686e7b;
+  --card-bg: #f7f8fa;
+  --border-color: #d5d8df;
   --accent-color: #FF6060;
-  --accent-text-color: #121212;
+  --accent-text-color: #ffffff;
   --accent-foreground: var(--accent-text-color);
-  --lighter-accent-color: #ff7d7d;
+  --lighter-accent-color: #ff8a8a;
 
   --surface-page: var(--background-color);
-  --surface-card: var(--card-bg);
+  --surface-card: transparent;
   --surface-raised: var(--lighter-background-color);
-  --surface-muted: color-mix(in srgb, var(--accent-color) 10%, transparent);
+  --surface-muted: color-mix(in srgb, var(--text-color) 10%, var(--background-color));
   --surface-border: var(--border-color);
   --surface-border-subtle: color-mix(in srgb, var(--text-color) 8%, transparent);
-  --elevation-low: 0 2px 8px rgb(0 0 0 / 6%);
+  --elevation-low: 0 1px 4px rgb(0 0 0 / 10%);
   --elevation-card: 0 8px 24px -4px rgb(0 0 0 / 8%);
   --elevation-high: 0 18px 40px -8px rgb(0 0 0 / 12%);
 
-  --status-watching: #16a34a;
-  --status-plan: #9333ea;
-  --status-completed: #2563eb;
-  --status-hold: #d97706;
-  --status-dropped: #dc2626;
-  --status-favorite: #f59e0b;
+  --status-watching: #6fcf87;
+  --status-plan: #c28ae9;
+  --status-completed: #82a9dc;
+  --status-hold: #f0bf63;
+  --status-dropped: #e77b7b;
+  --status-favorite: #ffca61;
   --player-controls-background: rgb(0 0 0 / 55%);
 }
 

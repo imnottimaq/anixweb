@@ -48,7 +48,7 @@
 .spoiler { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; user-select: none; }
 .spoiler input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent-color); }
 .counter { margin-left: auto; color: color-mix(in srgb, var(--text-color) 58%, transparent); font-size: 12px; font-variant-numeric: tabular-nums; }
-.send { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 34px; padding: 7px 12px; border: 0; border-radius: 9px; cursor: pointer; color: var(--background-color); background: var(--accent-color); font: inherit; font-size: 13px; font-weight: 700; }
+.send { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 34px; padding: 7px 12px; border: 0; border-radius: 9px; cursor: pointer; color: var(--accent-foreground); background: var(--accent-color); font: inherit; font-size: 13px; font-weight: 700; }
 .send img { width: 15px; height: 15px; }
 .send:hover:not(:disabled) { filter: brightness(.94); }
 .send:disabled { cursor: not-allowed; opacity: .52; }

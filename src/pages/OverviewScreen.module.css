@@ -66,7 +66,7 @@
 }
 
 .galleryButton img { width: 21px; height: 21px; filter: brightness(0) invert(1); }
-.galleryButton:hover { background: var(--accent-color); }
+.galleryButton:hover { background: rgb(0 0 0 / 70%); }
 .galleryButton:focus-visible, .featuredItem:focus-visible, .comment:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 3px; }
 .galleryPrevious { left: 16px; }
 .galleryNext { right: 16px; }
@@ -119,14 +119,14 @@
     cursor: pointer;
     background: color-mix(in srgb, var(--quick-action-color) 12%, var(--surface-card));
     color: var(--text-color);
-    transition: background-color var(--motion-fast), border-color var(--motion-fast), transform var(--motion-fast), box-shadow var(--motion-fast);
+    transition: background-color var(--motion-fast), border-color var(--motion-fast);
 }
 
 .quickAction:hover {
     background: color-mix(in srgb, var(--quick-action-color) 20%, var(--surface-card));
     border-color: var(--quick-action-color);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 18px -4px color-mix(in srgb, var(--quick-action-color) 30%, transparent);
+    transform: none;
+    box-shadow: none;
 }
 
 .quickAction:focus-visible {
@@ -152,16 +152,16 @@
     min-width: 0;
     padding: 14px 50px 14px 14px;
     border: 1px solid var(--surface-border);
-    border-radius: var(--radius-card);
+    border-radius: 8px;
     color: var(--text-color);
     background: var(--surface-card);
     text-decoration: none;
-    transition: border-color var(--motion-fast), box-shadow var(--motion-fast), transform var(--motion-fast);
+    transition: border-color var(--motion-fast);
 }
 .comment:hover {
-    border-color: color-mix(in srgb, var(--accent-color) 50%, var(--border-color));
-    box-shadow: var(--elevation-card);
-    transform: translateY(-2px);
+    border-color: var(--surface-border);
+    box-shadow: none;
+    transform: none;
 }
 .commentAvatar { flex: 0 0 40px; width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
 .commentBody { display: grid; min-width: 0; gap: 4px; }

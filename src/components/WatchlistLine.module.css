@@ -101,7 +101,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    border-radius: 999px;
+    border-radius: 4px;
     color: color-mix(in srgb, var(--text-color) 72%, transparent);
     font-size: 14px;
     line-height: 1;

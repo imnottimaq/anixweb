@@ -12,5 +12,5 @@
 .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
 .actions button { min-height: 38px; padding: 8px 14px; border-radius: 8px; cursor: pointer; font: inherit; font-weight: 700; }
 .reset { border: 1px solid var(--border-color); color: var(--text-color); background: transparent; }
-.apply { border: 0; color: var(--background-color); background: var(--accent-color); }
+.apply { border: 0; color: var(--accent-foreground); background: var(--accent-color); }
 @media (max-width: 540px) { .two-columns { grid-template-columns: minmax(0, 1fr); } .checkbox-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) } .actions { flex-direction: column-reverse; } .actions button { width: 100%; } }

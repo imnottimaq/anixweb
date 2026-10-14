@@ -123,8 +123,8 @@
   min-height: 0;
   padding: 12px 18px;
   border: 0;
-  border-radius: 2rem;
-  color: var(--background-color);
+  border-radius: var(--radius-control, 6px);
+  color: var(--accent-foreground);
   background: var(--accent-color);
   font: inherit;
   font-size: 14px;

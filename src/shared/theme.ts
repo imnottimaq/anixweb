@@ -66,13 +66,11 @@ export function getAutoTextColor(bgHex: string): { textColor: string; secondaryT
 }
 
 export function getAccentTextColor(
-    accentHex: string,
-    darkCandidate = '#121212',
+    _accentHex?: string,
+    _darkCandidate?: string,
     whiteCandidate = '#ffffff'
 ): string {
-    const contrastWithDark = getContrastRatio(accentHex, darkCandidate);
-    const contrastWithWhite = getContrastRatio(accentHex, whiteCandidate);
-    return contrastWithDark >= contrastWithWhite ? darkCandidate : whiteCandidate;
+    return whiteCandidate;
 }
 
 const CUSTOM_STYLE_PROPERTIES = [
@@ -86,6 +84,7 @@ const CUSTOM_STYLE_PROPERTIES = [
     '--accent-color',
     '--lighter-accent-color',
     '--accent-text-color',
+    '--accent-foreground',
     '--focus-ring-color',
 ];
 
@@ -145,6 +144,7 @@ export function applyTheme(appearance: AppSettings['appearance']): () => void {
             root.style.setProperty('--accent-color', customColors.accentColor);
             root.style.setProperty('--lighter-accent-color', `color-mix(in srgb, ${customColors.accentColor} 85%, white 15%)`);
             root.style.setProperty('--accent-text-color', accentText);
+            root.style.setProperty('--accent-foreground', accentText);
             root.style.setProperty('--focus-ring-color', `color-mix(in srgb, ${customColors.accentColor} 72%, transparent)`);
 
             if (isBgDark) {

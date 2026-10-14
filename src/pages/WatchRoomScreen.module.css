@@ -37,7 +37,7 @@
 .sectionHeading p { margin: 7px 0 0; }
 .rooms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
 .roomCard { display: flex; align-items: center; gap: 14px; min-width: 0; padding: 18px; border: 1px solid var(--border-color); border-radius: 12px; color: var(--text-color); background: var(--card-bg); text-decoration: none; }
-.roomCard:hover { border-color: var(--accent-color); }
+.roomCard:hover { border-color: var(--surface-border); }
 .roomCard > div { min-width: 0; flex: 1; }
 .roomCard strong { display: block; overflow-wrap: anywhere; }
 .roomCard p { margin: 5px 0 2px; font-size: 14px; }
@@ -99,7 +99,7 @@
 .reactionsSection { margin: 16px 0 10px; padding-top: 14px; border-top: 1px solid var(--border-color); }
 .reactionsBar { display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
 .card .reactionBtn { flex: 1; min-width: 36px; min-height: 36px; padding: 6px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border-color); border-radius: var(--radius-control, 9px); background: var(--surface-muted); color: var(--text-color); font-size: 18px; line-height: 1; cursor: pointer; transition: transform .15s ease, background .15s ease, border-color .15s ease; }
-.card .reactionBtn:hover:not(:disabled) { transform: scale(1.1); background: var(--surface-raised); border-color: var(--accent-color); }
+.card .reactionBtn:hover:not(:disabled) { transform: scale(1.1); background: var(--surface-raised); border-color: var(--border-color); }
 .card .reactionBtn:active:not(:disabled) { transform: scale(0.95); }
 .card .reactionBtn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
 .chatSection { margin-top: 12px; display: flex; flex-direction: column; min-width: 0; }

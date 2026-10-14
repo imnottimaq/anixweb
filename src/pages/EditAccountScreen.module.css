@@ -144,7 +144,7 @@
     padding: 0 15px;
     border: 0;
     border-radius: 9px;
-    color: var(--background-color);
+    color: var(--accent-foreground);
     background: var(--accent-color);
     font: inherit;
     font-size: 15px;
@@ -266,7 +266,7 @@
 .codeRow button,
 .modalActions button:last-child {
     border-color: transparent;
-    color: var(--background-color);
+    color: var(--accent-foreground);
     background: var(--accent-color);
     font-weight: 600;
 }

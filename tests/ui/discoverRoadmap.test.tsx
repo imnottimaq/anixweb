@@ -146,7 +146,9 @@ describe('Overview and shared navigation', () => {
         const user = userEvent.setup(); providers(<Routes><Route path="/" element={<RootLayout />}><Route index element={<Probe />} /></Route></Routes>, 'active-room');
         expect(screen.getByTestId('release-provider')).toHaveTextContent('available');
         const nav = screen.getByRole('navigation', { name: 'Primary navigation' });
-        for (const [name, path] of [['Popular', '/popular'], ['Schedule', '/schedule'], ['Home', '/'], ['Overview', '/overview']]) expect(within(nav).getByRole('link', { name })).toHaveAttribute('href', path);
+        expect(within(nav).queryByRole('link', { name: 'Popular' })).not.toBeInTheDocument();
+        expect(within(nav).queryByRole('link', { name: 'Schedule' })).not.toBeInTheDocument();
+        for (const [name, path] of [['Home', '/'], ['Overview', '/overview'], ['Favorites', '/favorites']]) expect(within(nav).getByRole('link', { name })).toHaveAttribute('href', path);
         expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings');
         expect(screen.getByRole('link', { name: /return/i })).toHaveAttribute('href', '/together/active-room');
         const menu = screen.getByRole('button', { name: 'Menu' }); await user.click(menu);

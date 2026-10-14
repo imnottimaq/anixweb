@@ -12,9 +12,9 @@
 }
 
 .release-card:hover {
-    background: color-mix(in srgb, var(--surface-card) 85%, transparent);
-    border-color: color-mix(in srgb, var(--accent-color) 35%, var(--border-color));
-    transform: translateX(2px);
+    background: transparent;
+    border-color: var(--border-color);
+    transform: none;
 }
 
 .release-card img {
@@ -22,7 +22,6 @@
     aspect-ratio: 75 / 106;
     border-radius: 8px;
     object-fit: cover;
-    box-shadow: var(--elevation-low);
 }
 
 .release-content {

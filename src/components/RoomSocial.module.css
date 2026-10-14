@@ -130,9 +130,9 @@
     align-items: center;
     gap: 4px;
     padding: 6px 14px;
-    border-radius: 999px;
+    border-radius: var(--radius-control, 6px);
     background: var(--accent-color, #e5e4df);
-    color: var(--accent-text-color, #121212);
+    color: var(--accent-foreground, #ffffff);
     border: none;
     font-size: 12px;
     font-weight: 600;
@@ -266,7 +266,7 @@
     align-items: center;
     gap: 8px;
     padding: 6px 14px;
-    border-radius: 999px;
+    border-radius: 8px;
     background: rgba(18, 18, 24, 0.88);
     backdrop-filter: blur(8px);
     border: 1px solid rgba(255, 255, 255, 0.16);
