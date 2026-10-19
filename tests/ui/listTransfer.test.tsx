@@ -40,27 +40,28 @@ describe('AnimeListTransfer Component', () => {
         expect(screen.getByRole('button', { name: /Экспортировать списки/i })).toBeInTheDocument();
     });
 
-    it('handles export click, requests paginated lists and triggers download', async () => {
+    it('handles export click, requests authenticated bookmarks and triggers download', async () => {
         localStorage.setItem(
             'user_room_identity',
             JSON.stringify({ id: 10, login: 'TesterOtaku' })
         );
 
         const mockFetch = vi.fn().mockImplementation((url: string) => {
-            if (url.includes('/profile/list/all/1/')) {
+            if (url.includes('/export/bookmarks')) {
                 return Promise.resolve({
                     ok: true,
                     json: () =>
                         Promise.resolve({
                             code: 0,
-                            total_page_count: 1,
-                            content: [
+                            releases: [
                                 {
                                     id: 101,
                                     title_ru: 'Атака титанов',
                                     title_original: 'Shingeki no Kyojin',
                                     profile_list_status: 1,
                                     episodes_released: 25,
+                                    is_favorite: false,
+                                    your_vote: 0,
                                 },
                             ],
                         }),
@@ -293,7 +294,7 @@ describe('AnimeListTransfer Component', () => {
         expect(apiCalls.some(url => url.includes('/release/vote/add/101/5'))).toBe(true);
     });
 
-    it('rejects blind title matching and requires manual resolution for generic MAL XML', async () => {
+    it('automatically matches a unique exact title in generic MAL XML', async () => {
         localStorage.setItem(
             'user_room_identity',
             JSON.stringify({ id: 10, login: 'TesterOtaku' })
@@ -347,12 +348,11 @@ describe('AnimeListTransfer Component', () => {
         fireEvent.change(fileInput, { target: { files: [file] } });
 
         await waitFor(() => {
-            expect(screen.getByText(/Shingeki no Kyojin/i)).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: /^Подтвердить и импортировать \(1\)$/i })).toBeEnabled();
         });
 
-        expect(screen.getByText(/Не найдено/i)).toBeInTheDocument();
-        const confirmBtn = screen.getByRole('button', { name: /Подтвердить и импортировать \(0\)/i });
-        expect(confirmBtn).toBeDisabled();
+        const confirmBtn = screen.getByRole('button', { name: /Подтвердить и импортировать \(1\)/i });
+        expect(confirmBtn).toBeEnabled();
     });
 
     it('supports native Shikimori JSON import and preserves data', async () => {
@@ -401,6 +401,7 @@ describe('AnimeListTransfer Component', () => {
                 status: 'watching',
                 score: 8,
                 episodes: 12,
+                text: null,
             },
         ]);
 
@@ -423,20 +424,20 @@ describe('AnimeListTransfer Component', () => {
         );
 
         const mockFetch = vi.fn().mockImplementation((url: string) => {
-            if (url.includes('/profile/list/all/1/')) {
+            if (url.includes('/export/bookmarks')) {
                 return Promise.resolve({
                     ok: true,
                     json: () =>
                         Promise.resolve({
                             code: 0,
-                            total_page_count: 1,
-                            content: [
+                            releases: [
                                 {
                                     id: 101,
                                     title_ru: 'Атака титанов',
                                     title_original: 'Shingeki no Kyojin',
                                     profile_list_status: 1,
                                     episodes_released: 25,
+                                    is_favorite: false,
                                     your_vote: 5,
                                 },
                             ],

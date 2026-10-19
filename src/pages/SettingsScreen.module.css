@@ -369,8 +369,13 @@
 .select button{
     appearance: none;
     border: 1px solid var(--border-color);
-    padding: 6px;
-    font-size: medium;
+    min-height: 40px;
+    padding: 8px 12px;
+    color: var(--text-color);
+    background: var(--background-color);
+    font: inherit;
+    cursor: pointer;
+    font-size: 14px;
     border-radius: .4rem;
 }
 
@@ -768,4 +773,15 @@
 .auto-sync-toggle small {
     font-size: 13px;
     color: var(--text-secondary);
+}
+
+.select button:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.tabs { scrollbar-width: thin; scrollbar-color: var(--border-color) transparent; }
+.tabs::-webkit-scrollbar { display: block; height: 3px; }
+.tabs::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+@media (max-width: 560px) {
+    .settings-item:has(.select) { flex-direction: column; align-items: stretch; gap: 12px; }
+    .select { width: 100%; margin-left: 0; gap: 8px; }
+    .select button { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .action-setting { flex-wrap: wrap; gap: 12px; }
 }

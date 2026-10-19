@@ -1,4 +1,6 @@
 export const roadmapImportsRu = {
+    'roadmap.imports.autoMatchedBadge': 'Совпадение по названию',
+    'roadmap.imports.changeMatch': 'Изменить совпадение',
     'roadmap.imports.importCanceled': 'Импорт остановлен. Уже сохранённые изменения остались в аккаунте.',
     'roadmap.imports.importSkipped': 'Пропущено без изменений: {count}.',
     'roadmap.imports.transferLimits': 'До 2000 записей и 10 МБ. Переносятся только статусы и оценки; прогресс просмотра, избранное и заметки не переносятся.',
@@ -82,6 +84,8 @@ export const roadmapImportsRu = {
 } as const;
 
 export const roadmapImportsEn = {
+    'roadmap.imports.autoMatchedBadge': 'Matched by title',
+    'roadmap.imports.changeMatch': 'Change match',
     'roadmap.imports.importCanceled': 'Import stopped. Changes already saved remain in your account.',
     'roadmap.imports.importSkipped': 'Skipped without changes: {count}.',
     'roadmap.imports.transferLimits': 'Up to 2000 entries and 10 MB. Only status and ratings transfer; watch progress, favorites and notes do not transfer.',

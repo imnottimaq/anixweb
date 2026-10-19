@@ -117,11 +117,7 @@ export class RoomClient {
     private rejectPending() {
         for(const pending of this.pending.values()) {
             clearTimeout(pending.timer);
-            if (pending.type === 'close_room') {
-                pending.resolve();
-            } else {
-                pending.reject(new Error('ROOM_DISCONNECTED'));
-            }
+            pending.reject(new Error('ROOM_DISCONNECTED'));
         }
         this.pending.clear();
     }

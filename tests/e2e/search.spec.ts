@@ -10,6 +10,33 @@ import {
 } from './fixtures/mockData';
 
 test.describe('Header search bar flow', () => {
+  test('hides earlier results after a failed new query and retries the current query', async ({ page }) => {
+    await setupDeterministicNetwork(page);
+    const queries: string[] = [];
+    let fail = true;
+    await page.route('**/search/releases/*', async route => {
+      const query = route.request().postDataJSON().query as string;
+      queries.push(query);
+      if (query === 'Second' && fail) return route.fulfill({ status: 503, body: '{}' });
+      return route.fulfill({ json: { code: 0, releases: [query === 'First' ? mockAnime1 : mockAnime3] } });
+    });
+    await seedStorageState(page, { settings: { appearance: { language: 'english' } } });
+    await page.goto('/settings');
+    await page.getByRole('button', { name: 'Search anime' }).click();
+    const input = page.getByRole('textbox', { name: 'Search anime' });
+    await input.fill('First');
+    await expect(page.getByText(mockAnime1.title_original, { exact: true })).toBeVisible();
+    await input.fill('Second');
+    await expect(page.getByText(mockAnime1.title_original, { exact: true })).not.toBeVisible();
+    await expect(page.getByRole('alert')).toContainText('Search failed');
+    await expect(page.getByText(mockAnime1.title_original, { exact: true })).not.toBeVisible();
+    fail = false;
+    await page.getByRole('button', { name: 'Try again' }).click();
+    await expect(page.getByText(mockAnime3.title_original, { exact: true })).toBeVisible();
+    expect(queries).toEqual(['First', 'Second', 'Second']);
+    await expect(page.getByRole('alert')).not.toBeVisible();
+  });
+
   test('debounces search requests and does not query before delay', async ({ page }) => {
     let searchRequestCount = 0;
 

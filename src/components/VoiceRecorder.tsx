@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from '../shared/useTranslation';
+import { useVoicePlaybackVolume } from '../shared/hooks/useVoicePlaybackVolume';
 import type { TranslationKey } from '../shared/i18n';
 import styles from './VoiceRecorder.module.css';
 
@@ -115,6 +116,7 @@ export default function VoiceRecorder({
     onCancel,
 }: VoiceRecorderProps) {
     const { t, language } = useTranslation();
+    const audioRef = useVoicePlaybackVolume();
 
     const translate = useCallback((key: string): string => {
         try {
@@ -590,6 +592,7 @@ export default function VoiceRecorder({
             {state === 'preview' && draft && (
                 <div className={styles.previewState}>
                     <audio
+                        ref={audioRef}
                         controls
                         src={draft.previewUrl}
                         className={styles.audioPlayer}

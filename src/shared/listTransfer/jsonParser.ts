@@ -30,7 +30,7 @@ export function parseShikimoriJson(rawJson: string): ParsedAnimeItem[] {
             const rawScore = integerField(rec.score ?? 0, 'score', 10);
             const episodesWatched = integerField(rec.episodes ?? 0, 'episodes');
             const rewatches = rec.rewatches === undefined ? undefined : integerField(rec.rewatches, 'rewatches');
-            if (rec.text !== undefined && typeof rec.text !== 'string') throw new Error('Invalid text');
+            if (rec.text != null && typeof rec.text !== 'string') throw new Error('Invalid text');
             const anixartId = rec.anixart_id === undefined ? undefined : positiveId(rec.anixart_id);
             if (rec.anixart_id !== undefined && !anixartId) throw new Error('Invalid anixart_id');
             return {
@@ -38,7 +38,7 @@ export function parseShikimoriJson(rawJson: string): ParsedAnimeItem[] {
                 titleRu: typeof rec.target_title_ru === 'string' ? rec.target_title_ru.trim() || undefined : undefined,
                 episodesWatched, rawScore, anixartScore: mapMalScoreToAnixart(rawScore),
                 rawStatus, anixartStatus: mapMalStatusToAnixart(rawStatus), anixartId,
-                text: rec.text as string | undefined, rewatches,
+                text: typeof rec.text === 'string' ? rec.text : undefined, rewatches,
             };
         } catch (error) {
             throw new JsonParseError(`Row ${index + 1}: ${error instanceof Error ? error.message : 'Invalid anime record'}`);

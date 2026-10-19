@@ -369,7 +369,7 @@ describe('Modal Component (src/modals/ModalTemplate.tsx)', () => {
         const dialog = screen.getByRole('dialog');
         expect(dialog).toBeInTheDocument();
         expect(dialog).toHaveAttribute('aria-modal', 'true');
-        expect(dialog).toHaveAttribute('aria-labelledby', 'modal-title');
+        expect(document.getElementById(dialog.getAttribute('aria-labelledby')!)).toHaveTextContent(screen.getByRole('heading').textContent!);
 
         expect(screen.getByRole('heading', { level: 2, name: 'Заголовок модалки' })).toBeInTheDocument();
         expect(screen.getByText('Текст описания внутри модального окна')).toBeInTheDocument();

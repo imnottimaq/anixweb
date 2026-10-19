@@ -284,3 +284,11 @@ button.seen img {
         flex-wrap: wrap;
     }
 }
+
+@media (max-width: 540px) {
+    button.episode { align-items: flex-start; flex-direction: column; gap: 4px; }
+    .episode h3 { max-width: 100%; }
+    .episode-meta { margin-left: 0; padding-left: 0; }
+    .episode-meta:empty { display: none; }
+    button.seen { min-width: 40px; min-height: 40px; justify-content: center; }
+}

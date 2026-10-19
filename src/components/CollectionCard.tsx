@@ -15,7 +15,7 @@ export default function CollectionCard({ collection }: CollectionCardProps) {
             <RemoteImage src={collection.image} className={styles.poster} alt={collection.title} />
             <div className={styles.content}>
                 <h2>{collection.title}</h2>
-                {collection.description && <p>{collection.description}</p>}
+                <p>{collection.description?.trim() || t('release.noDescription')}</p>
             </div>
         </Link>
         <footer className={styles.footer}>

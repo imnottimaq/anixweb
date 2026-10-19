@@ -201,6 +201,7 @@ describe('VoiceRecorder component', () => {
 
         // Preview state active
         const audioElement = screen.getByTestId('voice-preview-audio') as HTMLAudioElement;
+        expect(audioElement.volume).toBe(defaultAppSettings.player.volume / 100);
         expect(audioElement).toBeInTheDocument();
         expect(audioElement.src).toContain('blob:');
         expect(createdUrls.length).toBe(1);

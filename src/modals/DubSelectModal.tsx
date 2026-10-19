@@ -3,7 +3,6 @@ import styles from './DubSelectModal.module.css';
 import { extractVideoLinks } from '../utils/LinkParser';
 import type { VideoSources } from '../shared/types/video';
 import type { PlayerSessionEpisode } from '../shared/playerSession';
-import CloseIcon from '../assets/icons/xmark.svg';
 import EyeIcon from '../assets/icons/eye.svg';
 import { clearWatchProgress, getWatchProgress } from '../shared/watchProgress';
 import { Modal } from './ModalTemplate';
@@ -90,7 +89,6 @@ export default function DubSelectModal({
     const episodesRequestRef = useRef(0);
     const activeEpisodeRef = useRef<HTMLButtonElement | null>(null);
     const episodeListRef = useRef<HTMLDivElement | null>(null);
-    const pickerRootRef = useRef<HTMLDivElement | null>(null);
     const episodeProgress = getWatchProgress()[String(releaseId)] ?? {};
 
     const autoDubId = autoSelect?.dubId;
@@ -223,41 +221,6 @@ export default function DubSelectModal({
         dubsRequestRef.current++; sourcesRequestRef.current++; episodesRequestRef.current++;
     }, [releaseId]);
 
-    useEffect(() => {
-        if (!isOpen) return;
-        const onEscape = (event: globalThis.KeyboardEvent) => { if (event.key === 'Escape') invalidateSelection(); };
-        window.addEventListener('keydown', onEscape, true);
-        return () => window.removeEventListener('keydown', onEscape, true);
-    }, [invalidateSelection, isOpen]);
-
-    useEffect(() => {
-        if (!isOpen) return;
-        const dialogs = pickerRootRef.current?.querySelectorAll<HTMLElement>('[role="dialog"]');
-        const dialog = dialogs?.[dialogs.length - 1];
-        if (!dialog) return;
-        const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-        const focusable = () => Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled), select:not(:disabled), input:not(:disabled), [tabindex="0"]'));
-        if (!previous || !dialog.contains(previous)) (focusable()[0] ?? dialog).focus();
-        const trapTab = (event: globalThis.KeyboardEvent) => {
-            if (event.key !== 'Tab') return;
-            const items = focusable();
-            const index = items.indexOf(document.activeElement as HTMLElement);
-            if (!items.length) { event.preventDefault(); dialog.focus(); }
-            else if (event.shiftKey && index <= 0) { event.preventDefault(); items[items.length - 1].focus(); }
-            else if (!event.shiftKey && (index < 0 || index === items.length - 1)) { event.preventDefault(); items[0].focus(); }
-        };
-        const containFocus = (event: FocusEvent) => {
-            if (!dialog.contains(event.target as Node)) (focusable()[0] ?? dialog).focus();
-        };
-        document.addEventListener('keydown', trapTab, true);
-        document.addEventListener('focusin', containFocus);
-        return () => {
-            document.removeEventListener('keydown', trapTab, true);
-            document.removeEventListener('focusin', containFocus);
-            if (previous?.isConnected) previous.focus();
-        };
-    }, [episodeToUnwatch, isOpen]);
-
     const selectEpisode = useCallback(async (episode: Episode, shouldMarkWatched: boolean) => {
         if (!isOpen || selectionRef.current || isDubsLoading || isSourcesLoading || isEpisodesLoading || loadError) return;
         const id = ++selectionGenerationRef.current;
@@ -336,29 +299,19 @@ export default function DubSelectModal({
     const isLoading = isDubsLoading || isSourcesLoading || isEpisodesLoading;
 
     return (
-        <div ref={pickerRootRef} className={styles['picker-root']}>
+        <div className={styles['picker-root']}>
             <Modal
-                onClose={() => { invalidateSelection(); onClose(); }}
+                onClose={onClose}
+                onCloseStart={invalidateSelection}
                 isOpen={isOpen}
-                showCloseButton={false}
+                title={t('dubSelect.title')}
+                stickyHeader
                 contentStyle={{
                     '--modal-width': 'min(640px, 92vw)',
-                    '--modal-height': 'min(580px, 85vh)',
+                    '--modal-max-height': 'min(580px, calc(100dvh - 24px))',
                 } as React.CSSProperties}
             >
-                {close => (
                     <>
-                        <div className={styles['top-row']}>
-                            <h3>{t('dubSelect.title')}</h3>
-                            <button
-                                type="button"
-                                className={styles['close-btn']}
-                                onClick={() => { invalidateSelection(); close(); }}
-                                aria-label={t('misc.close')}
-                            >
-                                <img src={CloseIcon} alt={t('misc.close')} />
-                            </button>
-                        </div>
                         <div className={styles['picker-controls']}>
                             <label className={styles['picker-field']}>
                                 <span>{t('roadmap.player.pickerDubs')}</span>
@@ -517,7 +470,6 @@ export default function DubSelectModal({
                             })}
                         </div>
                     </>
-                )}
             </Modal>
 
             <Modal

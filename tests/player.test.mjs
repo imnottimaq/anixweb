@@ -4,7 +4,8 @@ import test from 'node:test';
 import ts from 'typescript';
 import { createUpscalerScope } from '../src/shared/upscalerScope.ts';
 import { PlaybackBridge } from '../src/shared/playbackBridge.ts';
-import { isHlsStream, isDirectMp4Stream, formatBytes, sanitizeFilename } from '../src/shared/player/download.ts';
+import { roomPlaybackAccess } from '../src/shared/roomPermissions.ts';
+import { getDownloadStreamOptions, isHlsStream, isDirectMp4Stream, formatBytes, sanitizeFilename } from '../src/shared/player/download.ts';
 
 // Execute the actual component and its event/effect callbacks with deterministic
 // hook, media and socket doubles. No DOM layout, CDN or GPU driver is simulated.
@@ -28,7 +29,7 @@ const code = ts.transpileModule([...fullscreenHelpers, component].map(node => no
 }).outputText;
 const sources = { '1080': [{ src: 'high.mp4', type: 'video/mp4' }], '720': [{ src: 'low.mp4', type: 'video/mp4' }] };
 const media = { releaseId: 1, dubId: 3, sourceId: 4, episode: 1, releaseName: 'Anime', episodeName: 'One' };
-const room = overrides => ({ roomId: 'room', hostId: 99, syncEpoch: 1, media, participants: [{profileId:7,canControl:true}], playback: { position: 0, paused: true, intent:'paused', rate: 1.5, updatedAt:0 }, ...overrides });
+const room = overrides => ({ roomId: 'room', hostId: 99, syncEpoch: 1, media, participants: [{profileId:7,canControl:true,connected:true}], playback: { position: 0, paused: true, intent:'paused', rate: 1.5, updatedAt:0 }, ...overrides });
 
 function harness(options = {}) {
     const state = {}, refs = {}, effects = [], navigation = [], sessions = [], saved = [], sockets = [];
@@ -83,8 +84,8 @@ function harness(options = {}) {
         useSettings: () => ({ settings, setSettings: fn => Object.assign(settings, fn(settings)) }),
         useTranslation: () => ({ t: key => key }), useUser: () => ({ userToken: '', userId: 7 }),
         useApi: () => ({ get: async () => ({ code: 0 }) }), useRoomPresence: () => ({ room: options.roomId ? (options.room ?? room()) : null, self: options.self ?? null, status: 'connected', send: async payload => sockets.push(payload), serverNow: () => 0 }),
-        PlaybackBridge, RoomPanel: () => null, ReactionOverlay: () => null,
-        useEpisodeDownload: () => downloadDouble, isHlsStream, isDirectMp4Stream, formatBytes, sanitizeFilename,
+        PlaybackBridge, roomPlaybackAccess, RoomPanel: () => null, ReactionOverlay: () => null,
+        useEpisodeDownload: () => downloadDouble, getDownloadStreamOptions, isHlsStream, isDirectMp4Stream, formatBytes, sanitizeFilename,
         createUpscalerScope,
         canUseAnime4KVideo: () => false, isSafariBrowser: () => false, WatchRoomSocket: Socket, getRoomParticipant: () => ({}),
         getWatchProgress: () => ({ '1': { '1': 120, '2': 90 } }),
@@ -244,6 +245,28 @@ test('global player hotkeys ignore interactive targets, consumed keys, IME and e
     h.window.dispatch('keydown',key); assert.equal(h.video.playCalls,1);
 });
 
+test('download dialog selects an available MP4 and saves that source instead of the playback HLS', () => {
+    const h = harness();
+    h.props.playerSession.sources = {
+        '1080': [{src:'high.m3u8',type:'application/x-mpegurl'}],
+        '720': [{src:'low.m3u8',type:'application/x-mpegurl'}, {src:'low.mp4',type:'video/mp4'}],
+    };
+    h.state.selectedQuality = '1080';
+    h.render();
+    h.find(node => node.tag === 'button' && node.props['aria-label'] === 'roadmap.player.download').props.onClick();
+    assert.equal(h.state.downloadSelectedQuality, '720');
+    h.render();
+    h.find(node => node.tag === 'button' && node.props.children[0] === 'roadmap.player.downloadStart').props.onClick();
+    const start = h.downloadCalls.find(call => call.type === 'start');
+    assert.equal(start.args.stream.src, 'low.mp4');
+    assert.equal(start.args.filename, 'Anime - Ep 1 (720p).mp4');
+    h.download.status = 'downloading';
+    h.download.progress = {loaded:1024,total:0,percent:0};
+    h.render();
+    assert.equal(h.find(node => node.tag === 'button' && node.props['aria-pressed'] === true).props.disabled, true);
+    assert.equal(h.find(node => node.props?.role === 'progressbar').props['aria-valuenow'], undefined);
+});
+
 test('download dialog focuses inside, wraps Tab, handles Escape and restores its trigger', () => {
     const h=harness(); h.state.isDownloadModalOpen=true; h.render();
     const focusNode=()=>{const node=new h.HTMLElement();node.isConnected=true;node.focus=()=>{h.document.activeElement=node;};return node;};
@@ -261,6 +284,17 @@ test('download dialog focuses inside, wraps Tab, handles Escape and restores its
     assert.equal(h.state.isDownloadModalOpen,false);
     assert.deepEqual(h.downloadCalls,[{type:'reset'}]);
     cleanup(); assert.equal(h.document.activeElement,trigger);
+});
+
+test('HLS-only episode exposes download and forwards the playlist to the download hook', () => {
+    const h = harness();
+    h.props.playerSession.sources = { '1080': [{src:'episode.m3u8',type:'application/x-mpegurl'}] };
+    h.state.selectedQuality = '1080';
+    h.state.isDownloadModalOpen = true;
+    h.render();
+    h.find(node => node.tag === 'button' && node.props.children[0] === 'roadmap.player.downloadStart').props.onClick();
+    assert.equal(h.downloadCalls.at(-1).args.stream.src, 'episode.m3u8');
+    assert.equal(h.downloadCalls.at(-1).args.filename, 'Anime - Ep 1 (1080p).mp4');
 });
 
 for (const paused of [true, false]) test(`manual quality change preserves time and paused=${paused}`, () => {
@@ -321,9 +355,30 @@ test('controller can pause during a room loading barrier without local play', ()
 });
 
 test('control checks use server verified identity rather than cached profile', () => {
-    const h = harness({roomId:'room',self:{profileId:33,login:'Verified'},room:room({participants:[{profileId:33,canControl:true}]})});
+    const h = harness({roomId:'room',self:{profileId:33,login:'Verified'},room:room({participants:[{profileId:33,canControl:true,connected:true}]})});
     h.find(node => node.tag === 'button' && node.props['aria-label'] === 'player.play').props.onClick();
     assert.deepEqual(h.sockets, [{type:'play',position:0}]);
+});
+
+test('viewer pause button sends a shared pause without granting resume or seeking', () => {
+    const playing = room({ participants: [{ profileId: 7, connected: true, canControl: false }], playback: { position: 0, paused: false, intent: 'playing', rate: 1, updatedAt: 0 } });
+    const h = harness({ roomId: 'room', room: playing });
+    const pause = h.find(node => node.tag === 'button' && node.props['aria-label'] === 'player.pause');
+    assert.equal(pause.props.disabled, false);
+    pause.props.onClick();
+    assert.deepEqual(h.sockets, [{ type: 'pause', position: 0 }]);
+    playing.playback.intent = 'paused';
+    playing.playback.paused = true;
+    h.render();
+    assert.equal(h.find(node => node.tag === 'button' && node.props['aria-label'] === 'player.play').props.disabled, true);
+});
+
+test('host pause policy disables the viewer pause action and its event handler', () => {
+    const h = harness({ roomId: 'room', room: room({ allowParticipantPause: false, participants: [{ profileId: 7, connected: true, canControl: false }], playback: { position: 0, paused: false, intent: 'playing', rate: 1, updatedAt: 0 } }) });
+    const pause = h.find(node => node.tag === 'button' && node.props['aria-label'] === 'player.pause');
+    assert.equal(pause.props.disabled, true);
+    pause.props.onClick();
+    assert.deepEqual(h.sockets, []);
 });
 
 test('room back action is accessible and returns to management without leaving', () => {

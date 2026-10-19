@@ -17,8 +17,7 @@ import {
     type ImportPreviewItem,
     type ImportProgress,
     type ParsedAnimeItem,
-    fetchAllReleasesForStatus,
-    fetchAllFavorites,
+    fetchExportBookmarks,
     serializeToMalXml,
     serializeToShikimoriJson,
     triggerXmlDownload,
@@ -45,7 +44,6 @@ const DEFAULT_EXPORT_OPTIONS: ExportListOption[] = [
     { id: 'completed', statusId: 3, labelKey: 'status.watched', enabled: true },
     { id: 'onHold', statusId: 4, labelKey: 'status.hold_on', enabled: true },
     { id: 'dropped', statusId: 5, labelKey: 'status.dropped', enabled: true },
-    { id: 'favorites', isFavorite: true, labelKey: 'nav.favorites', enabled: true },
 ];
 
 export const AnimeListTransfer: React.FC = () => {
@@ -132,77 +130,8 @@ const TransferSession: React.FC = () => {
         const signal = exportAbortController.current.signal;
         const currentJobId = ++exportJobIdRef.current;
 
-        const collected: ExportPreviewItem[] = [];
-        const seenIds = new Set<number>();
-
         try {
-            for (const opt of exportOptions) {
-                if (signal.aborted) throw new DOMException('Export aborted', 'AbortError');
-                if (!opt.enabled) continue;
-
-                if (opt.statusId) {
-                    const releases = await fetchAllReleasesForStatus(
-                        opt.statusId,
-                        api,
-                        signal,
-                        (page, count) => {
-                            if (isMountedRef.current && exportJobIdRef.current === currentJobId) {
-                                setExportProgress({
-                                    currentListLabel: opt.labelKey,
-                                    currentPage: page,
-                                    fetchedCount: collected.length + count,
-                                    isExporting: true,
-                                    error: null,
-                                });
-                            }
-                        }
-                    );
-                    if (!isMountedRef.current || exportJobIdRef.current !== currentJobId) return;
-
-                    for (const anime of releases) {
-                        if (!seenIds.has(anime.id)) {
-                            seenIds.add(anime.id);
-                            collected.push({
-                                id: `exp_${anime.id}`,
-                                anime,
-                                status: opt.statusId,
-                                isSkipped: false,
-                            });
-                        }
-                    }
-                } else if (opt.isFavorite) {
-                    const favorites = await fetchAllFavorites(
-                        api,
-                        signal,
-                        (page, count) => {
-                            if (isMountedRef.current && exportJobIdRef.current === currentJobId) {
-                                setExportProgress({
-                                    currentListLabel: opt.labelKey,
-                                    currentPage: page,
-                                    fetchedCount: collected.length + count,
-                                    isExporting: true,
-                                    error: null,
-                                });
-                            }
-                        }
-                    );
-                    if (!isMountedRef.current || exportJobIdRef.current !== currentJobId) return;
-
-                    for (const anime of favorites) {
-                        if (!seenIds.has(anime.id)) {
-                            seenIds.add(anime.id);
-                            const status = (anime.profile_list_status as AnixartListStatusId) || 2;
-                            collected.push({
-                                id: `exp_fav_${anime.id}`,
-                                anime,
-                                status,
-                                isSkipped: false,
-                            });
-                        }
-                    }
-                }
-            }
-
+            const collected = await fetchExportBookmarks(api, exportOptions, signal);
             if (!isMountedRef.current || exportJobIdRef.current !== currentJobId) return;
             if (signal.aborted) throw new DOMException('Export aborted', 'AbortError');
             setExportItems(collected);
@@ -483,6 +412,7 @@ const TransferSession: React.FC = () => {
                       return {
                           ...item,
                           matchedRelease: release,
+                          autoMatched: false,
                           matchState: 'matched',
                           hasConflict,
                           currentListStatus: release.profile_list_status,
@@ -812,7 +742,10 @@ const TransferSession: React.FC = () => {
                                                             rel="noopener noreferrer"
                                                             className={styles.shikimoriLink}
                                                         >
-                                                            {t('roadmap.imports.shikimoriLink', { id: item.externalId })} ↗
+                                                            <span>{t('roadmap.imports.shikimoriLink', { id: item.externalId })}</span>
+                                                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ display: 'inline-block', verticalAlign: 'middle', marginLeft: 4 }}>
+                                                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" />
+                                                            </svg>
                                                         </a>
                                                         <button
                                                             type="button"
@@ -820,7 +753,9 @@ const TransferSession: React.FC = () => {
                                                             style={{ padding: '2px 8px', fontSize: 11 }}
                                                             onClick={() => handleExportExternalIdChange(item.id, '')}
                                                         >
-                                                            ✕
+                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                                                <path d="M18 6L6 18M6 6l12 12" />
+                                                            </svg>
                                                         </button>
                                                     </>
                                                 ) : (
@@ -875,7 +810,10 @@ const TransferSession: React.FC = () => {
                                                                         rel="noopener noreferrer"
                                                                         className={styles.shikimoriLink}
                                                                     >
-                                                                        Shikimori ↗
+                                                                        <span>Shikimori</span>
+                                                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ display: 'inline-block', verticalAlign: 'middle', marginLeft: 4 }}>
+                                                                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" />
+                                                                        </svg>
                                                                     </a>
                                                                     <button
                                                                         type="button"
@@ -1087,7 +1025,7 @@ const TransferSession: React.FC = () => {
                                                             {item.matchedRelease.title_ru || item.matchedRelease.title_original}
                                                         </span>
                                                         <span className={`${styles.badge} ${styles.badgeMatched}`}>
-                                                            {item.anixartId
+                                                            {item.autoMatched ? t('roadmap.imports.autoMatchedBadge') : item.anixartId
                                                                 ? t('roadmap.imports.matchedBadge')
                                                                 : t('roadmap.imports.verifiedManualBadge')}
                                                         </span>
@@ -1123,15 +1061,13 @@ const TransferSession: React.FC = () => {
                                             </div>
 
                                             <div style={{ display: 'flex', gap: 6 }}>
-                                                {(!item.matchedRelease || item.matchState === 'candidate') && (
-                                                    <button
-                                                        type="button"
-                                                        className={styles.secondaryButton}
-                                                        onClick={() => openManualResolve(item)}
-                                                    >
-                                                        {t('roadmap.imports.resolve')}
-                                                    </button>
-                                                )}
+                                                <button
+                                                    type="button"
+                                                    className={styles.secondaryButton}
+                                                    onClick={() => openManualResolve(item)}
+                                                >
+                                                    {t(item.matchedRelease ? 'roadmap.imports.changeMatch' : 'roadmap.imports.resolve')}
+                                                </button>
                                                 <button
                                                     type="button"
                                                     className={styles.secondaryButton}

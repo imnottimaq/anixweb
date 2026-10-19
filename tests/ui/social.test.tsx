@@ -278,17 +278,20 @@ describe('Frontend Social UI (RoomChat, ReactionOverlay, RoomPanel Social)', () 
             expect(textarea.value).toBe('Valuable draft text');
         });
 
-        it('character counter displays remaining characters up to 500 max length', async () => {
+        it('character counter displays used characters out of 500', async () => {
             renderWithContext(<RoomChat />);
 
             const textarea = screen.getByPlaceholderText(/Write a message/i) as HTMLTextAreaElement;
             const counter = screen.getByTestId('chat-char-counter');
 
             expect(textarea).toHaveAttribute('maxLength', '500');
-            expect(counter).toHaveTextContent(/500 characters left/i);
+            expect(counter).toHaveTextContent(/^0\/500$/);
+            expect(counter).not.toHaveAttribute('aria-live');
+            expect(textarea).toHaveAttribute('aria-describedby', counter.id);
 
             await userEvent.type(textarea, 'Hello');
-            expect(counter).toHaveTextContent(/495 characters left/i);
+            expect(counter).toHaveTextContent(/^5\/500$/);
+            expect(counter).toHaveAttribute('aria-label', '495 characters left');
         });
     });
 
@@ -360,10 +363,32 @@ describe('Frontend Social UI (RoomChat, ReactionOverlay, RoomPanel Social)', () 
             for (const { emoji, label } of expectedReactions) {
                 const btn = screen.getByRole('button', { name: label });
                 expect(btn).toBeInTheDocument();
-                expect(btn).toHaveTextContent(REACTION_MAP[emoji]);
+                expect(btn.querySelector(`[data-reaction="${emoji}"]`)).toHaveTextContent(REACTION_MAP[emoji]);
 
                 await userEvent.click(btn);
                 expect(sendReactionMock).toHaveBeenCalledWith(emoji);
+            }
+        });
+
+        it('renders emoji reactions while keeping accessible labels and IDs', () => {
+            const sendReactionMock = vi.fn().mockResolvedValue(undefined);
+            const room = createMockRoom();
+            renderWithContext(<RoomPanel />, { room, status: 'connected', sendReaction: sendReactionMock });
+
+            const reactionsToolbar = screen.getByRole('toolbar', { name: /Reactions/i });
+            expect(reactionsToolbar).toBeInTheDocument();
+
+            const buttons = reactionsToolbar.querySelectorAll('button');
+            expect(buttons).toHaveLength(6);
+
+            for (const btn of buttons) {
+                const symbol = btn.querySelector('[data-reaction]');
+                expect(symbol).toBeInTheDocument();
+                expect(btn.querySelector('svg')).toBeNull();
+                const reactionAttr = symbol?.getAttribute('data-reaction') as ReactionEmoji;
+                expect(['heart', 'laugh', 'clap', 'fire', 'surprise', 'sad']).toContain(reactionAttr);
+                expect(symbol).toHaveTextContent(REACTION_MAP[reactionAttr]);
+                expect(btn.getAttribute('aria-label')).toBeTruthy();
             }
         });
 
@@ -390,9 +415,9 @@ describe('Frontend Social UI (RoomChat, ReactionOverlay, RoomPanel Social)', () 
             renderWithContext(<ReactionOverlay reactions={mockReactions} />);
 
             expect(screen.getByText('Bob')).toBeInTheDocument();
-            expect(screen.getByText(REACTION_MAP.fire)).toBeInTheDocument();
+            expect(document.querySelector('[data-testid="reaction-overlay"] [data-reaction="fire"]')).toHaveTextContent(REACTION_MAP.fire);
             expect(screen.getByText('Charlie')).toBeInTheDocument();
-            expect(screen.getByText(REACTION_MAP.heart)).toBeInTheDocument();
+            expect(document.querySelector('[data-testid="reaction-overlay"] [data-reaction="heart"]')).toHaveTextContent(REACTION_MAP.heart);
         });
 
         it('ReactionOverlay cleans up reactions on expiry timer', () => {
@@ -520,12 +545,12 @@ describe('Frontend Social UI (RoomChat, ReactionOverlay, RoomPanel Social)', () 
             );
 
             // New messages affordance badge should appear
-            const newMessagesBtn = await screen.findByRole('button', { name: /(New messages|Новые сообщения) ↓/i });
+            const newMessagesBtn = await screen.findByRole('button', { name: /(New messages|Новые сообщения)/i });
             expect(newMessagesBtn).toBeInTheDocument();
 
             // Clicking the button scrolls to bottom and removes the badge
             await userEvent.click(newMessagesBtn);
-            expect(screen.queryByRole('button', { name: /(New messages|Новые сообщения) ↓/i })).toBeNull();
+            expect(screen.queryByRole('button', { name: /(New messages|Новые сообщения)/i })).toBeNull();
         });
     });
 

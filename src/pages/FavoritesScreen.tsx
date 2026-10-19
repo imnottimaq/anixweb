@@ -13,6 +13,11 @@ import { useSearchScope, type SearchScope } from '../shared/contexts/searchConte
 import styles from './FavoritesScreen.module.css';
 import { useTranslation } from '../shared/useTranslation';
 import { useApi } from '../shared/apiClient';
+import TabContextMenu, { type TabContextMenuItem } from '../components/TabContextMenu';
+import { FAVORITES_TAB_ORDER } from '../shared/types/settings';
+import { normalizeTabOrder } from '../shared/tabOrder';
+import { useReorderableTabs } from '../shared/useReorderableTabs';
+import TabDragHandle from '../components/TabDragHandle';
 
 type ProfilePage = 'collections' | 'favorites' | 'history' | 'watching' | 'planned' | 'completed' | 'onHold' | 'dropped';
 type ReleasePage = Exclude<ProfilePage, 'collections'>;
@@ -20,6 +25,28 @@ type ReleasePage = Exclude<ProfilePage, 'collections'>;
 const PAGE_ITEMS: { page: ProfilePage; buttonText: 'nav.collections' | 'nav.favorites' | 'home.history' | 'status.watching' | 'status.planned' | 'status.watched' | 'status.hold_on' | 'status.dropped'; label?: string }[] = [
     { page: 'collections', buttonText: 'nav.collections' }, { page: 'favorites', buttonText: 'nav.favorites' }, { page: 'history', buttonText: 'home.history' }, { page: 'watching', buttonText: 'status.watching' }, { page: 'planned', buttonText: 'status.planned' }, { page: 'completed', buttonText: 'status.watched' }, { page: 'onHold', buttonText: 'status.hold_on' }, { page: 'dropped', buttonText: 'status.dropped' },
 ];
+
+const SETTING_BY_FAVORITES_TAB: Record<ProfilePage, 'collections' | 'favorites' | 'history' | 'watching' | 'planned' | 'completed' | 'hold_on' | 'dropped'> = {
+    collections: 'collections',
+    favorites: 'favorites',
+    history: 'history',
+    watching: 'watching',
+    planned: 'planned',
+    completed: 'completed',
+    onHold: 'hold_on',
+    dropped: 'dropped',
+};
+
+const FAVORITES_TAB_BY_SETTING: Record<'collections' | 'favorites' | 'history' | 'watching' | 'planned' | 'completed' | 'hold_on' | 'dropped', ProfilePage> = {
+    collections: 'collections',
+    favorites: 'favorites',
+    history: 'history',
+    watching: 'watching',
+    planned: 'planned',
+    completed: 'completed',
+    hold_on: 'onHold',
+    dropped: 'dropped',
+};
 
 const PROFILE_LIST_IDS: Record<Exclude<ProfilePage, 'collections' | 'history'>, number> = {
     favorites: 0,
@@ -77,7 +104,7 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
     const { userToken } = useUser();
     const api = useApi();
     const navigate = useNavigate();
-    const { settings } = useSettings();
+    const { settings, setSettings } = useSettings();
     const { t } = useTranslation();
     const { setSearchScope } = useSearchScope();
     const triggerRef = useRef<HTMLDivElement | null>(null);
@@ -85,16 +112,17 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
     const sortVersionRef = useRef(0);
     const [activePage, setActivePage] = useState<ProfilePage>(() => {
         if (profileId) return 'favorites';
-        return settings.content.defaultTabOnFavorites === 'hold_on'
-            ? 'onHold'
-            : settings.content.defaultTabOnFavorites;
+        return FAVORITES_TAB_BY_SETTING[settings.content.defaultTabOnFavorites] ?? 'favorites';
     });
+    const [tabContextMenu, setTabContextMenu] = useState<{ page: ProfilePage; x: number; y: number; trigger: HTMLElement } | null>(null);
     const [sort, setSort] = useState<ReleaseSort>('addedDesc');
     const [tabs, setTabs] = useState<FavoritesTabs>(createTabs);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [retryVersion, setRetryVersion] = useState(0);
     const selectedProfileId = Number(profileId);
     const isProfileFavorites = profileId !== undefined;
+    const orderedItems = isProfileFavorites ? EXTERNAL_PROFILE_PAGE_ITEMS : normalizeTabOrder(settings.content.favoritesTabOrder, FAVORITES_TAB_ORDER).map(key => PAGE_ITEMS.find(item => item.page === FAVORITES_TAB_BY_SETTING[key])!);
+    const reorder = useReorderableTabs(orderedItems.map(item => item.page), order => setSettings(previous => ({ ...previous, content: { ...previous.content, favoritesTabOrder: order.map(page => SETTING_BY_FAVORITES_TAB[page]) } })), page => t(PAGE_ITEMS.find(item => item.page === page)!.buttonText));
     const hasValidProfileId = Number.isInteger(selectedProfileId) && selectedProfileId > 0;
 
     const isCollectionsPage = activePage === 'collections';
@@ -253,18 +281,45 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
     return (
         <div className={styles.body}>
             <div className={styles['side-panel']} role="tablist" aria-label={t('favorites.sectionsAria')}>
-                {(isProfileFavorites ? EXTERNAL_PROFILE_PAGE_ITEMS : PAGE_ITEMS).map(({ page, buttonText }) => (
+                {orderedItems.map(({ page, buttonText }) => (
                     <button
+                        {...(!isProfileFavorites ? reorder.props(page) : {})}
                         key={page}
                         role="tab"
                         aria-selected={activePage === page}
-                        className={activePage === page ? styles.active : ''}
+                        aria-haspopup={!isProfileFavorites ? 'menu' : undefined}
+                        className={`${!isProfileFavorites ? reorder.tabClass : ''} ${activePage === page ? styles.active : ''}`}
                         onClick={() => setActivePage(page)}
+                        onContextMenu={!isProfileFavorites ? (e) => {
+                            e.preventDefault();
+                            setTabContextMenu({
+                                page,
+                                x: e.clientX,
+                                y: e.clientY,
+                                trigger: e.currentTarget,
+                            });
+                        } : undefined}
+                        onKeyDown={!isProfileFavorites ? (e) => {
+                            if (reorder.onKeyDown(e, page)) return;
+                            if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+                                e.preventDefault();
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setTabContextMenu({
+                                    page,
+                                    x: rect.left + rect.width / 2,
+                                    y: rect.bottom,
+                                    trigger: e.currentTarget,
+                                });
+                            }
+                        } : undefined}
                     >
                         {t(buttonText)}
+                        {!isProfileFavorites && <TabDragHandle />}
                     </button>
                 ))}
             </div>
+
+            <span className={reorder.announcementClass} aria-live="polite" aria-atomic="true">{reorder.announcement}</span>
 
             <div className={styles.content}>
                 {isProfileFavorites && <h1>{t('favorites.userLists')}</h1>}
@@ -297,6 +352,39 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
                     <button type="button" onClick={() => navigate('/account/login')}>{t('auth.login')}</button>
                 </div>
             </div>}
+            {tabContextMenu && (() => {
+                const isDefault = settings.content.defaultTabOnFavorites === SETTING_BY_FAVORITES_TAB[tabContextMenu.page];
+                const items: TabContextMenuItem[] = [
+                    {
+                        key: 'make-default',
+                        label: isDefault ? t('tabMenu.isDefault') : t('tabMenu.makeDefault'),
+                        disabled: isDefault,
+                        onClick: () => {
+                            const settingValue = SETTING_BY_FAVORITES_TAB[tabContextMenu.page];
+                            setSettings(prev => ({
+                                ...prev,
+                                content: {
+                                    ...prev.content,
+                                    defaultTabOnFavorites: settingValue,
+                                },
+                            }));
+                        },
+                    },
+                ];
+
+                const currentTabItem = PAGE_ITEMS.find(item => item.page === tabContextMenu.page);
+
+                return (
+                    <TabContextMenu
+                        x={tabContextMenu.x}
+                        y={tabContextMenu.y}
+                        trigger={tabContextMenu.trigger}
+                        title={currentTabItem ? t(currentTabItem.buttonText) : undefined}
+                        items={items}
+                        onClose={() => setTabContextMenu(null)}
+                    />
+                );
+            })()}
         </div>
     );
 }

@@ -1,5 +1,6 @@
 import type { RoomAttachment } from '../shared/roomAttachmentTypes';
 import { useAttachmentBlob } from '../shared/hooks/useAttachmentBlob';
+import { useVoicePlaybackVolume } from '../shared/hooks/useVoicePlaybackVolume';
 import { useTranslation } from '../shared/useTranslation';
 import styles from './RoomSocial.module.css';
 
@@ -18,6 +19,7 @@ function formatDuration(ms?: number): string {
 
 export default function AudioAttachment({ roomId, attachment }: AudioAttachmentProps) {
     const { t } = useTranslation();
+    const audioRef = useVoicePlaybackVolume();
     const { url, loading, error, retry } = useAttachmentBlob(roomId, attachment.id, { lazy: false });
 
     return (
@@ -48,6 +50,7 @@ export default function AudioAttachment({ roomId, attachment }: AudioAttachmentP
             {url && !loading && (
                 <div className={styles.audioPlayerWrapper}>
                     <audio
+                        ref={audioRef}
                         controls
                         src={url}
                         preload="metadata"

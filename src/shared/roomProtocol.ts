@@ -55,6 +55,7 @@ export type WatchRoomState = {
     barrier: { id: number; target: number; deadline: number } | null;
     participants: RoomParticipant[]; emptySince: number | null; closed: boolean;
     chat?: RoomChatMessage[];
+    allowParticipantPause?: boolean;
 };
 export type RoomCommandPayload =
     | { type: 'set_media'; media: RoomMedia }
@@ -66,6 +67,7 @@ export type RoomCommandPayload =
     | { type: 'grant_control' | 'revoke_control' | 'kick' | 'transfer_host'; profileId: number }
     | { type: 'leave' }
     | { type: 'close_room' }
+    | { type: 'set_pause_permission'; allow: boolean }
     | { type: 'chat_message'; text: string }
     | { type: 'reaction'; emoji: ReactionEmoji };
 export type RoomCommand = RoomCommandPayload & { commandId: string; mediaVersion: number };
@@ -77,7 +79,7 @@ export type ServerMessage =
     | { type: 'pong'; requestId: string; serverTime: number }
     | { type: 'kicked' | 'session_replaced' | 'room_closed' }
     | { type: 'reaction'; reaction: RoomReaction };
-export type PublicRoom = Pick<WatchRoomState, 'roomId' | 'title' | 'hostId' | 'media'> & { participants: number };
+export type PublicRoom = Pick<WatchRoomState, 'roomId' | 'title' | 'media'> & { participants: number };
 
 function object(value: unknown): value is Record<string, unknown> { return !!value && typeof value === 'object' && !Array.isArray(value); }
 function text(value: unknown, max: number): value is string { return typeof value === 'string' && value.length > 0 && value.length <= max; }
@@ -112,11 +114,12 @@ export function parseClientMessage(value: unknown): ClientMessage {
     if (value.type === 'sync_request') return { type: 'sync_request' };
     if (value.type === 'ping' && text(value.requestId, 80)) return { type: 'ping', requestId: value.requestId };
     if (!text(value.commandId, 80)) throw new Error('INVALID_COMMAND');
-    const mediaVersion = natural(value.mediaVersion) ? value.mediaVersion : (value.type === 'close_room' ? 0 : -1);
+    const mediaVersion = natural(value.mediaVersion) ? value.mediaVersion : (value.type === 'close_room' || value.type === 'set_pause_permission' ? 0 : -1);
     if (mediaVersion < 0) throw new Error('INVALID_COMMAND');
     const envelope = { commandId: value.commandId, mediaVersion };
     switch (value.type) {
         case 'close_room': return { ...envelope, type: 'close_room' };
+        case 'set_pause_permission': if (typeof value.allow === 'boolean') return { ...envelope, type: value.type, allow: value.allow }; break;
         case 'set_media': if (isRoomMedia(value.media)) return { ...envelope, type: value.type, media: value.media }; break;
         case 'play': case 'pause': case 'seek': if (position(value.position)) return { ...envelope, type: value.type, position: value.position }; break;
         case 'set_rate': if (position(value.position) && typeof value.rate === 'number' && [0.5, 0.75, 1, 1.25, 1.5, 2].includes(value.rate)) return { ...envelope, type: value.type, position: value.position, rate: value.rate }; break;
@@ -149,6 +152,7 @@ export function isRoomState(value: unknown): value is WatchRoomState {
         || !natural(value.hostId) || !natural(value.mediaVersion) || !natural(value.syncEpoch)
         || !(value.media === null || isRoomMedia(value.media)) || typeof value.closed !== 'boolean'
         || !(value.emptySince === null || natural(value.emptySince)) || !object(value.playback)) return false;
+    if (value.allowParticipantPause !== undefined && typeof value.allowParticipantPause !== 'boolean') return false;
     const p = value.playback;
     if (!position(p.position) || typeof p.paused !== 'boolean' || !(p.intent === 'playing' || p.intent === 'paused')
         || typeof p.rate !== 'number' || ![0.5, 0.75, 1, 1.25, 1.5, 2].includes(p.rate) || !natural(p.updatedAt)) return false;

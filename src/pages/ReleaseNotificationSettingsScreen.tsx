@@ -6,6 +6,7 @@ import { useApi } from '../shared/apiClient';
 import type { ReleaseNotificationsPreferencesAPIResponse } from '../shared/types/api';
 import { useTranslation } from '../shared/useTranslation';
 import { useAsyncLoad } from '../shared/useAsyncLoad';
+import starIcon from '../assets/icons/star.svg';
 import styles from './ReleaseNotificationSettingsScreen.module.css';
 
 export default function ReleaseNotificationSettingsScreen() {
@@ -32,7 +33,10 @@ export default function ReleaseNotificationSettingsScreen() {
                 <Link to={`/anime/${release.id}`} className={styles.poster}><RemoteImage src={release.image} alt={t('releaseNotifications.posterAlt', { title })} /></Link>
                 <div className={styles.copy}>
                     <Link to={`/anime/${release.id}`}>{title}</Link>
-                    <p>{t('releaseNotifications.meta', { episodes: formatNumber(release.episodes_released), grade: formatNumber(release.grade, { maximumFractionDigits: 1, minimumFractionDigits: 1 }) })}</p>
+                    <p>
+                        {t('releaseNotifications.meta', { episodes: formatNumber(release.episodes_released), grade: formatNumber(release.grade, { maximumFractionDigits: 1, minimumFractionDigits: 1 }) })}
+                        <img src={starIcon} alt="" width="12" height="12" style={{ display: 'inline-block', verticalAlign: '-1px', marginLeft: 4 }} />
+                    </p>
                     <small>{t('releaseNotifications.dubsCount', { count: formatNumber(release.profile_release_type_notification_preference_count) })}</small>
                 </div>
             </article>; })}

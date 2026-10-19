@@ -153,11 +153,7 @@ export default function RoomProvider({ children }: { children: ReactNode }) {
     const send = useCallback((payload: RoomCommandPayload) => client.send(payload), [client]);
     const closeRoom = useCallback(async () => {
         const version = ++actionVersion.current;
-        try {
-            await client.send({ type: 'close_room' });
-        } catch {
-            /* Offline or terminated close still clears local membership */
-        }
+        await client.send({ type: 'close_room' });
         if (version !== actionVersion.current) return;
         client.disconnect();
         active.current = null;

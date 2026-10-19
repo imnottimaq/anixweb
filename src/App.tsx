@@ -46,6 +46,8 @@ function App() {
 
     let isCancelled = false;
     const currentSessionToken = userToken;
+    // Include edits made while the initial profile validation is pending.
+    const editCountAtStart = localEditCountRef.current;
 
     const loadCurrentProfileId = async () => {
       try {
@@ -65,7 +67,6 @@ function App() {
             }
 
             if (isAutoSyncAccountEnabled()) {
-              const editCountAtStart = localEditCountRef.current;
               const tokenAtStart = currentSessionToken;
               const profileIdAtStart = profileId;
 

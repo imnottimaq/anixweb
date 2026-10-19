@@ -69,6 +69,21 @@ test('downloadEpisodeDirect refuses to download HLS streams as fake MP4', async 
     );
 });
 
+test('download options find MP4 alternatives behind HLS or empty entries', () => {
+    const options = getDownloadStreamOptions({
+        '1080': [
+            {src: 'https://cdn.example.com/high.m3u8', type: 'application/x-mpegurl'},
+            {src: 'https://cdn.example.com/high.mp4', type: 'video/mp4'},
+        ],
+        '720': [{src: '', type: 'video/mp4'}, {src: 'https://cdn.example.com/low.mp4', type: 'video/mp4'}],
+        '480': [],
+    });
+    assert.equal(options[0].src, 'https://cdn.example.com/high.mp4');
+    assert.equal(options[0].isDirectMp4, true);
+    assert.equal(options[1].src, 'https://cdn.example.com/low.mp4');
+    assert.equal(options[2].isDirectMp4, false);
+});
+
 test('downloadEpisodeDirect streams real MP4 bytes with progress and completes', async () => {
     const chunk1 = new Uint8Array([0, 0, 0, 8]);
     const chunk2 = new Uint8Array([102, 116, 121, 112]);

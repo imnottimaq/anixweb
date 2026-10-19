@@ -6,6 +6,8 @@ export interface DownloadProgress {
     loaded: number;
     total: number;
     percent: number;
+    completedSegments?: number;
+    totalSegments?: number;
 }
 
 export interface DownloadStreamOption {
@@ -47,7 +49,9 @@ export function formatBytes(bytes: number): string {
 export function getDownloadStreamOptions(sources: Record<string, Array<{ src: string; type: string }>>): DownloadStreamOption[] {
     const qualities = Object.keys(sources).sort((a, b) => (Number(b) || 0) - (Number(a) || 0));
     return qualities.map(quality => {
-        const stream = sources[quality]?.[0];
+        const streams = sources[quality] || [];
+        const stream = streams.find(candidate => candidate.src && isDirectMp4Stream(candidate))
+            || streams.find(candidate => candidate.src);
         const src = stream?.src || '';
         const type = stream?.type || '';
         const isHls = isHlsStream({ src, type });
@@ -57,7 +61,7 @@ export function getDownloadStreamOptions(sources: Record<string, Array<{ src: st
 }
 
 export interface DownloadOptions {
-    stream: { src: string; type?: string };
+    stream: { src: string; type?: string; quality?: string };
     filename: string;
     onProgress?: (progress: DownloadProgress) => void;
     signal?: AbortSignal;
@@ -243,13 +247,7 @@ export function useEpisodeDownload() {
         reset();
         const currentJobId = ++jobIdRef.current;
 
-        if (isHlsStream(stream)) {
-            setStatus('unsupported');
-            setUnsupportedReason('HLS streams (.m3u8 playlists) are segmented media that require remuxing or transcoding to produce a single MP4 file. Direct MP4 downloading is available only for direct MP4 sources.');
-            return;
-        }
-
-        if (!isDirectMp4Stream(stream)) {
+        if (!isHlsStream(stream) && !isDirectMp4Stream(stream)) {
             setStatus('unsupported');
             setUnsupportedReason('Provider does not offer a direct downloadable MP4 format for this selection.');
             return;
@@ -260,7 +258,10 @@ export function useEpisodeDownload() {
         setStatus('downloading');
 
         try {
-            const result = await downloadEpisodeDirect({
+            const download = isHlsStream(stream)
+                ? (await import('./hlsDownloadClient.ts')).downloadHlsInWorker
+                : downloadEpisodeDirect;
+            const result = await download({
                 stream,
                 filename,
                 signal: controller.signal,

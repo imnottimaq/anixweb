@@ -8,12 +8,19 @@ import { useSettings } from '../shared/contexts/settingsContext';
 import styles from './HomepageScreen.module.css';
 import FilterModal from '../modals/FilterModal';
 import { useTranslation } from '../shared/useTranslation';
+import TabContextMenu, { type TabContextMenuItem } from '../components/TabContextMenu';
+import { HOME_TAB_ORDER, type HomeTabKey } from '../shared/types/settings';
+import { normalizeTabOrder } from '../shared/tabOrder';
+import { useReorderableTabs } from '../shared/useReorderableTabs';
+import TabDragHandle from '../components/TabDragHandle';
 
-const PAGE_ITEMS: { page: Page; buttonText: 'home.my' | 'home.latest' | 'home.ongoing' | 'home.announced' | 'home.completed' | 'home.films' }[] = [
+const PAGE_ITEMS: { page: Page; buttonText: 'home.my' | 'home.latest' | 'home.donghua' | 'home.ongoing' | 'home.announced' | 'home.completed' | 'home.films' }[] = [
+    { page: 'donghua', buttonText: 'home.donghua' },
     { page: 'my', buttonText: 'home.my' }, { page: 'latest', buttonText: 'home.latest' }, { page: 'ongoing', buttonText: 'home.ongoing' }, { page: 'announced', buttonText: 'home.announced' }, { page: 'ended', buttonText: 'home.completed' }, { page: 'films', buttonText: 'home.films' },
 ];
 
 const DEFAULT_FILTERS: Record<Exclude<Page, 'my'>, Filter> = {
+    donghua: { country: 'Китай' },
     latest: {},
     ongoing: { status_id: 2 },
     announced: { status_id: 3 },
@@ -21,12 +28,23 @@ const DEFAULT_FILTERS: Record<Exclude<Page, 'my'>, Filter> = {
     films: { category_id: 2 },
 };
 
-const HOME_TAB_BY_SETTING: Record<'latest' | 'my' | 'ongoing' | 'announced' | 'finished' | 'films', Page> = {
+const HOME_TAB_BY_SETTING: Record<HomeTabKey, Page> = {
+    donghua: 'donghua',
     latest: 'latest',
     my: 'my',
     ongoing: 'ongoing',
     announced: 'announced',
     finished: 'ended',
+    films: 'films',
+};
+
+const SETTING_BY_HOME_TAB: Record<Page, HomeTabKey> = {
+    donghua: 'donghua',
+    latest: 'latest',
+    my: 'my',
+    ongoing: 'ongoing',
+    announced: 'announced',
+    ended: 'finished',
     films: 'films',
 };
 
@@ -53,6 +71,7 @@ const EMPTY_FILTER: Required<Filter> = {
 
 function createTabs(): Record<Page, TabData> {
     return {
+        donghua: emptyTab(),
         my: emptyTab(),
         latest: emptyTab(),
         ongoing: emptyTab(),
@@ -78,14 +97,17 @@ function getMyFilters(): Filter {
 
 export default function HomepageScreen() {
     const { userToken } = useUser();
-    const { settings } = useSettings();
+    const { settings, setSettings } = useSettings();
     const { t } = useTranslation();
+    const orderedItems = normalizeTabOrder(settings.content.homeTabOrder, HOME_TAB_ORDER).map(key => PAGE_ITEMS.find(item => item.page === HOME_TAB_BY_SETTING[key])!);
+    const reorder = useReorderableTabs(orderedItems.map(item => item.page), order => setSettings(previous => ({ ...previous, content: { ...previous.content, homeTabOrder: order.map(page => SETTING_BY_HOME_TAB[page]) } })), page => t(PAGE_ITEMS.find(item => item.page === page)!.buttonText));
     const triggerRef = useRef<HTMLDivElement | null>(null);
     const loadingRequestsRef = useRef(new Set<string>());
     const latestRequestKeysRef = useRef(new Map<Page, string>());
-    const [activePage, setActivePage] = useState<Page>(() => HOME_TAB_BY_SETTING[settings.content.defaultTabOnHome]);
+    const [activePage, setActivePage] = useState<Page>(() => HOME_TAB_BY_SETTING[settings.content.defaultTabOnHome] ?? 'latest');
     const [myFilters, setMyFilters] = useState<Filter>(getMyFilters);
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+    const [tabContextMenu, setTabContextMenu] = useState<{ page: Page; x: number; y: number; trigger: HTMLElement } | null>(null);
     const [filterError, setFilterError] = useState<string | null>(null);
     const [retryVersion, setRetryVersion] = useState(0);
     const [myFilterVersion, setMyFilterVersion] = useState(0);
@@ -187,23 +209,46 @@ export default function HomepageScreen() {
     return (
         <div className={styles.body}>
             <div className={styles['side-panel']} role="tablist" aria-label={t('home.catalogAria')}>
-                {PAGE_ITEMS.map(({ page, buttonText }) => (
+                {orderedItems.map(({ page, buttonText }) => (
                     <button
+                        {...reorder.props(page)}
                         key={page}
                         role="tab"
                         aria-selected={activePage === page}
-                        className={activePage === page ? styles.active : ''}
+                        aria-haspopup="menu"
+                        className={`${reorder.tabClass} ${activePage === page ? styles.active : ''}`}
                         onClick={() => setActivePage(page)}
-                        onContextMenu={page === 'my' ? (e) => {
+                        onContextMenu={(e) => {
                             e.preventDefault();
-                            setIsFilterModalOpen(true);
-                        } : undefined}
+                            setTabContextMenu({
+                                page,
+                                x: e.clientX,
+                                y: e.clientY,
+                                trigger: e.currentTarget,
+                            });
+                        }}
+                        onKeyDown={(e) => {
+                            if (reorder.onKeyDown(e, page)) return;
+                            if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+                                e.preventDefault();
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setTabContextMenu({
+                                    page,
+                                    x: rect.left + rect.width / 2,
+                                    y: rect.bottom,
+                                    trigger: e.currentTarget,
+                                });
+                            }
+                        }}
                         title={page === 'my' ? t('home.myTabHint') : undefined}
                     >
                         {t(buttonText)}
+                        <TabDragHandle />
                     </button>
                 ))}
             </div>
+
+            <span className={reorder.announcementClass} aria-live="polite" aria-atomic="true">{reorder.announcement}</span>
 
             <div className={styles.content}>
                 {isMyTabUnconfigured ? (
@@ -241,6 +286,51 @@ export default function HomepageScreen() {
                     setFilterError(null);
                 }}
             />
+            {tabContextMenu && (() => {
+                const isDefault = settings.content.defaultTabOnHome === SETTING_BY_HOME_TAB[tabContextMenu.page];
+                const items: TabContextMenuItem[] = [
+                    {
+                        key: 'make-default',
+                        label: isDefault ? t('tabMenu.isDefault') : t('tabMenu.makeDefault'),
+                        disabled: isDefault,
+                        onClick: () => {
+                            const settingValue = SETTING_BY_HOME_TAB[tabContextMenu.page];
+                            setSettings(prev => ({
+                                ...prev,
+                                content: {
+                                    ...prev.content,
+                                    defaultTabOnHome: settingValue,
+                                },
+                            }));
+                        },
+                    },
+                ];
+
+                if (tabContextMenu.page === 'my') {
+                    items.push({
+                        key: 'change-filters',
+                        label: t('tabMenu.changeFilters'),
+                        restoreFocusOnSelect: false,
+                        onClick: () => {
+                            tabContextMenu.trigger.focus();
+                            setIsFilterModalOpen(true);
+                        },
+                    });
+                }
+
+                const currentTabItem = PAGE_ITEMS.find(item => item.page === tabContextMenu.page);
+
+                return (
+                    <TabContextMenu
+                        x={tabContextMenu.x}
+                        y={tabContextMenu.y}
+                        trigger={tabContextMenu.trigger}
+                        title={currentTabItem ? t(currentTabItem.buttonText) : undefined}
+                        items={items}
+                        onClose={() => setTabContextMenu(null)}
+                    />
+                );
+            })()}
         </div>
     );
 }

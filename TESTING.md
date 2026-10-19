@@ -53,6 +53,12 @@ This document describes the automated test infrastructure, commands, fixture bou
 
 ## Browser Installation
 
+`npm run test:production` builds the real app under `/anixweb/` and runs route recovery checks in Chromium, Firefox, and WebKit. Chromium additionally verifies service-worker installation, an unvisited lazy route opening offline, and offline reloads. Install these browsers with `npx playwright install chromium firefox webkit` (`--with-deps` on Linux). To run only the installed Chromium browser locally, use `npm run test:production -- --project chromium`.
+
+`tests/serviceWorker.test.mjs` exercises failed installation rollback, version transitions, scope-isolated cleanup, and API/media cache exclusions. Build tests also verify that every emitted precache asset exists for both root and subpath builds. Service workers are registered only in production; development uses Vite directly. Production worker updates wait for the previous version's tabs to close, keeping HTML and lazy chunks on the same build.
+
+Room closure regression tests distinguish server acknowledgement/`room_closed` from network loss, denial, and timeout. Failed closure retains membership and confirmation controls for retry. Settings restore tests render `App` and edit local settings during both profile validation and cloud loading. Search browser tests cover success followed by a failed different query and retry.
+
 Playwright Chromium browser binaries are required for running E2E tests:
 ```bash
 npx playwright install chromium

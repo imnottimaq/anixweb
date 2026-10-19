@@ -38,6 +38,34 @@ test('session replacement stops reconnection until explicit connect',async()=> {
     const h=setup();await h.client.connect('room-one');const s=h.sockets[0];s.open();s.message({type:'session_replaced'});assert.equal(h.statuses.at(-1),'replaced');assert.deepEqual(h.terminals,['session_replaced']);
     await new Promise(resolve=>setTimeout(resolve,550));assert.equal(h.sockets.length,1);await h.client.connect('room-one');assert.equal(h.sockets.length,2);h.client.disconnect();
 });
+
+test('closing a room requires an ack or authoritative closure, not a dropped connection', async () => {
+    const h = setup();
+    try {
+        await h.client.connect('room-one');
+        const socket = h.sockets[0];
+        socket.open();
+        socket.message({ type: 'room_state', state: snapshot(), serverTime: 1000 });
+        const pending = h.client.send({ type: 'close_room' });
+        const rejected = assert.rejects(pending, /ROOM_DISCONNECTED/);
+        socket.close();
+        await rejected;
+    } finally { h.client.disconnect(); }
+});
+
+test('an authoritative room_closed event completes a pending closure without an ack', async () => {
+    const h = setup();
+    try {
+        await h.client.connect('room-one');
+        const socket = h.sockets[0];
+        socket.open();
+        socket.message({ type: 'room_state', state: snapshot(), serverTime: 1000 });
+        const pending = h.client.send({ type: 'close_room' });
+        socket.message({ type: 'room_closed' });
+        await pending;
+        assert.deepEqual(h.terminals, ['room_closed']);
+    } finally { h.client.disconnect(); }
+});
 test('clock estimates RTT and advances with monotonic time',async()=> {
     const h=setup();await h.client.connect('room-one');const s=h.sockets[0];s.open();const ping=s.sent[0];h.setMono(100);s.message({type:'pong',requestId:ping.requestId,serverTime:2000});assert.equal(h.client.serverNow(),2050);h.setMono(300);assert.equal(h.client.serverNow(),2250);h.client.disconnect();
 });

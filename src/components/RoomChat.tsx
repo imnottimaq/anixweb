@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { type FormEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useRoomPresence } from '../shared/contexts/roomContext';
 import { useUser } from '../shared/contexts/userContext';
 import { useTranslation } from '../shared/useTranslation';
@@ -11,6 +11,7 @@ import styles from './RoomSocial.module.css';
 
 export interface RoomChatProps {
     compact?: boolean;
+    fill?: boolean;
 }
 
 function formatChatTime(timestamp: number): string {
@@ -27,7 +28,10 @@ function formatBytes(bytes: number): string {
 }
 
 const isPlaceholder = (txt: string) =>
-    txt === '📷 Фото' || txt === '📷 Image' || txt === '🎤 Голосовое сообщение' || txt === '🎤 Voice message';
+    txt === '\u{1F4F7} \u0424\u043E\u0442\u043E' ||
+    txt === '\u{1F4F7} Image' ||
+    txt === '\u{1F3A4} \u0413\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0435 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0435' ||
+    txt === '\u{1F3A4} Voice message';
 
 export default function RoomChat(props: RoomChatProps) {
     const {room} = useRoomPresence();
@@ -35,7 +39,8 @@ export default function RoomChat(props: RoomChatProps) {
     return <RoomChatSession key={`${room?.roomId ?? 'none'}:${userToken}`} {...props} />;
 }
 
-function RoomChatSession({ compact = false }: RoomChatProps) {
+function RoomChatSession({ compact = false, fill = false }: RoomChatProps) {
+    const counterId = useId();
     const { room, status, sendChat } = useRoomPresence();
     const { t } = useTranslation();
     const currentRoomId = useRef(room?.roomId);
@@ -312,7 +317,7 @@ function RoomChatSession({ compact = false }: RoomChatProps) {
     };
 
     return (
-        <div className={`${styles.chatContainer} ${compact ? styles.compact : ''}`} aria-label={t('roomSocial.chat')} onKeyDown={e => e.stopPropagation()}>
+        <div className={`${styles.chatContainer} ${compact ? styles.compact : ''} ${fill ? styles.fill : ''}`} aria-label={t('roomSocial.chat')} onKeyDown={e => e.stopPropagation()}>
             <div className={styles.messagesWrapper}>
                 <div
                     ref={messagesContainerRef}
@@ -369,12 +374,16 @@ function RoomChatSession({ compact = false }: RoomChatProps) {
                         onClick={() => scrollToBottom(true)}
                         aria-label={t('roomSocial.newMessages')}
                     >
-                        {t('roomSocial.newMessages')}
+                        <span>{t('roomSocial.newMessages')}</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M12 5v14M19 12l-7 7-7-7" />
+                        </svg>
                     </button>
                 )}
             </div>
 
             <form className={styles.chatForm} onSubmit={handleSubmit} noValidate onKeyDown={e => e.stopPropagation()}>
+                <div className={styles.composer}>
                 {imageDraft && (
                     <div className={styles.chatDraftPreview}>
                         <img src={imageDraft.previewUrl} alt="" className={styles.draftThumbnail} />
@@ -389,15 +398,27 @@ function RoomChatSession({ compact = false }: RoomChatProps) {
                             aria-label={t('roomSocial.removeAttachment')}
                             title={t('roomSocial.removeAttachment')}
                         >
-                            ✕
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M18 6L6 18M6 6l12 12" />
+                            </svg>
                         </button>
                     </div>
                 )}
 
+                <div className={styles.textInput}>
+                <span
+                    className={styles.charCounter}
+                    data-testid="chat-char-counter"
+                    id={counterId}
+                    aria-label={t('roomSocial.charsRemaining', { count: 500 - draft.length })}
+                >
+                    {draft.length}/500
+                </span>
                 <textarea
                     className={styles.chatTextarea}
                     placeholder={t('roomSocial.chatPlaceholder')}
                     aria-label={t('roomSocial.chat')}
+                    aria-describedby={counterId}
                     value={draft}
                     maxLength={500}
                     disabled={!isConnected || isSending}
@@ -409,8 +430,9 @@ function RoomChatSession({ compact = false }: RoomChatProps) {
                     }}
                     onKeyDown={handleKeyDown}
                 />
+                </div>
 
-                <div className={styles.inputFooter}>
+                <div className={styles.inputFooter} data-chat-actions>
                     <div className={styles.chatActionsGroup}>
                         <input
                             type="file"
@@ -428,7 +450,10 @@ function RoomChatSession({ compact = false }: RoomChatProps) {
                             disabled={!isConnected || isSending}
                             onClick={() => fileInputRef.current?.click()}
                         >
-                            📷
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                                <circle cx="12" cy="13" r="4" />
+                            </svg>
                         </button>
                         <VoiceRecorder
                             disabled={!isConnected || isSending}
@@ -438,14 +463,6 @@ function RoomChatSession({ compact = false }: RoomChatProps) {
                         />
                     </div>
 
-                    <span
-                        className={styles.charCounter}
-                        data-testid="chat-char-counter"
-                        aria-live="polite"
-                    >
-                        {t('roomSocial.charsRemaining', { count: 500 - draft.length })}
-                    </span>
-
                     <button
                         type="submit"
                         className={styles.sendButton}
@@ -453,6 +470,7 @@ function RoomChatSession({ compact = false }: RoomChatProps) {
                     >
                         {t('roomSocial.send')}
                     </button>
+                </div>
                 </div>
 
                 {validationError && (

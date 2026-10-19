@@ -1,18 +1,34 @@
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
-import { act, render, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import App from '../../src/App';
 import { roomErrorKey } from '../../src/shared/roomError';
+import { useSettings } from '../../src/shared/contexts/settingsContext';
+import { loadAccountSettings } from '../../src/shared/cloudSettings';
+import { defaultAppSettings } from '../../src/shared/types/settings';
+import { createDeferred } from './helpers/deferred';
 
 vi.mock('../../src/app/router', () => ({ router: {} }));
-vi.mock('react-router-dom', () => ({ RouterProvider: () => null }));
+vi.mock('react-router-dom', () => ({ RouterProvider: () => <SettingsProbe /> }));
 vi.mock('../../src/shared/contexts/RoomProvider', () => ({ default: ({ children }: { children: ReactNode }) => children }));
+vi.mock('../../src/shared/cloudSettings', async importOriginal => ({
+    ...await importOriginal<typeof import('../../src/shared/cloudSettings')>(),
+    loadAccountSettings: vi.fn(),
+}));
+
+function SettingsProbe() {
+    const { settings, setSettings } = useSettings();
+    return <button onClick={() => setSettings(previous => ({ ...previous, appearance: { ...previous.appearance, theme: 'dark' } }))}>
+        {settings.appearance.theme}
+    </button>;
+}
 
 beforeEach(() => {
     localStorage.clear();
     document.cookie = 'anixart_token=fixture-token; path=/';
     localStorage.setItem('user_id', '42');
     localStorage.setItem('user_room_identity', JSON.stringify({ id: 42, login: 'StoredUser' }));
+    vi.mocked(loadAccountSettings).mockReset().mockRejectedValue(new Error('No cloud settings'));
 });
 afterEach(() => {
     vi.unstubAllGlobals();
@@ -46,4 +62,22 @@ it('distinguishes a required sign-in from an unavailable auth API', () => {
         expect(roomErrorKey(code)).toBe('roomUX.errorSignIn');
     }
     expect(roomErrorKey('AUTH_UNAVAILABLE')).toBe('roomUX.errorAuth');
+});
+
+it.each(['profile', 'cloud'] as const)('preserves local edits made while the %s request is pending', async pendingStage => {
+    const profile = createDeferred<Response>();
+    const cloud = createDeferred<Awaited<ReturnType<typeof loadAccountSettings>>>();
+    vi.stubGlobal('fetch', vi.fn(() => profile.promise));
+    vi.mocked(loadAccountSettings).mockReturnValue(cloud.promise);
+    localStorage.setItem('app_settings', JSON.stringify({ ...defaultAppSettings, appearance: { ...defaultAppSettings.appearance, theme: 'light' } }));
+    render(<App />);
+    if (pendingStage === 'profile') fireEvent.click(screen.getByRole('button', { name: 'light' }));
+    await act(async () => { profile.resolve(Response.json({ code: 0, is_my_profile: true, profile: { id: 42, login: 'VerifiedUser' } })); });
+    await waitFor(() => expect(loadAccountSettings).toHaveBeenCalled());
+    if (pendingStage === 'cloud') fireEvent.click(screen.getByRole('button', { name: 'light' }));
+    await act(async () => {
+        cloud.resolve({ payload: { version: 1, uploadedAt: new Date().toISOString(), settings: { ...defaultAppSettings, appearance: { ...defaultAppSettings.appearance, theme: 'light' } }, my_filters: null } });
+    });
+    expect(screen.getByRole('button', { name: 'dark' })).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem('app_settings')!).appearance.theme).toBe('dark');
 });

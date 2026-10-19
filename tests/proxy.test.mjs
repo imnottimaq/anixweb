@@ -427,13 +427,14 @@ test('compiled production Vite bundle preserves production worker URLs in browse
             globalThis.process = originalProcess;
         }
 
-        // 2. Verify getRoomServerUrl in index chunk
-        const indexFile = assetFiles.find(f => f.startsWith('index-') && f.endsWith('.js'));
-        assert.ok(indexFile, 'Production build must emit index chunk');
+        // 2. The room module may be split out of the entry chunk by Vite.
+        const indexFile = assetFiles.find(f => f.startsWith('watchRoom-') && f.endsWith('.js'))
+            ?? assetFiles.find(f => f.startsWith('index-') && f.endsWith('.js'));
+        assert.ok(indexFile, 'Production build must include the room session module');
         const indexCode = readFileSync(join(assetsDir, indexFile), 'utf8');
         assert.ok(
             indexCode.includes('anixweb-server.imnottimaq.workers.dev'),
-            'Production index chunk must include worker domain for watchRoom'
+            'Production room module must include worker domain for watchRoom'
         );
         assert.ok(
             !indexCode.includes("`http://localhost:8787`.replace"),

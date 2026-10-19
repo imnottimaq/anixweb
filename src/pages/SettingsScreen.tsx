@@ -525,6 +525,7 @@ export default function SettingsScreen(){
                         <label className={styles['select-setting']}>
                             <span><strong>{t('settings.startPage')}</strong><small>{t('settings.startPage.desc')}</small></span>
                             <select value={settings.content.defaultTabOnHome} onChange={event => updateContent({ defaultTabOnHome: event.target.value as typeof settings.content.defaultTabOnHome })}>
+                                <option value="donghua">{t('home.donghua')}</option>
                                 <option value="latest">{t('home.latest')}</option><option value="my">{t('home.my')}</option><option value="ongoing">{t('home.ongoing')}</option><option value="announced">{t('home.announced')}</option><option value="finished">{t('home.completed')}</option><option value="films">{t('home.films')}</option>
                             </select>
                         </label>
@@ -644,7 +645,11 @@ export default function SettingsScreen(){
                                 <>
                                     <div className={styles['cloud-actions-row']}>
                                         <div className={styles['account-sync-badge']}>
-                                            <span aria-hidden="true">●</span>
+                                            <span aria-hidden="true">
+                                                <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor">
+                                                    <circle cx="4" cy="4" r="3.5" />
+                                                </svg>
+                                            </span>
                                             {t('settings.accountSync.profile', {
                                                 login: userProfile?.login || 'User',
                                                 id: String(userId),

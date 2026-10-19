@@ -1,5 +1,5 @@
 import { type Anime } from "./api";
-export type Page = 'my' | 'latest' | 'ongoing' | 'announced' | 'ended' | 'films';
+export type Page = 'my' | 'latest' | 'donghua' | 'ongoing' | 'announced' | 'ended' | 'films';
 
 export type TabData = {
     releases: Anime[];

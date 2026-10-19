@@ -315,7 +315,7 @@ describe('Room Attachments RTL Regression Tests', () => {
         expect(screen.getByRole('dialog')).toBeInTheDocument();
 
         // Press Escape
-        fireEvent.keyDown(window, { key: 'Escape' });
+        fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
 
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });

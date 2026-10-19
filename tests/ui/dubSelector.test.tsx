@@ -244,7 +244,7 @@ describe('DubSelectModal Redesign (src/modals/DubSelectModal.tsx)', () => {
         expect(closeBtn).toBeInTheDocument();
         expect(dubSelect).toBeInTheDocument();
         expect(providerSelect).toBeInTheDocument();
-        expect(screen.getByRole('img', { name: 'Закрыть' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Закрыть' })).toBeInTheDocument();
         expect(screen.getByText('Озвучка')).toBeInTheDocument();
         expect(screen.getByText('Источник')).toBeInTheDocument();
 

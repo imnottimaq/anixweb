@@ -1,4 +1,5 @@
 export * from './types.ts';
+export * from './bookmarks.ts';
 export * from './statusMapper.ts';
 export * from './xmlParser.ts';
 export * from './xmlSerializer.ts';

@@ -105,7 +105,23 @@
 .anime-rating { display: inline-flex; align-items: center; gap: 4px; margin-left: 2px; color: var(--status-favorite); font-weight: 700; }
 .anime-rating img { width: 15px; height: 15px; }
 .anime-description { display: -webkit-box; margin: 0; overflow: hidden; color: color-mix(in srgb, var(--text-color) 72%, transparent); font-size: 13.5px; line-height: 1.4; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
-.comment-activity { margin: auto 0 0; color: var(--text-secondary); font-size: 12.5px; line-height: 1.2; }
+.comment-activity {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 7px;
+  margin: auto 0 0;
+  padding: 6px 9px;
+  border: 1px solid color-mix(in srgb, var(--accent-color) 24%, transparent);
+  border-radius: 7px;
+  color: color-mix(in srgb, var(--text-color) 85%, var(--accent-color));
+  background: color-mix(in srgb, var(--accent-color) 10%, transparent);
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+}
+.comment-activity svg { flex: 0 0 17px; width: 17px; height: 17px; }
 
 .status-watching { background-color: var(--status-watching); color: #121212; }
 .status-plan { background-color: var(--status-plan); color: #ffffff; }

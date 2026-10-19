@@ -7,6 +7,7 @@ import { useApi } from '../shared/apiClient';
 import { useTranslation } from '../shared/useTranslation';
 import type { Anime } from '../shared/types/api';
 import styles from './ReleaseContextMenu.module.css';
+import ActionIcon from './ActionIcon';
 
 type MenuTarget = {id: number; name: string; x: number; y: number; trigger: HTMLAnchorElement; serial: number; initial: ReleasePatch | null};
 const STATUS_KEYS = ['releaseMenu.removeList', 'status.watching', 'status.planned', 'status.watched', 'status.hold_on', 'status.dropped'] as const;
@@ -157,9 +158,9 @@ function ReleaseContextMenu({target, onClose}: {target: MenuTarget; onClose: () 
         <p className={styles.title}>{target.name}</p>
         <button ref={moveButton} type="button" role="menuitem" aria-haspopup="menu" aria-expanded={expanded} disabled={disabled} onClick={() => setExpanded(value=>!value)} onKeyDown={event=>{
             if (event.key==='ArrowRight') {event.preventDefault(); event.stopPropagation(); setExpanded(true);}
-        }}>{t('releaseMenu.move')} <span aria-hidden="true">&#8250;</span></button>
+        }}>{t('releaseMenu.move')} <ActionIcon name="chevron" /></button>
         {expanded && <div className={styles.submenu} role="menu" aria-label={t('releaseMenu.move')} ref={element => {if (element) element.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();}}>
-            {STATUS_KEYS.map((key,status)=><button type="button" key={key} role="menuitemradio" aria-checked={data?.profile_list_status===status} disabled={disabled} onClick={()=>void mutate(status)}><span aria-hidden="true">{data?.profile_list_status===status ? '\u2713' : ''}</span>{t(key)}</button>)}
+            {STATUS_KEYS.map((key,status)=><button type="button" key={key} role="menuitemradio" aria-checked={data?.profile_list_status===status} disabled={disabled} onClick={()=>void mutate(status)}><span aria-hidden="true">{data?.profile_list_status===status && <ActionIcon name="check" />}</span>{t(key)}</button>)}
         </div>}
         <button type="button" role="menuitem" disabled={disabled} onClick={()=>void mutate()}>{t(data?.is_favorite ? 'releaseMenu.removeFavorite' : 'release.addToFavorites')}</button>
         {!userToken && <Link role="menuitem" to="/account/login" onClick={onClose}>{t('release.loginToChangeStatus')}</Link>}

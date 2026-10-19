@@ -27,6 +27,7 @@
     "tests/**/*.ts",
     "tests/**/*.tsx",
     "vitest.config.ts",
-    "playwright.config.ts"
+    "playwright.config.ts",
+    "playwright.production.config.ts"
   ]
 }

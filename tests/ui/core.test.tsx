@@ -541,8 +541,11 @@ describe('Proxy Utilities (src/shared/proxy.ts)', () => {
     });
 
     it('resolves default proxy and media proxy URLs when environment variables are unset', () => {
+        for (const key of ['VITE_PROXY_SERVER_URL', 'VITE_ROOM_SERVER_URL', 'VITE_MEDIA_PROXY_URL']) vi.stubEnv(key, '');
+        try {
         expect(getProxyServerUrl()).toBe(DEFAULT_PROXY_SERVER_URL);
         expect(getMediaProxyUrl()).toBe(DEFAULT_MEDIA_PROXY_URL);
+        } finally { vi.unstubAllEnvs(); }
     });
 
     it('cleans double percent-encoded URLs', () => {

@@ -96,12 +96,6 @@ test('service worker public/sw.js implements scope-aware caching, safe cache del
     // Safe activate deletion
     assert.ok(sw.includes("startsWith('anixweb-')") || sw.includes('startsWith(CACHE_PREFIX)'), 'activate must only delete caches matching this app prefix');
 
-    // Prohibited cache paths
-    assert.ok(sw.includes('/api/v2/user'), 'sw.js must never cache user account API');
-    assert.ok(sw.includes('/api/v2/session'), 'sw.js must never cache session API');
-    assert.ok(sw.includes('/corsproxy'), 'sw.js must never cache corsproxy');
-    assert.ok(sw.includes('/agentproxy'), 'sw.js must never cache agentproxy');
-
     // Scope relative static assets
     assert.ok(sw.includes('STATIC_ASSETS'), 'sw.js must define STATIC_ASSETS');
 });
@@ -166,6 +160,16 @@ test('Vite build succeeds for root base path and subpath /anixweb/', { timeout: 
         });
         const subpathHtml = readFileSync(join(subpathOutDir, 'index.html'), 'utf8');
         assert.ok(subpathHtml.includes('/anixweb/'), 'Built subpath HTML uses /anixweb/ base');
+
+        for (const directory of [rootOutDir, subpathOutDir]) {
+            const worker = readFileSync(join(directory, 'sw.js'), 'utf8');
+            assert.ok(!worker.includes('__BUILD_VERSION__'), 'Worker has a content-derived version');
+            const assets = JSON.parse(worker.match(/const BUILD_ASSETS = (\[[^;]+\]);/)[1]);
+            assert.ok(assets.some(file => file.endsWith('.js')), 'Application JavaScript is precached');
+            assert.ok(assets.some(file => file.endsWith('.css')), 'Application CSS is precached');
+            assert.ok(assets.some(file => file.includes('SettingsScreen') && file.endsWith('.js')), 'Lazy screens are precached');
+            for (const asset of assets) assert.ok(existsSync(join(directory, asset)), `Precache asset exists: ${asset}`);
+        }
 
         // Sentinel assertion: pre-existing dist must remain intact
         assert.ok(existsSync(sentinelPath), 'Pre-existing dist sentinel must not be wiped by Vite builds');

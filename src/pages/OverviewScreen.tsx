@@ -24,7 +24,6 @@ type DiscoverComment = DiscoverCommentItem;
 
 type OverviewData = {
     interesting: DiscoverInteresting[];
-    recommendations: Anime[];
     watching: Anime[];
     discussing: Anime[];
     comments: DiscoverComment[];
@@ -32,7 +31,7 @@ type OverviewData = {
 };
 
 const EMPTY_DATA: OverviewData = {
-    interesting: [], recommendations: [], watching: [], discussing: [], comments: [], failedSections: 0,
+    interesting: [], watching: [], discussing: [], comments: [], failedSections: 0,
 };
 
 
@@ -42,24 +41,28 @@ export default function OverviewScreen() {
     const navigate = useNavigate();
     const [activeInterestingIndex, setActiveInterestingIndex] = useState(0);
 
+    const recommendations = useAsyncLoad(
+        signal => api.post<PagedResponse<Anime>>('/discover/recommendations/-1?previous_page=-1', undefined, undefined, { signal }),
+        [api],
+    );
+    const recommendedReleases = recommendations.data?.content ?? [];
+
     const { data = EMPTY_DATA, isLoading, error, reload } = useAsyncLoad(signal => {
-        const get = <T,>(path: string) => api.get<PagedResponse<T>>(path, { signal });
+        const post = <T,>(path: string) => api.post<PagedResponse<T>>(path, undefined, undefined, { signal });
 
         const promise = Promise.allSettled([
-            get<DiscoverInteresting>('/discover/interesting'),
-            get<Anime>('/discover/recommendations/-1'),
-            get<Anime>('/discover/watching/0'),
-            get<Anime>('/discover/discussing'),
-            get<DiscoverComment>('/discover/comments'),
+            post<DiscoverInteresting>('/discover/interesting'),
+            post<Anime>('/discover/watching/0'),
+            post<Anime>('/discover/discussing'),
+            post<DiscoverComment>('/discover/comments'),
         ] as const).then(results => {
             if (signal.aborted) throw new DOMException('Запрос отменён', 'AbortError');
-            const [interesting, recommendations, watching, discussing, comments] = results;
+            const [interesting, watching, discussing, comments] = results;
             const failedSections = results.filter(result => result.status === 'rejected').length;
             if (failedSections === results.length) throw new Error('Не удалось загрузить обзор.');
 
             const result = {
                 interesting: getContent(interesting),
-                recommendations: getContent(recommendations),
                 watching: getContent(watching),
                 discussing: getContent(discussing),
                 comments: resolveCommentReleases(getContent(comments)),
@@ -129,16 +132,20 @@ export default function OverviewScreen() {
                     <span>{t('overview.random')}</span>
                 </Link>
             </nav>
+        </>}
 
             <section className={styles.section}>
                 <SectionTitle title={t('overview.recommended')} description={t('overview.recommendedDescription')} />
-                {data.recommendations.length > 0
+                {recommendations.isLoading ? <PageState status="loading" message={t('overview.recommendationsLoading')} />
+                    : recommendations.error ? <PageState status="error" message={t('overview.recommendationsError')} onRetry={recommendations.reload} />
+                    : recommendedReleases.length > 0
                     ? <div className={styles.posterRail}>
-                        {data.recommendations.map(anime => <AnimeCard key={anime.id} anime={anime} />)}
+                        {recommendedReleases.map(anime => <AnimeCard key={anime.id} anime={anime} />)}
                     </div>
-                    : data.failedSections === 0 ? <p className={styles.recommendationsEmpty}>{t('overview.rateMore')}</p> : null}
+                    : <p className={styles.recommendationsEmpty}>{t('overview.rateMore')}</p>}
             </section>
 
+        {!isLoading && !error && <>
             {data.watching.length > 0 && <section className={styles.section}>
                 <SectionTitle title={t('overview.watching')} />
                 <div className={styles.posterRail}>
@@ -153,7 +160,7 @@ export default function OverviewScreen() {
                 </div>
             </section>}
 
-            {!data.interesting.length && !data.recommendations.length && !data.watching.length && !data.discussing.length && <p className={styles.empty}>{t('overview.empty')}</p>}
+            {!data.interesting.length && !recommendedReleases.length && !data.watching.length && !data.discussing.length && <p className={styles.empty}>{t('overview.empty')}</p>}
         </>}
     </PageLayout>;
 }

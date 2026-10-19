@@ -70,13 +70,13 @@ function Lobby() {
             </div>
             <p className={styles.heroDescription}>{t('watchRoom.description')}</p>
         </header>
-        {activeRoomId && <div className={styles.activeRoom}><div><span className={styles.eyebrow}>{t('roomUX.activeTitle')}</span><strong>{room?.title ?? t('watchRoom.room')}</strong></div><Link className={styles.primaryLink} to={`/together/${activeRoomId}`}>{t('roomUX.returnRoom')} →</Link></div>}
+        {activeRoomId && <div className={styles.activeRoom}><div><span className={styles.eyebrow}>{t('roomUX.activeTitle')}</span><strong>{room?.title ?? t('watchRoom.room')}</strong></div><Link className={styles.primaryLink} to={`/together/${activeRoomId}`}><span>{t('roomUX.returnRoom')}</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7" /></svg></Link></div>}
         {!userToken && <div className={styles.signIn}><div><strong>{t('roomUX.signInTitle')}</strong><p>{t('roomUX.signInHint')}</p></div><Link className={styles.primaryLink} to="/account/login">{t('nav.account')}</Link></div>}
         <section className={styles.publicSection} aria-labelledby="public-rooms-title" aria-busy={loading}>
             <header className={styles.sectionHeading}><div><h2 id="public-rooms-title">{t('watchRoom.publicRooms')}</h2><p className={styles.muted}>{t('roomUX.publicHintList')}</p></div><button className={styles.secondary} type="button" disabled={loading} onClick={() => void load()}>{t('watchRoom.refresh')}</button></header>
             {listError && <p role="alert" className={styles.inlineError}>{listError}</p>}
             <div className={styles.rooms}>{rooms.map(r => <Link key={r.roomId} to={`/together/${r.roomId}`} className={styles.roomCard}>
-                <span className={styles.roomIcon} aria-hidden="true"><img src={PlayIcon} alt="" /></span><div><strong>{r.title}</strong><p>{r.media?.releaseName ?? t('watchRoom.noEpisode')}</p>{r.media && <small>{r.media.episodeName}</small>}</div><span className={styles.roomCount}>{t(`watchRoom.participants.${selectPlural(r.participants)}`, { count: r.participants })}<span aria-hidden="true"> ↗</span></span>
+                <span className={styles.roomIcon} aria-hidden="true"><img src={PlayIcon} alt="" /></span><div><strong>{r.title}</strong><p>{r.media?.releaseName ?? t('watchRoom.noEpisode')}</p>{r.media && <small>{r.media.episodeName}</small>}</div><span className={styles.roomCount}>{t(`watchRoom.participants.${selectPlural(r.participants)}`, { count: r.participants })}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ display: 'inline-block', verticalAlign: 'middle', marginLeft: 4 }}><path d="M7 17L17 7M7 7h10v10" /></svg></span>
             </Link>)}</div>
             {loading && <p role="status" className={styles.muted}>{t('page.loading')}</p>}
             {!rooms.length && !loading && !listError && <div className={styles.emptyState}><strong>{t('roomUX.emptyRooms')}</strong><p>{t('roomUX.emptyRoomsHint')}</p></div>}
@@ -124,23 +124,24 @@ function ConnectedRoom({ roomId }: { roomId: string }) {
     const searching = normalizedQuery.length >= 2 && (result.query !== normalizedQuery || result.status === 'loading');
 
     return <section className={styles.page}>
-        <Link className={styles.back} to="/together">← {t('watchRoom.allRooms')}</Link>
+        <Link className={styles.back} to="/together"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: 6 }}><path d="M19 12H5M12 19l-7-7 7-7" /></svg><span>{t('watchRoom.allRooms')}</span></Link>
         <header className={styles.roomPageHeader}><div><span className={styles.eyebrow}>{t('watchRoom.title')}</span><h1>{room?.title ?? t('watchRoom.room')}</h1></div>{room && <span className={styles.badge}>{t(room.visibility === 'private' ? 'watchRoom.privateRoom' : 'watchRoom.publicRoom')}</span>}</header>
         {!userToken ? <div className={styles.signIn}><p>{t('roomUX.signInHint')}</p><Link className={styles.primaryLink} to="/account/login">{t('nav.account')}</Link></div> : <div className={styles.roomGrid}>
             <div className={styles.roomContent}>
-                <section className={`${styles.card} ${styles.mediaHero}`} aria-labelledby="room-media-title">
+                {room?.media && <section className={`${styles.card} ${styles.mediaHero}`} aria-labelledby="room-media-title">
                     <span className={styles.mediaIcon} aria-hidden="true"><img src={PlayIcon} alt="" /></span>
                     <div><p className={styles.eyebrow}>{room?.media ? t('watchRoom.nowWatching') : t('watchRoom.title')}</p><h2 id="room-media-title">{room?.media?.releaseName ?? t('roomUX.emptyMedia')}</h2>
                         <p className={styles.muted}>{room?.media?.episodeName ?? t(canControl ? 'roomUX.emptyMediaHint' : 'roomUX.waitHostHint')}</p>
-                        {room?.media && <div className={styles.mediaActions}><Link className={styles.primaryLink} to={`/anime/${room.media.releaseId}/watch?room=${encodeURIComponent(roomId)}`}>{t('roomUX.startTogether')} <span aria-hidden="true">→</span></Link><span className={styles.muted}>{room.barrier ? t('roomV2.waiting') : t(room.playback.paused ? 'roomUX.paused' : 'roomUX.playing')}</span></div>}
+                        {room?.media && <div className={styles.mediaActions}><Link className={styles.primaryLink} to={`/anime/${room.media.releaseId}/watch?room=${encodeURIComponent(roomId)}`}><span>{t('roomUX.startTogether')}</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7" /></svg></Link><span className={styles.muted}>{room.barrier ? t('roomV2.waiting') : t(room.playback.paused ? 'roomUX.paused' : 'roomUX.playing')}</span></div>}
                     </div>
-                </section>
+                </section>}
+                {!room?.media && !canControl && <p className={styles.muted}>{t('roomUX.waitHostHint')}</p>}
                 {canControl && (selected ? <RoomMediaPicker release={selected} onCancel={cancelSelection} onSelected={selectMedia} disabled={status !== 'connected'} /> : <section className={styles.card} aria-labelledby="room-search-title">
                     <h2 id="room-search-title">{t('roomUX.chooseAnime')}</h2>
                     <label className={styles.field}>{t('watchRoom.searchAnime')}<input ref={searchInput} value={query} placeholder={t('watchRoom.searchPlaceholder')} onChange={event => setQuery(event.target.value)} /></label>
                     {normalizedQuery.length < 2 ? <p className={styles.fieldHint}>{t('roomUX.searchHint')}</p> : searching ? <p role="status" className={styles.muted}>{t('watchRoom.searching')}</p> : result.status === 'error' ? <p role="alert" className={styles.inlineError}>{t('watchRoom.searchError')}</p> : <div className={styles.searchResults}>
                         {result.items.length ? result.items.map(release => <button type="button" key={release.id} className={styles.searchResult} onClick={() => setSelected(release)}>
-                            {release.image && <RemoteImage src={release.image} alt="" loading="lazy" />}<span><strong>{language === 'english' ? release.title_original || release.title_ru : release.title_ru || release.title_original}</strong><small>{release.year || t('watchRoom.unknownYear')} · {t('watchRoom.episodeCount', { count: release.episodes_released || 0 })}</small></span><span aria-hidden="true">→</span>
+                            {release.image && <RemoteImage src={release.image} alt="" loading="lazy" />}<span><strong>{language === 'english' ? release.title_original || release.title_ru : release.title_ru || release.title_original}</strong><small>{release.year || t('watchRoom.unknownYear')} · {t('watchRoom.episodeCount', { count: release.episodes_released || 0 })}</small></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
                         </button>) : <p className={styles.muted}>{t('roomUX.searchEmpty')}</p>}
                     </div>}
                 </section>)}

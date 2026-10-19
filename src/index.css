@@ -26,6 +26,13 @@
   --radius-card: 8px;
   --radius-pill: 999px;
   --control-height: 40px;
+  --dialog-padding: 20px;
+  --dialog-radius: var(--radius-card);
+  --dialog-backdrop: rgb(0 0 0 / 55%);
+  --dialog-blur: 8px;
+  --popup-background: var(--card-bg);
+  --popup-shadow: var(--elevation-high);
+
   --focus-ring-color: color-mix(in srgb, var(--accent-color) 75%, transparent);
   --focus-ring: 2px solid var(--focus-ring-color);
   --focus-ring-offset: 2px;
@@ -147,6 +154,8 @@
 
 html {
   color-scheme: dark;
+  /* Keep centered layouts fixed when loading states remove the page scrollbar. */
+  scrollbar-gutter: stable;
 }
 
 [data-theme="light"] {
@@ -279,4 +288,8 @@ button, input, select, textarea {
     --accent-text-color: HighlightText;
     --focus-ring: 2px solid Highlight;
   }
+}
+
+@media (max-width: 540px) {
+  :root { --dialog-padding: 16px; }
 }

@@ -117,11 +117,26 @@ describe('Schedule real weekday response', () => {
 });
 
 describe('Overview and shared navigation', () => {
+    it('uses the native POST contract and renders recommendations without waiting for other sections', async () => {
+        mockPost.mockImplementation((path: string) => path.includes('recommendations')
+            ? Promise.resolve({ code: 0, content: [anime] }) : new Promise(() => {}));
+        providers(<OverviewScreen />);
+        expect(await screen.findByRole('link', { name: /First release/ })).toBeVisible();
+        expect(mockPost).toHaveBeenCalledWith('/discover/recommendations/-1?previous_page=-1', undefined, undefined, { signal: expect.any(AbortSignal) });
+        expect(mockGet).not.toHaveBeenCalled();
+    });
+    it('shows the native eligibility and daily refresh explanation even if another section fails', async () => {
+        mockPost.mockImplementation((path: string) => path.includes('interesting')
+            ? Promise.reject(new Error('Outage')) : Promise.resolve({ code: 0, content: [] }));
+        providers(<OverviewScreen />);
+        expect(await screen.findByText(/Positively rate at least 20 releases/)).toHaveTextContent('once a day');
+        expect(await screen.findByRole('alert')).toHaveTextContent('Some sections could not be loaded');
+    });
     it('renders catalog-ID comment links and leaves unresolved references as readable articles', async () => {
         const releases = resolveCommentReleases([{ id: 1, profile: { login: 'User' }, message: 'Resolved comment', release: 71 },
             { id: 2, profile: { login: 'Other' }, message: 'Full release', release: { '@id': 71, id: 9101, title_original: 'First season' } },
             { id: 3, profile: { login: 'Unknown' }, message: 'Unknown reference', release: 999 }]);
-        mockGet.mockImplementation((path: string) => Promise.resolve({ code: 0, content: path === '/discover/comments' ? releases : [] }));
+        mockPost.mockImplementation((path: string) => Promise.resolve({ code: 0, content: path === '/discover/comments' ? releases : [] }));
         providers(<OverviewScreen />);
         expect(await screen.findByRole('link', { name: /Resolved comment/ })).toHaveAttribute('href', '/anime/9101');
         expect(screen.queryByRole('link', { name: /Unknown reference/ })).not.toBeInTheDocument();
@@ -131,15 +146,15 @@ describe('Overview and shared navigation', () => {
     });
     it('surfaces partial failure, retries it, and does not cache outages on remount', async () => {
         let fail = true;
-        mockGet.mockImplementation((path: string) => path.includes('recommendations') && fail ? Promise.reject(new Error('Outage')) : Promise.resolve({ code: 0, content: path.includes('recommendations') ? [anime] : [] }));
+        mockPost.mockImplementation((path: string) => path.includes('recommendations') && fail ? Promise.reject(new Error('Outage')) : Promise.resolve({ code: 0, content: path.includes('recommendations') ? [anime] : [] }));
         const user = userEvent.setup(); const view = providers(<OverviewScreen />);
-        expect(await screen.findByRole('alert')).toHaveTextContent('Some sections could not be loaded');
+        expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load recommendations.');
         fail = false; await user.click(screen.getByRole('button', { name: 'Try again' }));
         expect(await screen.findByRole('link', { name: /First release/ })).toBeVisible();
         expect(screen.queryByRole('alert')).not.toBeInTheDocument();
         view.unmount(); providers(<OverviewScreen />);
         await screen.findByRole('link', { name: /First release/ });
-        expect(mockGet.mock.calls.filter(call => call[0].includes('recommendations'))).toHaveLength(3);
+        expect(mockPost.mock.calls.filter(call => call[0].includes('recommendations'))).toHaveLength(3);
     });
     it('preserves release provider and navigation controls; Escape restores menu-trigger focus', async () => {
         function Probe() { return <span data-testid="release-provider">{useContext(ReleaseActionsContext) ? 'available' : 'missing'}</span>; }

@@ -10,7 +10,7 @@ export default defineConfig({
   outputDir: './test-results/playwright-artifacts',
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5180',
-    trace: 'off',
+    trace: 'retain-on-failure',
   },
   webServer: {
     command: 'npx vite --host 127.0.0.1 --port 5180 --strictPort',

@@ -72,11 +72,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Playwright Chromium
-        run: npx playwright install chromium --with-deps
+      - name: Install Playwright browsers
+        run: npx playwright install chromium firefox webkit --with-deps
 
       - name: Run E2E tests
         run: npm run test:e2e
+
+      - name: Test production routes and offline shell
+        run: npm run test:production
 
   deploy:
     runs-on: ubuntu-latest

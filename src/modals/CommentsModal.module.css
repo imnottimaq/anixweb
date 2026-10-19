@@ -2,7 +2,7 @@
     --modal-sticky-header-padding-top: 12px;
     --modal-sticky-header-padding-bottom: 12px;
     overflow-x: hidden;
-    border-radius: 1rem;
+    border-radius: var(--dialog-radius);
 }
 
 .message { margin: 20px 0; color: var(--text-secondary); text-align: center; }

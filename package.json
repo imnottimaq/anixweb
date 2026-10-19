@@ -12,11 +12,14 @@
     "test:ui": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "test:production": "playwright test --config playwright.production.config.ts",
     "preview": "vite preview"
   },
   "dependencies": {
     "anime4k-webgpu": "^1.0.0",
     "hls.js": "^1.6.16",
+    "m3u8-parser": "^7.2.0",
+    "mux.js": "^6.3.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.1"
@@ -27,6 +30,7 @@
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",
+    "@types/m3u8-parser": "^7.2.6",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",

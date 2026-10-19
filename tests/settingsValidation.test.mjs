@@ -4,6 +4,26 @@ import { defaultAppSettings, defaultPlayerKeybindings, defaultCustomColors } fro
 import { parseImportedSettings, normalizeLegacySettings } from '../src/shared/settingsNormalizer.ts';
 import { saveAccountSettings, loadAccountSettings, safeSetItem } from '../src/shared/cloudSettings.ts';
 
+test('saved tab orders survive settings migration and import with Donghua appended to older orders', () => {
+    const payload = { content: { defaultTabOnHome: 'donghua', homeTabOrder: ['films', 'my', 'latest'], favoritesTabOrder: ['history', 'favorites'] } };
+    const migrated = normalizeLegacySettings(payload);
+    assert.equal(migrated.content.defaultTabOnHome, 'donghua');
+    assert.deepEqual(migrated.content.homeTabOrder.slice(0, 3), ['films', 'my', 'latest']);
+    assert.equal(migrated.content.homeTabOrder.filter(tab => tab === 'donghua').length, 1);
+    const imported = parseImportedSettings({ settings: migrated });
+    assert.deepEqual(imported.settings.content.homeTabOrder, migrated.content.homeTabOrder);
+    assert.deepEqual(imported.settings.content.favoritesTabOrder.slice(0, 2), ['history', 'favorites']);
+});
+
+test('tab ordering rejects malformed imports while recovering invalid legacy preferences', () => {
+    for (const homeTabOrder of ['films', ['films', 'films'], ['unknown']]) {
+        assert.throws(() => parseImportedSettings({ settings: { content: { homeTabOrder } } }), /Invalid content.homeTabOrder/);
+    }
+    const migrated = normalizeLegacySettings({ content: { homeTabOrder: ['films', 'films', 'unknown'] } });
+    assert.equal(migrated.content.homeTabOrder[0], 'films');
+    assert.equal(migrated.content.homeTabOrder.length, defaultAppSettings.content.homeTabOrder.length);
+});
+
 // ---------------------------------------------------------------------------
 // 1. Malformed settings payloads must throw and reject on import
 // ---------------------------------------------------------------------------
@@ -452,6 +472,8 @@ test('full roundtrip preserves notifications and all valid settings exactly', ()
         content: {
             defaultTabOnHome: 'films',
             defaultTabOnFavorites: 'history',
+            homeTabOrder: [...defaultAppSettings.content.homeTabOrder],
+            favoritesTabOrder: [...defaultAppSettings.content.favoritesTabOrder],
             rememberSource: true,
             rememberedSourceId: 88,
             rememberDub: true,

@@ -149,7 +149,7 @@ export default function CollectionScreen() {
             {collection.image && <RemoteImage className={styles.cover} src={collection.image} alt={t('collection.coverAlt', { title: collection.title })} />}
             <div className={styles.description}>
                 {isPrivate && <p className={styles.privateNotice}>{t('collection.privateNotice')}</p>}
-                {collection.description && <p>{collection.description}</p>}
+                <p>{collection.description?.trim() || t('release.noDescription')}</p>
                 <Link className={styles.creator} to={`/account/${collection.creator.id}`}>
                     <RemoteImage src={collection.creator.avatar} alt={t('collection.creatorAlt', { name: collection.creator.login })} />
                     <span>{collection.creator.login}</span>

@@ -32,6 +32,12 @@ npm run build
 npm run dev
 ```
 
+## Episode downloads and offline use
+
+The player can save direct MP4 files and compatible, completed HLS episodes. Downloads are limited to 256 MiB; this bounds file size, not total browser memory use. Encrypted or live HLS, separate audio playlists, and timeline discontinuities are not supported. If a source is incompatible, choose another source or quality.
+
+The production app caches its interface for offline reloads after installation completes. Catalog requests, account data, room messages, and streamed video still require a connection. New interface versions activate after all tabs using the previous version are closed and the app is reopened.
+
 ## Limitations
 
 - Some features require an Anixart account

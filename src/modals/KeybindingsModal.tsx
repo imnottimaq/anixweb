@@ -1,28 +1,17 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId, useState } from 'react';
 import { useSettings } from '../shared/contexts/settingsContext';
 import { useTranslation } from '../shared/useTranslation';
 import { defaultPlayerKeybindings, playerKeybindingActions, type PlayerKeybindingAction } from '../shared/types/settings';
 import { Modal } from './ModalTemplate';
 import styles from './KeybindingsModal.module.css';
+import ActionIcon from '../components/ActionIcon';
 
 export default function KeybindingsModal({onClose}: {onClose: () => void}) {
     const {settings, setSettings} = useSettings();
     const {t} = useTranslation();
     const id = useId();
-    const container = useRef<HTMLDivElement>(null);
     const [capturingBinding, setCapturingBinding] = useState<PlayerKeybindingAction | null>(null);
     const keybindings = settings.player.keybindings ?? defaultPlayerKeybindings;
-
-    useEffect(() => {
-        const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-        container.current?.querySelector<HTMLButtonElement>('button')?.focus();
-        const previousOverflow = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-        return () => {
-            document.body.style.overflow = previousOverflow;
-            if (previousFocus?.isConnected) previousFocus.focus();
-        };
-    }, []);
 
     const keybindingLabels: Record<PlayerKeybindingAction, string> = {
         togglePlayback: t('settings.keybinding.togglePlayback'),
@@ -54,14 +43,7 @@ export default function KeybindingsModal({onClose}: {onClose: () => void}) {
         setCapturingBinding(null);
     };
 
-    return <div ref={container} onKeyDown={event => {
-        if (event.key !== 'Tab') return;
-        const buttons = container.current?.querySelectorAll<HTMLButtonElement>('button:not([disabled])');
-        if (!buttons?.length) return;
-        const first = buttons[0], last = buttons[buttons.length - 1];
-        if (event.shiftKey && document.activeElement === first) {event.preventDefault(); last.focus();}
-        else if (!event.shiftKey && document.activeElement === last) {event.preventDefault(); first.focus();}
-    }}>
+    return (
         <Modal isOpen onClose={onClose} title={t('settings.keybindings')} size="medium" stickyHeader>
             <div className={styles.toolbar}>
                 <p>{t('settings.keybindings.desc')}</p>
@@ -92,12 +74,12 @@ export default function KeybindingsModal({onClose}: {onClose: () => void}) {
                             assign(action, event.code);
                         }}
                     ><kbd id={`${id}-${action}-value`}>{capturingBinding === action ? t('settings.keybindings.capture') : formatKey(keybindings[action]) || t('settings.keybindings.unassigned')}</kbd></button>
-                    <button type="button" className={styles.iconButton} aria-label={`${t('roadmap.settings.clearKey')}: ${keybindingLabels[action]}`} disabled={!keybindings[action]} onClick={() => assign(action, '')}><span aria-hidden="true">&#215;</span></button>
-                    <button type="button" className={styles.iconButton} aria-label={`${t('roadmap.settings.resetKey')}: ${keybindingLabels[action]}`} onClick={() => assign(action, defaultPlayerKeybindings[action])}><span aria-hidden="true">&#8634;</span></button>
+                    <button type="button" className={styles.iconButton} aria-label={`${t('roadmap.settings.clearKey')}: ${keybindingLabels[action]}`} disabled={!keybindings[action]} onClick={() => assign(action, '')}><ActionIcon name="close" /></button>
+                    <button type="button" className={styles.iconButton} aria-label={`${t('roadmap.settings.resetKey')}: ${keybindingLabels[action]}`} onClick={() => assign(action, defaultPlayerKeybindings[action])}><ActionIcon name="reset" /></button>
                     </div>
                 </div>)}
                 </section>)}
             </div>
         </Modal>
-    </div>;
+    );
 }

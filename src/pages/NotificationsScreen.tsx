@@ -9,9 +9,10 @@ import type { TranslationKey } from '../shared/i18n';
 import type { AnixartNotification, NotificationProfile } from '../shared/types/api';
 import SettingsIcon from '../assets/icons/gear.svg';
 import styles from './NotificationsScreen.module.css';
+import { feedId } from '../shared/feed';
 
-type NotificationFilter = 'all' | 'episode' | 'comments' | 'friend' | 'collection';
-const FILTERS: NotificationFilter[] = ['all', 'episode', 'comments', 'friend', 'collection'];
+type NotificationFilter = 'all' | 'episode' | 'comments' | 'friend' | 'collection' | 'feed';
+const FILTERS: NotificationFilter[] = ['all', 'episode', 'comments', 'friend', 'collection', 'feed'];
 type T = (key: TranslationKey, params?: TranslationParams) => string;
 
 export default function NotificationsScreen() {
@@ -41,13 +42,14 @@ export default function NotificationsScreen() {
 
     const visible = useMemo(() => notifications.filter(item => filter === 'all' ||
         (filter === 'episode' && item.type === 'episode') || (filter === 'friend' && item.type === 'friend') ||
-        (filter === 'collection' && item.type === 'myCollection') || (filter === 'comments' && item.type === 'releaseComment')), [filter, notifications]);
+        (filter === 'collection' && item.type === 'myCollection') || (filter === 'comments' && item.type === 'releaseComment') ||
+        (filter === 'feed' && ['article', 'articleComment', 'myArticle'].includes(item.type))), [filter, notifications]);
 
     return <PageLayout>
         <PageHeader title={t('notifications.title')} description={t('notifications.description')} actions={<>
             <label className={styles.filter}><span className={styles.visuallyHidden}>{t('notifications.filterAria')}</span>
                 <select value={filter} onChange={event => setFilter(event.target.value as NotificationFilter)}>
-                    {FILTERS.map(value => <option key={value} value={value}>{t(`notifications.filter.${value}` as TranslationKey)}</option>)}
+                    {FILTERS.map(value => <option key={value} value={value}>{t(value === 'feed' ? 'nav.feed' : `notifications.filter.${value}` as TranslationKey)}</option>)}
                 </select>
             </label>
             <Link className={styles.settingsLink} to="/notifications/settings" aria-label={t('notifications.settings')} title={t('notifications.settings')}><img src={SettingsIcon} alt="" /></Link>
@@ -60,6 +62,19 @@ export default function NotificationsScreen() {
 }
 
 function NotificationItem({ notification, t, language, relative }: { notification: AnixartNotification; t: T; language: string; relative: (value: number, unit?: Intl.RelativeTimeFormatUnit) => string }) {
+    if (notification.type === 'article') {
+        const article = notification.article;
+        const id = feedId(typeof article === 'number' ? article : article?.id);
+        const channel = typeof article === 'object' ? article?.channel : undefined;
+        return <NotificationRow notification={notification} image={channel?.avatar} to={id ? `/feed/post/${id}` : undefined} text={t('feed.newPostNotification', { channel: channel?.title ?? t('feed.channel') })} t={t} relative={relative} />;
+    }
+    if (notification.type === 'articleComment' || notification.type === 'myArticle') {
+        const comment = notification.type === 'myArticle' ? notification.article_comment : notification.comment;
+        const parent = notification.type === 'articleComment' ? notification.parentComment : undefined;
+        const article = comment?.article ?? parent?.article;
+        const id = feedId(typeof article === 'number' ? article : article?.id);
+        return <NotificationRow notification={notification} profile={comment?.profile} to={id ? `/feed/post/${id}#comments` : undefined} text={t(parent ? 'notifications.reply' : 'notifications.comment', { user: comment?.profile?.login ?? t('notifications.unknownUser'), message: comment?.is_spoiler ? t('feed.containsSpoiler') : comment?.message ?? '' })} t={t} relative={relative} />;
+    }
     if (notification.type === 'episode') {
         const { episode } = notification;
         const title = language === 'english' ? episode.release.title_original || episode.release.title_ru : episode.release.title_ru || episode.release.title_original;
@@ -78,6 +93,6 @@ function NotificationRow({ notification, text, image, imageAlt = '', profile, to
     const [now] = useState(Date.now);
     const seconds = Math.max(0, Math.floor(now / 1000) - notification.timestamp);
     const time = seconds < 45 ? t('notifications.justNow') : seconds < 3600 ? relative(-Math.round(seconds / 60), 'minute') : seconds < 86400 ? relative(-Math.round(seconds / 3600), 'hour') : relative(-Math.round(seconds / 86400), 'day');
-    const content = <><span className={styles.avatar}>{image ? <RemoteImage src={image} alt={imageAlt} /> : profile?.avatar ? <RemoteImage src={profile.avatar} alt={t('notifications.avatarAlt', { user: profile.login })} /> : <span aria-hidden="true">✦</span>}</span><span className={styles.content}><span className={styles.text}>{text}</span><time dateTime={new Date(notification.timestamp * 1000).toISOString()}>{time}</time></span>{notification.is_new && <span className={styles.dot} aria-label={t('notifications.new')} />}</>;
+    const content = <><span className={styles.avatar}>{image ? <RemoteImage src={image} alt={imageAlt} /> : profile?.avatar ? <RemoteImage src={profile.avatar} alt={t('notifications.avatarAlt', { user: profile.login })} /> : <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.4 6.9 6.9 2.4-6.9 2.4L12 20.6l-2.4-6.9L2.7 11.3l6.9-2.4L12 2z" /></svg>}</span><span className={styles.content}><span className={styles.text}>{text}</span><time dateTime={new Date(notification.timestamp * 1000).toISOString()}>{time}</time></span>{notification.is_new && <span className={styles.dot} aria-label={t('notifications.new')} />}</>;
     return to ? <Link className={styles.notification} to={to}>{content}</Link> : <article className={styles.notification}>{content}</article>;
 }

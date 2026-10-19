@@ -1,0 +1,1005 @@
+/* ==========================================================================
+   RoomSidebar.module.css
+   Modern, dense, neutral sidebar design for Anixweb watch rooms & player panel.
+   Preserves 100% of RoomPanel.tsx class names for drop-in module integration.
+   ========================================================================== */
+
+.panel.card { height: min(640px, calc(100dvh - 128px)); min-height: min(360px, calc(100dvh - 128px)); padding: 16px; }
+.panel [hidden] { display: none !important; }
+.tabs { display: flex; gap: 20px; flex-shrink: 0; margin-top: 4px; border-bottom: 1px solid var(--border-color); }
+.tabs button { display: inline-flex; align-items: center; gap: 7px; position: relative; padding: 10px 0; border: 0; border-radius: 0; color: var(--text-secondary); background: transparent; font: inherit; font-size: 14px; cursor: pointer; }
+.tabs button[aria-selected="true"] { color: var(--text-color); font-weight: 600; }
+.tabs button[aria-selected="true"]::after { content: ''; position: absolute; bottom: -1px; inset-inline: 0; height: 2px; background: var(--text-color); }
+.tabCount { color: var(--text-secondary); font-size: 12px; font-weight: 400; }
+.pausePermission { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.pausePermission strong { font-size: 13px; font-weight: 600; }
+.pausePermission p { margin: 4px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.4; }
+.roomDetails { flex: 1; min-height: 0; overflow: auto; padding-top: 16px; scrollbar-width: thin; }
+.chatPanel { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.panel .chatSection { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.panel .chatSection [role="log"] { height: auto; max-height: none; min-height: 0; flex: 1; }
+.panel .reactionsSection { margin-top: 0; padding-top: 8px; border-top: 0; flex-shrink: 0; }
+.panel .participants { max-height: none; overflow: visible; }
+.panel .panelFooter { flex-shrink: 0; }
+.panel .chatSection textarea { border: 0; border-radius: 0; background: transparent; }
+.panel .chatSection textarea:focus, .panel .chatSection textarea:focus-visible { border: 0; outline: none; }
+
+/* --------------------------------------------------------------------------
+   Root Container & Surface Structure
+   -------------------------------------------------------------------------- */
+.card,
+.panel {
+    box-sizing: border-box;
+}
+
+.card.panel,
+.panel {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    padding: 14px;
+    background: var(--card-bg, #202126);
+    border: 1px solid var(--border-color, #383b44);
+    border-radius: 6px;
+    color: var(--text-color, #f4f5f7);
+    font-family: inherit;
+    line-height: 1.4;
+}
+
+/* Compact mode (used inside player overlay or embedded panels) */
+.compact.panel,
+.compact.card,
+.panel.compact {
+    padding: 10px;
+    border-radius: 6px;
+}
+
+/* --------------------------------------------------------------------------
+   Header & Connection Indicator
+   -------------------------------------------------------------------------- */
+.panelHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-color, #383b44);
+    min-width: 0;
+}
+
+.compact .panelHeader {
+    margin-bottom: 6px;
+    padding-bottom: 6px;
+}
+
+.panelHeader h2 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--text-color, #f4f5f7);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.compact .panelHeader h2 {
+    font-size: 15px;
+}
+
+.connection {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary, #aeb3bd);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-secondary, #aeb3bd);
+    transition: background-color 0.2s ease;
+}
+
+.online {
+    background: var(--status-watching, #27ae60);
+    box-shadow: 0 0 5px color-mix(in srgb, var(--status-watching, #27ae60) 50%, transparent);
+}
+
+/* --------------------------------------------------------------------------
+   Replaced Session Notice Banner
+   -------------------------------------------------------------------------- */
+.notice {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    border: 1px solid var(--status-hold, #f2994a);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--status-hold, #f2994a) 8%, var(--card-bg, #202126));
+    font-size: 12px;
+}
+
+.notice p {
+    margin: 0;
+    color: var(--text-color, #f4f5f7);
+    line-height: 1.4;
+}
+
+.notice button {
+    align-self: flex-start;
+    min-height: 28px;
+    padding: 4px 10px;
+    border: 1px solid var(--border-color, #383b44);
+    border-radius: 4px;
+    background: var(--surface-raised, #2a2c33);
+    color: var(--text-color, #f4f5f7);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.notice button:hover:not(:disabled) {
+    background: var(--surface-muted, #383b44);
+}
+
+/* --------------------------------------------------------------------------
+   Role Info & Badge
+   -------------------------------------------------------------------------- */
+.roleInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border-color, #383b44);
+}
+
+.compact .roleInfo {
+    padding-bottom: 6px;
+    margin-bottom: 6px;
+}
+
+.roleInfo p {
+    margin: 0;
+    color: var(--text-secondary, #aeb3bd);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.compact .roleInfo p {
+    display: none;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color, #383b44);
+    background: var(--surface-raised, #2a2c33);
+    color: var(--text-color, #f4f5f7);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1.3;
+}
+
+/* --------------------------------------------------------------------------
+   Barrier Wait Countdown
+   -------------------------------------------------------------------------- */
+.waiting {
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    border-radius: 4px;
+    border: 1px solid color-mix(in srgb, var(--status-hold, #f2994a) 35%, var(--border-color, #383b44));
+    background: color-mix(in srgb, var(--status-hold, #f2994a) 7%, var(--card-bg, #202126));
+}
+
+.waiting strong {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-color, #f4f5f7);
+}
+
+.waiting p,
+.waiting small {
+    display: block;
+    margin: 3px 0 0;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--text-secondary, #aeb3bd);
+    overflow-wrap: anywhere;
+}
+
+.waitProgress {
+    height: 3px;
+    margin-top: 6px;
+    border-radius: 2px;
+    background: var(--surface-raised, #2a2c33);
+    overflow: hidden;
+}
+
+.waitProgress span {
+    display: block;
+    height: 100%;
+    background: var(--status-hold, #f2994a);
+    transition: width 0.25s linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .waitProgress span {
+        transition: none;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   Invitation Section
+   -------------------------------------------------------------------------- */
+.invitation {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border-color, #383b44);
+}
+
+.compact .invitation {
+    gap: 5px;
+    padding-bottom: 6px;
+    margin-bottom: 6px;
+}
+
+.invitation .sectionHeading {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.sectionHeading h3 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary, #aeb3bd);
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.muted {
+    color: var(--text-secondary, #aeb3bd);
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+.inviteButton {
+    width: 100%;
+    min-height: 30px;
+    padding: 5px 10px;
+    border: 1px solid var(--border-color, #383b44);
+    border-radius: 4px;
+    background: var(--surface-raised, #2a2c33);
+    color: var(--text-color, #f4f5f7);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.inviteButton:hover:not(:disabled) {
+    background: var(--surface-muted, #383b44);
+    border-color: color-mix(in srgb, var(--text-color, #f4f5f7) 20%, var(--border-color, #383b44));
+}
+
+.inviteButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.codeButton {
+    width: 100%;
+    min-height: 30px;
+    padding: 5px 10px;
+    border: 1px solid var(--border-color, #383b44);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-secondary, #aeb3bd);
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.codeButton:hover:not(:disabled) {
+    background: var(--surface-raised, #2a2c33);
+    color: var(--text-color, #f4f5f7);
+    border-color: color-mix(in srgb, var(--text-color, #f4f5f7) 20%, var(--border-color, #383b44));
+}
+
+.codeButton strong {
+    color: var(--text-color, #f4f5f7);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+}
+
+/* --------------------------------------------------------------------------
+   Participants Section
+   -------------------------------------------------------------------------- */
+.sectionTitle {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary, #aeb3bd);
+    text-transform: none;
+    letter-spacing: normal;
+    margin: 0 0 6px 0;
+}
+
+.participants {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    max-height: 130px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 2px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color, #383b44) transparent;
+}
+
+.compact .participants {
+    max-height: 148px;
+}
+
+.participants:has(details[open]) { max-height: none; overflow: visible; }
+.invitation > small { grid-column: 1 / -1; }
+.codeButton > span { display: none; }
+.codeButton svg { flex-shrink: 0; }
+
+.participantRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 3px 6px;
+    border-radius: 4px;
+    background: transparent;
+    transition: background 0.12s ease;
+}
+
+.participantRow:hover {
+    background: color-mix(in srgb, var(--surface-raised, #2a2c33) 60%, transparent);
+}
+
+.avatar {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--surface-raised, #2a2c33);
+    color: var(--text-color, #f4f5f7);
+    font-size: 11px;
+    font-weight: 700;
+    border: 1px solid var(--border-color, #383b44);
+}
+
+.avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.participantText {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.participantText > strong {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-color, #f4f5f7);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.3;
+}
+
+.participantStatus {
+    display: block;
+    margin-top: 1px;
+    color: var(--text-secondary, #aeb3bd);
+    font-size: 11px;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.roleBadge {
+    flex-shrink: 0;
+    padding: 1px 5px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color, #383b44);
+    background: var(--surface-raised, #2a2c33);
+    color: var(--text-secondary, #aeb3bd);
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.participantMenu {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.participantMenu summary {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 34px;
+    border-radius: 4px;
+    list-style: none;
+    cursor: pointer;
+    font-size: 15px;
+    color: var(--text-secondary, #aeb3bd);
+    user-select: none;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+
+.participantMenu summary::-webkit-details-marker {
+    display: none;
+}
+
+.participantMenu summary:hover {
+    background: var(--surface-raised, #2a2c33);
+    color: var(--text-color, #f4f5f7);
+}
+
+.menuActions {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 4px);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 190px;
+    padding: 4px;
+    border: 1px solid var(--border-color, #383b44);
+    border-radius: 6px;
+    background: var(--lighter-background-color, #2a2c33);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.menuActions button {
+    width: 100%;
+    padding: 6px 8px;
+    text-align: left;
+    background: transparent;
+    color: var(--text-color, #f4f5f7);
+    border: none;
+    border-radius: 4px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+
+.menuActions button:hover:not(:disabled) {
+    background: var(--surface-muted, #383b44);
+}
+
+.menuActions button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.dangerText {
+    color: var(--status-dropped, #eb5757) !important;
+}
+
+.menuActions button.dangerText:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--status-dropped, #eb5757) 14%, transparent) !important;
+    color: var(--status-dropped, #eb5757) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Quiet Reactions Bar (Single Row, 6 SVG Icons)
+   -------------------------------------------------------------------------- */
+.reactionsSection {
+    margin: 8px 0 6px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color, #383b44);
+}
+
+.compact .reactionsSection {
+    margin: 6px 0 4px;
+    padding-top: 6px;
+}
+
+.reactionsBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    flex-wrap: nowrap;
+    width: 100%;
+}
+
+.reactionBtn {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 34px;
+    padding: 2px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-color, #383b44);
+    border-radius: 4px;
+    background: var(--surface-raised, #2a2c33);
+    color: var(--text-color, #f4f5f7);
+    font-size: 15px;
+    cursor: pointer;
+    transition: background 0.12s ease, border-color 0.12s ease, transform 0.1s ease;
+}
+
+.compact .reactionBtn {
+    height: 34px;
+    font-size: 13px;
+}
+
+.reactionBtn svg,
+.reactionBtn span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    line-height: 1;
+    pointer-events: none;
+}
+
+.reactionBtn:hover:not(:disabled) {
+    background: var(--surface-muted, #383b44);
+    border-color: color-mix(in srgb, var(--text-color, #f4f5f7) 25%, var(--border-color, #383b44));
+    transform: none;
+}
+
+.reactionBtn:active:not(:disabled) {
+    transform: translateY(0);
+    filter: brightness(0.9);
+}
+
+.reactionBtn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* --------------------------------------------------------------------------
+   Chat Section & Scoped Overrides
+   -------------------------------------------------------------------------- */
+.chatSection {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    margin-top: 6px;
+}
+
+/* Scoped Chat Container & Log bounds */
+.chatSection [role="log"] {
+    height: clamp(180px, 32vh, 280px);
+    min-height: 140px;
+    max-height: 280px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 4px 2px 6px 0;
+    gap: 6px;
+    box-sizing: border-box;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color, #383b44) transparent;
+}
+
+.compact .chatSection [role="log"] {
+    height: clamp(140px, 24vh, 200px);
+    min-height: 110px;
+    max-height: 200px;
+    gap: 5px;
+}
+
+/* Message rows inside log */
+.chatSection [role="log"] > div {
+    padding: 2px 0;
+    gap: 6px;
+}
+
+/* Chat Form & Textarea */
+.chatSection form {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 6px;
+    min-width: 0;
+    width: 100%;
+}
+
+.compact .chatSection form {
+    margin-top: 4px;
+    gap: 3px;
+}
+
+.chatSection textarea {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 42px;
+    max-height: 80px;
+    resize: none;
+    padding: 6px 8px;
+    border: 1px solid var(--border-color, #383b44);
+    border-radius: 4px;
+    background: var(--background-color, #161616);
+    color: var(--text-color, #f4f5f7);
+    font: inherit;
+    font-size: 13px;
+    line-height: 1.4;
+    transition: border-color 0.15s ease;
+}
+
+.compact .chatSection textarea {
+    min-height: 48px;
+    max-height: 64px;
+    font-size: 13px;
+    padding: 4px 6px;
+}
+
+.chatSection textarea:focus {
+    outline: var(--focus-ring, 2px solid var(--accent-color, #ff6060));
+    outline-offset: 1px;
+    border-color: var(--accent-color, #ff6060);
+}
+
+.chatSection textarea:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Composer footer row (action buttons, counter, send) */
+.chatSection [data-chat-actions] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    min-width: 0;
+    width: 100%;
+    flex-wrap: wrap;
+}
+
+/* Submit Send Button */
+.chatSection button[type="submit"] {
+    min-height: 28px;
+    padding: 4px 12px;
+    border-radius: 4px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--accent-color, #ff6060);
+    color: var(--accent-text-color, #ffffff);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: filter 0.15s ease, opacity 0.15s ease;
+    white-space: nowrap;
+}
+
+.compact .chatSection button[type="submit"] {
+    min-height: 34px;
+    padding: 3px 10px;
+    font-size: 13px;
+}
+
+.chatSection button[type="submit"]:hover:not(:disabled) {
+    filter: brightness(0.92);
+}
+
+.chatSection button[type="submit"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Chat Action Buttons (image upload, voice record button) */
+.chatSection button[type="button"]:not([class*="newMessages"]) {
+    min-width: 28px;
+    height: 28px;
+    padding: 3px 6px;
+    border: 1px solid var(--border-color, #383b44);
+    border-radius: 4px;
+    background: var(--surface-raised, #2a2c33);
+    color: var(--text-color, #f4f5f7);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease;
+}
+
+.compact .chatSection button[type="button"]:not([class*="newMessages"]) {
+    min-width: 34px;
+    height: 34px;
+    padding: 2px 5px;
+    font-size: 12px;
+}
+
+.chatSection button[type="button"]:not([class*="newMessages"]):hover:not(:disabled) {
+    background: var(--surface-muted, #383b44);
+}
+
+.chatSection button[type="button"]:not([class*="newMessages"]):disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* Character Counter */
+.chatSection span[data-testid="chat-char-counter"] {
+    font-size: 10px;
+    color: var(--text-secondary, #aeb3bd);
+    white-space: nowrap;
+    user-select: none;
+}
+
+/* Scoped Chat Errors */
+.chatSection [role="alert"] {
+    margin: 3px 0 0;
+    color: var(--status-dropped, #eb5757);
+    font-size: 11px;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+/* --------------------------------------------------------------------------
+   Panel Footer Actions (Leave & Close Room)
+   -------------------------------------------------------------------------- */
+.panelFooter {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    align-items: center;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color, #383b44);
+}
+
+.compact .panelFooter {
+    margin-top: 6px;
+    padding-top: 6px;
+}
+
+.leaveButton {
+    min-height: 28px;
+    padding: 4px 10px;
+    border: 1px solid var(--border-color, #383b44);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-secondary, #aeb3bd);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    white-space: nowrap;
+}
+
+.leaveButton:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--status-dropped, #eb5757) 12%, transparent);
+    color: var(--status-dropped, #eb5757);
+    border-color: color-mix(in srgb, var(--status-dropped, #eb5757) 35%, transparent);
+}
+
+.leaveButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.closeRoomButton {
+    min-height: 28px;
+    padding: 4px 10px;
+    border: 1px solid color-mix(in srgb, var(--status-dropped, #eb5757) 35%, transparent);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--status-dropped, #eb5757) 8%, transparent);
+    color: var(--status-dropped, #eb5757);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    white-space: nowrap;
+}
+
+.closeRoomButton:hover:not(:disabled) {
+    background: var(--status-dropped, #eb5757);
+    color: #ffffff;
+}
+
+.closeRoomButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* --------------------------------------------------------------------------
+   Status Notices & Inline Alerts
+   -------------------------------------------------------------------------- */
+.inlineError {
+    color: var(--status-dropped, #eb5757);
+    font-size: 11px;
+    line-height: 1.4;
+    margin: 4px 0 0;
+    overflow-wrap: anywhere;
+}
+
+.success {
+    color: var(--status-watching, #27ae60);
+    font-size: 11px;
+    line-height: 1.4;
+    margin: 4px 0 0;
+}
+
+/* --------------------------------------------------------------------------
+   Confirmation Modal Dialog
+   -------------------------------------------------------------------------- */
+.confirmDialog {
+    width: min(380px, calc(100vw - 32px));
+    padding: var(--dialog-padding);
+    border: 1px solid var(--border-color, #383b44);
+    border-radius: var(--dialog-radius);
+    background: var(--card-bg, #202126);
+    color: var(--text-color, #f4f5f7);
+    box-shadow: var(--popup-shadow);
+    box-sizing: border-box;
+}
+
+.confirmDialog::backdrop {
+    background: var(--dialog-backdrop);
+    backdrop-filter: blur(var(--dialog-blur));
+}
+
+.confirmDialog h2 {
+    margin: 0 0 6px 0;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-color, #f4f5f7);
+    overflow-wrap: anywhere;
+}
+
+.confirmDialog > p {
+    margin: 0 0 14px 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-secondary, #aeb3bd);
+}
+
+.dialogActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.dialogActions button {
+    min-height: 40px;
+    padding: 5px 12px;
+    border-radius: var(--radius-control);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, filter 0.15s ease;
+}
+
+.secondary {
+    border: 1px solid var(--border-color, #383b44);
+    background: transparent;
+    color: var(--text-color, #f4f5f7);
+}
+
+.secondary:hover:not(:disabled) {
+    background: var(--surface-raised, #2a2c33);
+}
+
+.dangerButton {
+    border: 1px solid var(--status-dropped, #eb5757);
+    background: var(--status-dropped, #eb5757);
+    color: #ffffff;
+}
+
+.dangerButton:hover:not(:disabled) {
+    filter: brightness(0.92);
+}
+
+/* --------------------------------------------------------------------------
+   Accessibility Focus Rings
+   -------------------------------------------------------------------------- */
+.panel button:focus-visible,
+.panel summary:focus-visible,
+.panel input:focus-visible,
+.panel textarea:focus-visible,
+.confirmDialog button:focus-visible {
+    outline: var(--focus-ring, 2px solid var(--accent-color, #ff6060));
+    outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   Responsive Adaptations
+   -------------------------------------------------------------------------- */
+@media (max-width: 390px) {
+    .card.panel,
+    .panel {
+        padding: 10px;
+    }
+
+    .panelHeader h2 {
+        font-size: 15px;
+    }
+
+    .reactionBtn { height: 34px; }
+
+    .chatSection [role="log"] {
+        height: clamp(140px, 25vh, 200px);
+    }
+}
+
+@media (max-width: 320px) {
+    .card.panel,
+    .panel {
+        padding: 8px;
+    }
+
+    .codeButton strong {
+        font-size: 12px;
+    }
+
+    .reactionsBar {
+        gap: 2px;
+    }
+}
+
+.confirmDialog { max-height: calc(100dvh - 24px); overflow: auto; }
+@media (max-width: 540px) {
+    .dialogActions { flex-wrap: wrap; }
+    .dialogActions button { flex: 1; }
+}

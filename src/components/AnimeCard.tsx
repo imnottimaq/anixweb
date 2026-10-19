@@ -39,7 +39,7 @@ export default function AnimeCard({ anime: originalAnime }: AnimeCardProps) {
         {anime.episodes_released || "?"} {t('misc.outOf')} {anime.episodes_total || "?"} {t('misc.episodes')}
         {anime.grade !== 0 && <span className={styles['anime-rating']}><img src={starIcon} alt="" />{anime.grade.toFixed(2)}</span>}
       </p>
-      {anime.description && <p className={styles['anime-description']}>{anime.description}</p>}
+      <p className={styles['anime-description']}>{anime.description?.trim() || t('release.noDescription')}</p>
     </Link>
   );
 }

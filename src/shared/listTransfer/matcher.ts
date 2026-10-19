@@ -9,7 +9,10 @@ import type { ImportPreviewItem, ParsedAnimeItem } from './types.ts';
  */
 export function normalizeTitle(raw: string): string {
     return raw
+        .normalize('NFKC')
         .toLowerCase()
+        .replace(/[‘’]/g, "'")
+        .replace(/[–—]/g, '-')
         .replace(/[.,/#!$%^&*;:{}=\-_`~()?[\]"']/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
@@ -65,7 +68,7 @@ export async function fetchReleaseById(
  * Follows strict rules:
  * - Direct ID lookup only if trusted Anixart ID is present (anixartId)
  * - Never strip season numbers or types to auto-match
- * - Search results require manual selection; titles alone never establish identity
+ * - A single exact title match can be selected automatically; ambiguous results stay suggestions
  * - Unmatched items are explicitly preserved with candidates list
  * - Current list status is checked to flag potential overwrite conflicts
  */
@@ -75,6 +78,7 @@ export async function matchItem(
 ): Promise<ImportPreviewItem> {
     let matchedRelease: Anime | null = null;
     let candidates: Anime[] = [];
+    let autoMatched = false;
 
     // 1. If explicit Anixart ID was provided (e.g., from our own export extension)
     const ownId = positiveId(item.anixartId);
@@ -87,16 +91,39 @@ export async function matchItem(
 
     // 2. Search by title if not already matched by explicit Anixart ID
     if (!matchedRelease) {
-        const queriesToTry: string[] = [];
-        if (item.titleRu) queriesToTry.push(item.titleRu);
-        if (item.title) queriesToTry.push(item.title);
-
-        for (const q of queriesToTry) {
-            candidates = await searchCandidates(q, api);
-            if (candidates.length > 0) break;
+        const queries = [item.titleRu, item.title].filter((title): title is string => Boolean(title?.trim()));
+        const seenQueries = new Set<string>();
+        const byId = new Map<number, Anime>();
+        for (const query of queries) {
+            const normalized = normalizeTitle(query);
+            if (seenQueries.has(normalized)) continue;
+            seenQueries.add(normalized);
+            for (const candidate of await searchCandidates(query, api)) byId.set(candidate.id, candidate);
         }
-
-        // Catalog titles are suggestions; only explicit own IDs establish identity.
+        candidates = [...byId.values()];
+        const exact = candidates.filter(candidate => {
+            const names = [candidate.title_original, candidate.title_ru].filter((title): title is string => Boolean(title));
+            if (!queries.some(query => names.some(name => areTitlesEquivalent(query, name)))) return false;
+            // An exact localized name must not hide a different numbered season in the original title.
+            if (item.title && candidate.title_original) {
+                const sourceNumbers = normalizeTitle(item.title).match(/\d+/g) ?? [];
+                const targetNumbers = normalizeTitle(candidate.title_original).match(/\d+/g) ?? [];
+                if (sourceNumbers.join(',') !== targetNumbers.join(',')) return false;
+                const sourceType = normalizeTitle(item.title).match(/\b(tv|ova|ona|movie|special)\b/)?.[0];
+                const targetType = normalizeTitle(candidate.title_original).match(/\b(tv|ova|ona|movie|special)\b/)?.[0];
+                if (sourceType && targetType && sourceType !== targetType) return false;
+            }
+            return true;
+        });
+        // Put the closest suggestions first without choosing between duplicate exact titles.
+        candidates = [...exact, ...candidates.filter(candidate => !exact.includes(candidate))];
+        if (exact.length === 1) {
+            const candidate = exact[0];
+            // Read existing list state before treating a sparse search hit as actionable.
+            const release = [0, 1, 2, 3, 4, 5].includes(candidate.profile_list_status)
+                ? candidate : await fetchReleaseById(candidate.id, api);
+            if (release && [0, 1, 2, 3, 4, 5].includes(release.profile_list_status)) { matchedRelease = release; autoMatched = true; }
+        }
     }
 
     const currentListStatus = matchedRelease?.profile_list_status ?? 0;
@@ -119,6 +146,7 @@ export async function matchItem(
         ...item,
         matchState,
         matchedRelease,
+        autoMatched,
         resolutionCandidates: candidates.slice(0, 10),
         currentListStatus,
         currentVote,

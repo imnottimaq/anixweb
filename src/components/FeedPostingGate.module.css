@@ -1,0 +1,19 @@
+.levels { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 4px; }
+.levels strong { font-size: 20px; }
+.levels > span { padding: 5px 12px; border-radius: var(--radius-pill); background: var(--accent-color); color: var(--accent-text-color); font-weight: 700; }
+.progress { display: block; width: 100%; height: 9px; margin: 14px 0 18px; border: 0; border-radius: var(--radius-pill); overflow: hidden; appearance: none; background: var(--surface-muted); accent-color: var(--accent-color); }
+.progress::-webkit-progress-bar { background: var(--surface-muted); }
+.progress::-webkit-progress-value { background: var(--accent-color); border-radius: var(--radius-pill); }
+.progress::-moz-progress-bar { background: var(--accent-color); border-radius: var(--radius-pill); }
+.description { margin: 0; color: var(--text-secondary); line-height: 1.5; }
+.helpLink { display: inline; margin: 0; padding: 0; border: 0; background: transparent; color: var(--text-color); font: inherit; text-align: left; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.helpLink:focus-visible { outline: var(--focus-ring); outline-offset: 3px; }
+.helpContent { display: grid; gap: 14px; line-height: 1.55; }
+.helpContent p { margin: 0; }
+.helpContent ul { margin: 0; padding-left: 22px; }
+.helpContent li + li { margin-top: 6px; }
+.benefits { display: grid; gap: 22px; margin: 24px 0 4px; padding: 0; list-style: none; }
+.benefits li { display: flex; align-items: flex-start; gap: 14px; }
+.benefits svg { margin-top: 2px; color: var(--accent-color); }
+.benefits strong { font-size: 16px; }
+.benefits p { margin: 4px 0 0; color: var(--text-secondary); line-height: 1.45; }

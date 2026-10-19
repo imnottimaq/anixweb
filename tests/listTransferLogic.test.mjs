@@ -437,6 +437,20 @@ test('jsonSerializer and jsonParser: supports native Shikimori JSON schema and r
     assert.equal(items[0].anixartScore, 4);
 });
 
+test('jsonParser: accepts empty notes from native Shikimori exports and rejects invalid note types', () => {
+    const record = { target_title: 'Great Teacher Onizuka', target_title_ru: 'Крутой учитель Онидзука', target_id: 245, target_type: 'Anime', score: 0, status: 'watching', rewatches: 0, episodes: 0, text: null };
+    const [item] = parseShikimoriJson(JSON.stringify([record]));
+    assert.equal(item.title, record.target_title);
+    assert.equal(item.sourceId, 245);
+    assert.equal(item.anixartStatus, 1);
+    assert.equal(item.anixartScore, 0);
+    assert.equal(item.text, undefined);
+    assert.equal(parseShikimoriJson(JSON.stringify([{ ...record, text: 'My note' }]))[0].text, 'My note');
+    for (const text of [123, false, {}, []]) {
+        assert.throws(() => parseShikimoriJson(JSON.stringify([{ ...record, text }])), /Invalid text/);
+    }
+});
+
 test('matcher: normalizes titles while preserving season and type identity', () => {
     assert.equal(normalizeTitle('Shingeki no Kyojin (TV)'), 'shingeki no kyojin tv');
     assert.equal(normalizeTitle('Bleach: Thousand-Year Blood War - Season 2'), 'bleach thousand year blood war season 2');
@@ -488,7 +502,7 @@ test('matcher: matchItem resolves explicit Anixart ID without guessing', async (
 test('matcher: matchItem detects ambiguous candidates and flags as candidate (no blind match)', async () => {
     const candidates = [
         { id: 1, title_ru: 'Магическая битва', title_original: 'Jujutsu Kaisen' },
-        { id: 2, title_ru: 'Магическая битва 2', title_original: 'Jujutsu Kaisen 2nd Season' },
+        { id: 2, title_ru: 'Магическая битва', title_original: 'Jujutsu Kaisen' },
     ];
 
     const mockApi = {

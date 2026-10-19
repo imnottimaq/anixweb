@@ -46,6 +46,11 @@ export const defaultCustomColors: CustomColorSettings = {
     autoTextColor: true,
 };
 
+export const HOME_TAB_ORDER = ['my', 'latest', 'donghua', 'ongoing', 'announced', 'finished', 'films'] as const;
+export const FAVORITES_TAB_ORDER = ['collections', 'favorites', 'history', 'watching', 'planned', 'completed', 'hold_on', 'dropped'] as const;
+export type HomeTabKey = typeof HOME_TAB_ORDER[number];
+export type FavoritesTabKey = typeof FAVORITES_TAB_ORDER[number];
+
 export interface AppSettings {
     player: {
         defaultQuality: 'auto'| '1080' | '720' | '480' | '360';
@@ -60,7 +65,9 @@ export interface AppSettings {
         keybindings: PlayerKeybindings;
     },
     content: {
-        defaultTabOnHome: 'latest' | 'my' | 'ongoing' | 'announced' | 'finished' | 'films';
+        defaultTabOnHome: HomeTabKey;
+        homeTabOrder: HomeTabKey[];
+        favoritesTabOrder: FavoritesTabKey[];
         defaultTabOnFavorites: 'collections' | 'favorites' | 'history' | 'watching' | 'planned' | 'completed' | 'hold_on' | 'dropped'
         rememberSource: boolean;
         rememberedSourceId: number | null;
@@ -106,6 +113,8 @@ export const defaultAppSettings:AppSettings = {
     },
     content:{
         defaultTabOnHome: 'latest',
+        homeTabOrder: [...HOME_TAB_ORDER],
+        favoritesTabOrder: [...FAVORITES_TAB_ORDER],
         defaultTabOnFavorites: 'favorites',
         rememberSource: false,
         rememberedSourceId: null,

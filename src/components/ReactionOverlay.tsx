@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { useRoomPresence } from '../shared/contexts/roomContext';
 import { REACTION_TTL_MS, type RoomReaction } from '../shared/roomProtocol';
-import { REACTION_MAP } from './roomSocialConstants';
+import { ReactionIcon } from './ReactionIcon';
 import styles from './RoomSocial.module.css';
 
 export type { RoomReaction };
@@ -91,7 +91,7 @@ export default function ReactionOverlay({ reactions: propReactions, compact = fa
                     data-testid="reaction-bubble"
                 >
                     <span className={styles.reactionEmoji}>
-                        {REACTION_MAP[reaction.emoji] ?? reaction.emoji}
+                        <ReactionIcon emoji={reaction.emoji} size={22} />
                     </span>
                     <span className={styles.reactionSender}>{reaction.login}</span>
                 </div>

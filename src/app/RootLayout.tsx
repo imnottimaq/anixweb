@@ -4,6 +4,7 @@ import { Modal } from '../modals/ModalTemplate';
 import ReleaseActionsProvider from '../components/ReleaseContextMenu';
 import SearchBar from '../components/SearchBar';
 import { useSettings } from '../shared/contexts/settingsContext';
+import { useUser } from '../shared/contexts/userContext';
 import { useTranslation } from '../shared/useTranslation';
 import SettingsIcon from '../assets/icons/gear.svg';
 import UsersIcon from '../assets/icons/users.svg';
@@ -19,6 +20,7 @@ export default function RootLayout() {
 
 function RootLayoutContent() {
   const { settings, setSettings } = useSettings();
+  const { userToken } = useUser();
   const { t } = useTranslation();
   const { activeRoomId } = useRoomPresence();
   const [isFirstTimeOpening, setIsFirstTimeOpeningState] = useState<boolean>(() => localStorage.getItem('onboarded') !== 'true');
@@ -85,8 +87,9 @@ function RootLayoutContent() {
         <nav ref={navigationRef} id="primary-navigation" className={`${styles.navigation} ${isMenuOpen ? styles.open : ''}`} aria-label={t('nav.primary')} onClick={() => setIsMenuOpen(false)}>
           <NavLink to="/" end className={navClassName}>{t('nav.home')}</NavLink>
           <NavLink to="/overview" className={navClassName}>{t('nav.overview')}</NavLink>
+          <NavLink to="/feed" className={navClassName}>{t('nav.feed')}</NavLink>
           <NavLink to="/favorites" className={navClassName}>{t('nav.favorites')}</NavLink>
-          <NavLink to="/account" className={navClassName}>{t('nav.account')}</NavLink>
+          <NavLink to={userToken ? '/account' : '/account/login'} className={navClassName}>{t('nav.account')}</NavLink>
           <NavLink to="/collections" className={navClassName}>{t('nav.collections')}</NavLink>
           <NavLink to="/together" className={navClassName}>{t('nav.watchTogether')}</NavLink>
         </nav>

@@ -3,8 +3,16 @@ import { roadmapImportsRu, roadmapImportsEn } from './translations/roadmapImport
 import { roadmapPlayerRu, roadmapPlayerEn } from './translations/roadmapPlayer';
 import { roadmapDiscoverRu, roadmapDiscoverEn } from './translations/roadmapDiscover';
 import { roomUXRussian, roomUXEnglish } from './roomUX';
+import { feedRu, feedEn } from './translations/feed';
 
 export const russian = {
+    'home.donghua': 'Дунхуа',
+    'tabMenu.dragHint': 'Перетащите вкладку. С клавиатуры: Alt + стрелки.',
+    'tabMenu.moved': 'Вкладка «{tab}» перемещена на позицию {position} из {count}.',
+    'imageViewer.open': 'Открыть изображение',
+    'imageViewer.previous': 'Предыдущее изображение',
+    'imageViewer.next': 'Следующее изображение',
+    ...feedRu,
     ...roadmapSettingsRu,
     ...roadmapImportsRu, ...roadmapPlayerRu, ...roadmapDiscoverRu,
     ...roomUXRussian,
@@ -43,6 +51,10 @@ export const russian = {
     'page.error': 'Не удалось загрузить данные.',
     'page.empty': 'Здесь пока ничего нет.',
     'page.retry': 'Попробовать снова',
+    'page.notFoundTitle': 'Страница не найдена',
+    'page.notFound': 'Проверьте адрес или перейдите на главную.',
+    'page.routeErrorTitle': 'Не удалось открыть страницу',
+    'page.routeError': 'Проверьте подключение и попробуйте снова. Страница будет перезагружена.',
     'toggle.label': 'Переключатель',
     'collection.open': 'Открыть коллекцию «{title}»',
     'collection.saved.one': '{count} сохранение',
@@ -84,6 +96,7 @@ export const russian = {
     'search.waiting': 'Поиск...',    
     'search.clear': 'Очистить',
     'search.empty': 'Пусто',
+    'search.error': 'Не удалось выполнить поиск. Попробуйте снова.',
     'search.franchiseReleases': 'Релизы франшизы',
     'sort.dateAddedNewFirst': 'По дате добавления: сначала новые',
     'sort.dateAddedOldFirst': 'По дате добавления: сначала старые',
@@ -120,7 +133,7 @@ export const russian = {
     'releaseType.special': 'Спешл',
     'releaseType.dorama': 'Дорама',
     'release.relatedReleases': 'Связанные релизы',
-    'release.collectionsLoadError': 'Не удалось загрузить ваши коллекции.', 'release.collectionAdded': 'Релиз добавлен в коллекцию «{title}».', 'release.alreadyInCollection': 'Этот релиз уже есть в коллекции.', 'release.collectionAddError': 'Не удалось добавить релиз в коллекцию.', 'release.notificationsLoadError': 'Не удалось загрузить настройки уведомлений.', 'release.notificationsSaveError': 'Не удалось сохранить настройки уведомлений.', 'release.ratingChangeError': 'Не удалось изменить оценку. Предыдущая оценка сохранена.', 'release.ratingRestoreError': 'Не удалось изменить или восстановить оценку. Данные будут загружены заново.', 'release.addCollection': 'Добавить в коллекцию', 'release.configureNotifications': 'Настроить уведомления', 'release.yourRating': 'Ваша оценка', 'release.rateValue': 'Оценить на {value}', 'release.ratingOutOfFive': '{value} из 5', 'release.gallery': 'Галерея кадров', 'release.screenshotAlt': 'Скриншот {number}', 'release.previousScreenshot': 'Предыдущий кадр', 'release.nextScreenshot': 'Следующий кадр', 'release.showScreenshot': 'Показать кадр {number}', 'release.selectCollection': 'Выберите одну из своих коллекций.', 'release.noCollections': 'У вас пока нет коллекций.', 'release.noDescription': 'Без описания', 'release.addingCollection': 'Добавляем…', 'release.notificationsTitle': 'Уведомления о релизе', 'release.notificationsCaption': 'Выберите, когда присылать уведомление о новой серии.', 'release.notificationsNone': 'Не получать', 'release.notificationsNoneDescription': 'Уведомления для этого релиза отключены', 'release.notificationsAll': 'От всех озвучек', 'release.notificationsAllDescription': 'При выходе серии в любой озвучке', 'release.notificationsSelected': 'От выбранных озвучек', 'release.notificationsSelectedDescription': 'Вы сможете отметить нужные варианты озвучки',
+    'release.collectionsLoadError': 'Не удалось загрузить ваши коллекции.', 'release.collectionAdded': 'Релиз добавлен в коллекцию «{title}».', 'release.alreadyInCollection': 'Этот релиз уже есть в коллекции.', 'release.collectionAddError': 'Не удалось добавить релиз в коллекцию.', 'release.notificationsLoadError': 'Не удалось загрузить настройки уведомлений.', 'release.notificationsSaveError': 'Не удалось сохранить настройки уведомлений.', 'release.ratingChangeError': 'Не удалось изменить оценку. Предыдущая оценка сохранена.', 'release.ratingRestoreError': 'Не удалось изменить или восстановить оценку. Данные будут загружены заново.', 'release.addCollection': 'Добавить в коллекцию', 'release.configureNotifications': 'Настроить уведомления', 'release.yourRating': 'Ваша оценка', 'release.rateValue': 'Оценить на {value}', 'release.ratingOutOfFive': '{value} из 5', 'release.gallery': 'Галерея кадров', 'release.screenshotAlt': 'Скриншот {number}', 'release.previousScreenshot': 'Предыдущий кадр', 'release.nextScreenshot': 'Следующий кадр', 'release.showScreenshot': 'Показать кадр {number}', 'release.selectCollection': 'Выберите одну из своих коллекций.', 'release.noCollections': 'У вас пока нет коллекций.', 'release.noDescription': 'Описание отсутствует', 'release.addingCollection': 'Добавляем…', 'release.notificationsTitle': 'Уведомления о релизе', 'release.notificationsCaption': 'Выберите, когда присылать уведомление о новой серии.', 'release.notificationsNone': 'Не получать', 'release.notificationsNoneDescription': 'Уведомления для этого релиза отключены', 'release.notificationsAll': 'От всех озвучек', 'release.notificationsAllDescription': 'При выходе серии в любой озвучке', 'release.notificationsSelected': 'От выбранных озвучек', 'release.notificationsSelectedDescription': 'Вы сможете отметить нужные варианты озвучки',
     'release.recommendedReleases': 'Также рекомендуем',
     'release.commentSection': 'Комментарии',
     'release.rating': 'Оценки',
@@ -346,7 +359,7 @@ export const russian = {
     'favorites.sectionsAria': 'Разделы профиля', 'favorites.userLists': 'Списки пользователя', 'favorites.loadError': 'Не удалось загрузить список. Проверьте соединение и попробуйте снова.', 'favorites.collectionsLoadError': 'Не удалось загрузить коллекции. Проверьте соединение и попробуйте снова.',
     'filterSearch.title': 'Поиск по фильтрам', 'filterSearch.description': 'Подберите релизы по жанру, году, статусу и другим параметрам.', 'filterSearch.change': 'Изменить фильтры', 'filterSearch.setup': 'Настройте фильтры, чтобы начать поиск.', 'filterSearch.loading': 'Ищем релизы…', 'filterSearch.error': 'Не удалось загрузить релизы.', 'filterSearch.empty': 'По выбранным фильтрам ничего не найдено.',
     'franchise.title': 'Франшиза', 'franchise.openError': 'Не удалось открыть франшизу.', 'franchise.loadError': 'Не удалось загрузить релизы франшизы.', 'franchise.moreError': 'Не удалось загрузить следующую страницу.', 'franchise.coverAlt': 'Обложка: {title}', 'franchise.loading': 'Загружаем релизы франшизы…', 'franchise.empty': 'В этой франшизе пока нет релизов.', 'franchise.loadingMore': 'Загружаем…', 'franchise.showMore': 'Показать ещё',
-    'overview.loading': 'Загружаем обзор…', 'overview.error': 'Не удалось загрузить обзор.', 'overview.interesting': 'Интересное', 'overview.previous': 'Предыдущий баннер', 'overview.next': 'Следующий баннер', 'overview.discussing': 'Сейчас обсуждают', 'overview.quickAria': 'Быстрые переходы', 'overview.popular': 'Популярное', 'overview.schedule': 'Расписание', 'overview.filter': 'Фильтр', 'overview.random': 'Рандом', 'overview.recommended': 'Рекомендуем тебе', 'overview.recommendedDescription': 'Релизы, которые могут тебе понравиться', 'overview.rateMore': 'Оцените хотя бы 20 релизов, чтобы получить персональные рекомендации.', 'overview.watching': 'Сейчас смотрят', 'overview.weekComments': 'Комментарии недели', 'overview.empty': 'Пока нечего показать. Попробуйте открыть страницу позже.',
+    'overview.loading': 'Загружаем обзор…', 'overview.error': 'Не удалось загрузить обзор.', 'overview.interesting': 'Интересное', 'overview.previous': 'Предыдущий баннер', 'overview.next': 'Следующий баннер', 'overview.discussing': 'Сейчас обсуждают', 'overview.quickAria': 'Быстрые переходы', 'overview.popular': 'Популярное', 'overview.schedule': 'Расписание', 'overview.filter': 'Фильтр', 'overview.random': 'Рандом', 'overview.recommended': 'Рекомендуем тебе', 'overview.recommendedDescription': 'Релизы, которые могут тебе понравиться', 'overview.rateMore': 'Для подбора рекомендаций нужно положительно оценить не менее 20 релизов. Подборка обновляется раз в сутки.', 'overview.recommendationsLoading': 'Загружаем рекомендации…', 'overview.recommendationsError': 'Не удалось загрузить рекомендации.', 'overview.watching': 'Сейчас смотрят', 'overview.weekComments': 'Комментарии недели', 'overview.empty': 'Пока нечего показать. Попробуйте открыть страницу позже.',
 
     'settings.description': 'Настройте внешний вид, контент и проигрыватель.', 'settings.language.russian': 'Русский', 'settings.language.english': 'English', 'settings.proxySearch': 'Проксировать поиск через Shikimori API', 'settings.proxySearch.desc': 'Повышает точность поиска аниме на английском, но требует больше времени.', 'settings.keybindings': 'Горячие клавиши', 'settings.keybindings.desc': 'Выберите действие, затем нажмите нужную клавишу. Повторяющиеся сочетания заменяются.', 'settings.keybindings.configure': 'Настроить клавиши', 'settings.keybindings.capture': 'Нажмите клавишу…', 'settings.keybindings.unassigned': 'Не назначено', 'settings.key.space': 'Пробел',
     'settings.keybinding.togglePlayback': 'Воспроизведение / пауза', 'settings.keybinding.seekBackward': 'Назад на 5 секунд', 'settings.keybinding.seekForward': 'Вперёд на 5 секунд', 'settings.keybinding.volumeDown': 'Уменьшить громкость', 'settings.keybinding.volumeUp': 'Увеличить громкость', 'settings.keybinding.toggleMute': 'Включить / выключить звук', 'settings.keybinding.toggleFullscreen': 'Полноэкранный режим', 'settings.keybinding.previousEpisode': 'Предыдущая серия', 'settings.keybinding.nextEpisode': 'Следующая серия', 'settings.keybinding.skipOpening': 'Пропустить опенинг',
@@ -526,7 +539,7 @@ export const russian = {
     'releaseNotifications.error': 'Не удалось загрузить релизы.',
     'releaseNotifications.empty': 'Для отдельных релизов уведомления пока не настроены.',
     'releaseNotifications.posterAlt': 'Обложка релиза «{title}»',
-    'releaseNotifications.meta': '{episodes} эп. · {grade} ★',
+    'releaseNotifications.meta': '{episodes} эп. · {grade}',
     'releaseNotifications.dubsCount': 'Выбрано озвучек: {count}',
 
     'watchRoom.title': 'Совместный просмотр', 'watchRoom.beta': 'Бета', 'watchRoom.description': 'Создай комнату, выбери серию и смотри синхронно с друзьями.', 'watchRoom.defaultTitle': 'Совместный просмотр', 'watchRoom.new': 'Новая комната', 'watchRoom.name': 'Название', 'watchRoom.visibility': 'Доступ', 'watchRoom.private': 'Приватная — по ссылке', 'watchRoom.public': 'Открытая — в каталоге', 'watchRoom.create': 'Создать комнату', 'watchRoom.code': 'Код комнаты', 'watchRoom.joinCode': 'Войти по коду', 'watchRoom.publicRooms': 'Открытые комнаты', 'watchRoom.refresh': 'Обновить', 'watchRoom.noRooms': 'Сейчас здесь пусто.', 'watchRoom.noEpisode': 'Серия ещё не выбрана',
@@ -544,7 +557,7 @@ export const russian = {
     'roomSocial.charsRemaining': '{count} симв. осталось',
     'roomSocial.emptyMessageError': 'Сообщение не может быть пустым',
     'roomSocial.sendError': 'Не удалось отправить сообщение',
-    'roomSocial.newMessages': 'Новые сообщения ↓',
+    'roomSocial.newMessages': 'Новые сообщения',
     'roomSocial.noMessages': 'Сообщений пока нет',
     'roomSocial.reactions': 'Реакции',
     'roomSocial.reaction.heart': 'Сердце',
@@ -581,12 +594,23 @@ export const russian = {
     "releaseMenu.saveError": "\u041e\u0448\u0438\u0431\u043a\u0430. \u041f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u0435 \u043f\u043e\u043f\u044b\u0442\u043a\u0443.",
     "releaseMenu.retry": "\u041f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u044c",
     'roomSocial.downloadImage': 'Скачать',
+    'tabMenu.title': 'Настройки вкладки',
+    'tabMenu.makeDefault': 'Сделать вкладкой по умолчанию',
+    'tabMenu.isDefault': 'Вкладка по умолчанию',
+    'tabMenu.changeFilters': 'Изменить фильтры',
 } as const;
 
 export type TranslationKey = keyof typeof russian;
 export type Translation = Record<TranslationKey, string>;
 
 export const english: Translation = {
+    'home.donghua': 'Donghua',
+    'tabMenu.dragHint': 'Drag to reorder tabs. Keyboard: Alt + arrow keys.',
+    'tabMenu.moved': 'Moved {tab} to position {position} of {count}.',
+    'imageViewer.open': 'Open image',
+    'imageViewer.previous': 'Previous image',
+    'imageViewer.next': 'Next image',
+    ...feedEn,
     ...roadmapSettingsEn,
     ...roadmapImportsEn, ...roadmapPlayerEn, ...roadmapDiscoverEn,
     ...roomUXEnglish,
@@ -625,6 +649,10 @@ export const english: Translation = {
     'page.error': 'Failed to load data.',
     'page.empty': 'Nothing here yet.',
     'page.retry': 'Try again',
+    'page.notFoundTitle': 'Page not found',
+    'page.notFound': 'Check the address or return to the home page.',
+    'page.routeErrorTitle': 'Could not open this page',
+    'page.routeError': 'Check your connection and try again. The page will reload.',
     'toggle.label': 'Toggle',
     'collection.open': 'Open collection “{title}”',
     'collection.saved.one': '{count} save',
@@ -645,6 +673,7 @@ export const english: Translation = {
     'nav.home': 'Home', 'nav.overview': 'Overview', 'nav.favorites': 'Favorites', 'nav.account': 'Account', 'nav.random': 'Random anime', 'nav.settings': 'Settings',
     'home.my': 'My tab', 'home.myTabHint': 'Right-click to configure filters', 'home.latest': 'Latest', 'home.ongoing': 'Ongoing', 'home.announced': 'Announcements', 'home.completed': 'Completed', 'home.films': 'Movies', 'home.history': 'History',
     'status.watching': 'Watching', 'status.planned': 'Plan to watch', 'status.watched': 'Completed', 'status.hold_on': 'On hold', 'status.dropped': 'Dropped',
+    'search.error': 'Search failed. Try again.',
     'search.anime': 'Search anime', 'search.users': 'Search users', 'search.waiting': 'Searching...', 'search.clear': 'Clear', 'search.empty': 'Nothing found', 'search.franchiseReleases': 'Franchise releases',
     'sort.dateAddedNewFirst': 'Date added: newest first', 'sort.dateAddedOldFirst': 'Date added: oldest first', 'sort.fromAtoZ': 'Alphabetical: A → Z', 'sort.fromZtoA': 'Alphabetical: Z → A', 'sort.releaseDateNewFirst': 'Release date: newest first', 'sort.releaseDateOldFirst': 'Release date: oldest first',
     'country.japan': 'Japan', 'country.china': 'China', 'country.southKorea': 'South Korea', 'seasons.winter': 'winter', 'seasons.spring': 'spring', 'seasons.summer': 'summer', 'seasons.autumn': 'autumn',
@@ -668,7 +697,7 @@ export const english: Translation = {
     'favorites.sectionsAria': 'Profile sections', 'favorites.userLists': 'User lists', 'favorites.loadError': 'Unable to load the list. Check your connection and try again.', 'favorites.collectionsLoadError': 'Unable to load collections. Check your connection and try again.',
     'filterSearch.title': 'Filter search', 'filterSearch.description': 'Find releases by genre, year, status, and other parameters.', 'filterSearch.change': 'Change filters', 'filterSearch.setup': 'Configure filters to start searching.', 'filterSearch.loading': 'Searching for releases…', 'filterSearch.error': 'Unable to load releases.', 'filterSearch.empty': 'No releases match the selected filters.',
     'franchise.title': 'Franchise', 'franchise.openError': 'Unable to open the franchise.', 'franchise.loadError': 'Unable to load franchise releases.', 'franchise.moreError': 'Unable to load the next page.', 'franchise.coverAlt': 'Cover: {title}', 'franchise.loading': 'Loading franchise releases…', 'franchise.empty': 'This franchise has no releases yet.', 'franchise.loadingMore': 'Loading…', 'franchise.showMore': 'Show more',
-    'overview.loading': 'Loading overview…', 'overview.error': 'Unable to load the overview.', 'overview.interesting': 'Featured', 'overview.previous': 'Previous banner', 'overview.next': 'Next banner', 'overview.discussing': 'Trending discussions', 'overview.quickAria': 'Quick links', 'overview.popular': 'Popular', 'overview.schedule': 'Schedule', 'overview.filter': 'Filter', 'overview.random': 'Random', 'overview.recommended': 'Recommended for you', 'overview.recommendedDescription': 'Releases you may like', 'overview.rateMore': 'Rate at least 20 releases to get personalized recommendations.', 'overview.watching': 'Watching now', 'overview.weekComments': 'Comments of the week', 'overview.empty': 'Nothing to show yet. Try opening this page later.',
+    'overview.loading': 'Loading overview…', 'overview.error': 'Unable to load the overview.', 'overview.interesting': 'Featured', 'overview.previous': 'Previous banner', 'overview.next': 'Next banner', 'overview.discussing': 'Trending discussions', 'overview.quickAria': 'Quick links', 'overview.popular': 'Popular', 'overview.schedule': 'Schedule', 'overview.filter': 'Filter', 'overview.random': 'Random', 'overview.recommended': 'Recommended for you', 'overview.recommendedDescription': 'Releases you may like', 'overview.rateMore': 'Positively rate at least 20 releases to get personalized recommendations. Recommendations update once a day.', 'overview.recommendationsLoading': 'Loading recommendations…', 'overview.recommendationsError': 'Unable to load recommendations.', 'overview.watching': 'Watching now', 'overview.weekComments': 'Comments of the week', 'overview.empty': 'Nothing to show yet. Try opening this page later.',
 
     'settings.description': 'Customize appearance, content, and the player.', 'settings.language.russian': 'Russian', 'settings.language.english': 'English', 'settings.proxySearch': 'Proxy searches through the Shikimori API', 'settings.proxySearch.desc': 'Improves English anime searches, but takes longer.', 'settings.keybindings': 'Keyboard shortcuts', 'settings.keybindings.desc': 'Select an action, then press a key. Duplicate bindings are replaced.', 'settings.keybindings.configure': 'Configure shortcuts', 'settings.keybindings.capture': 'Press a key…', 'settings.keybindings.unassigned': 'Unassigned', 'settings.key.space': 'Space',
     'settings.keybinding.togglePlayback': 'Play / pause', 'settings.keybinding.seekBackward': 'Seek backward 5 seconds', 'settings.keybinding.seekForward': 'Seek forward 5 seconds', 'settings.keybinding.volumeDown': 'Volume down', 'settings.keybinding.volumeUp': 'Volume up', 'settings.keybinding.toggleMute': 'Mute / unmute', 'settings.keybinding.toggleFullscreen': 'Fullscreen', 'settings.keybinding.previousEpisode': 'Previous episode', 'settings.keybinding.nextEpisode': 'Next episode', 'settings.keybinding.skipOpening': 'Skip opening',
@@ -848,7 +877,7 @@ export const english: Translation = {
     'releaseNotifications.error': 'Could not load releases.',
     'releaseNotifications.empty': 'No individual release notifications have been configured yet.',
     'releaseNotifications.posterAlt': 'Cover of “{title}”',
-    'releaseNotifications.meta': '{episodes} ep. · {grade} ★',
+    'releaseNotifications.meta': '{episodes} ep. · {grade}',
     'releaseNotifications.dubsCount': 'Dubbing teams selected: {count}',
 
     'watchRoom.title': 'Watch together', 'watchRoom.beta': 'Beta', 'watchRoom.description': 'Create a room, choose an episode, and watch in sync with friends.', 'watchRoom.defaultTitle': 'Watch together', 'watchRoom.new': 'New room', 'watchRoom.name': 'Name', 'watchRoom.visibility': 'Access', 'watchRoom.private': 'Private — link only', 'watchRoom.public': 'Public — listed in catalog', 'watchRoom.create': 'Create room', 'watchRoom.code': 'Room code', 'watchRoom.joinCode': 'Join by code', 'watchRoom.publicRooms': 'Public rooms', 'watchRoom.refresh': 'Refresh', 'watchRoom.noRooms': 'No rooms here right now.', 'watchRoom.noEpisode': 'No episode selected yet',
@@ -864,7 +893,7 @@ export const english: Translation = {
     'roomSocial.charsRemaining': '{count} characters left',
     'roomSocial.emptyMessageError': 'Message cannot be empty',
     'roomSocial.sendError': 'Failed to send message',
-    'roomSocial.newMessages': 'New messages ↓',
+    'roomSocial.newMessages': 'New messages',
     'roomSocial.noMessages': 'No messages yet',
     'roomSocial.reactions': 'Reactions',
     'roomSocial.reaction.heart': 'Heart',
@@ -901,6 +930,10 @@ export const english: Translation = {
     "releaseMenu.saveError": "Could not save. Please try again.",
     "releaseMenu.retry": "Retry",
     'roomSocial.downloadImage': 'Download',
+    'tabMenu.title': 'Tab options',
+    'tabMenu.makeDefault': 'Make this tab default',
+    'tabMenu.isDefault': 'Default tab',
+    'tabMenu.changeFilters': 'Change filters',
 };
 
 export const dictionaries = { russian, english } as const;

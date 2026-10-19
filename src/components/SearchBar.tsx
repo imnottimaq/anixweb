@@ -10,6 +10,7 @@ import SearchIcon from "../assets/icons/search.svg";
 import RemoteImage from './RemoteImage';
 import { useTranslation } from '../shared/useTranslation';
 import { useApi } from '../shared/apiClient';
+import { feedChildState } from '../shared/feedNavigationState';
 
 interface ReleaseSearchResponse{
   code: number;
@@ -40,8 +41,14 @@ type SearchResults = ReleaseSearchResponse | ProfileSearchResponse | CollectionS
 
 export default function SearchButton(){
     const [query, setQuery] = useState('');
-    const [searchResults, setSearchResults] = useState<SearchResults>();
-    const [isLoading, setIsLoading] = useState(false);
+    const [result, setResult] = useState<{
+        key: string;
+        api: ReturnType<typeof useApi>;
+        data?: SearchResults;
+        error?: boolean;
+        loading: boolean;
+    }>();
+    const [retryIndex, setRetryIndex] = useState(0);
     const {settings} = useSettings()
     const { t } = useTranslation();
     const { searchScope } = useSearchScope();
@@ -50,24 +57,28 @@ export default function SearchButton(){
     const [isExpanded, setIsExpanded] = useState(false);
     const searchRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const searchKey = JSON.stringify([query.trim(), searchScope, settings.content.proxySearchThroughShikimori]);
+    const currentResult = result?.key === searchKey && result.api === api ? result : undefined;
+    const searchResults = currentResult?.data;
+    const isLoading = isExpanded && Boolean(query.trim()) && (!currentResult || currentResult.loading);
 
     const navigate = useNavigate()
-    const { pathname } = useLocation();
+    const location = useLocation();
+    const { pathname } = location;
+    const isFeed = /^\/feed(?:\/|$)/.test(pathname);
     const previousPathname = useRef(pathname);
 
     const clearSearch = useCallback(() => {
         setQuery('');
-        setSearchResults(undefined);
+        setResult(undefined);
         setIsSearchOpen(false);
-        setIsLoading(false);
         window.requestAnimationFrame(() => inputRef.current?.focus());
     }, []);
 
     const collapseSearch = useCallback(() => {
         setQuery('');
-        setSearchResults(undefined);
+        setResult(undefined);
         setIsSearchOpen(false);
-        setIsLoading(false);
         setIsExpanded(false);
     }, []);
 
@@ -105,59 +116,59 @@ export default function SearchButton(){
         const value = query.trim();
         if (!value) return;
 
-        const oldHistory = JSON.parse(
-            localStorage.getItem('search_history') ?? '[]'
-        ) as string[];
-
-        const nextHistory = [
-            value,
-            ...oldHistory.filter(i => i.toLowerCase() !== value.toLowerCase()),
-        ].slice(0, 10);
-
-        localStorage.setItem('search_history', JSON.stringify(nextHistory));
+        try {
+            const stored: unknown = JSON.parse(localStorage.getItem('search_history') ?? '[]');
+            const oldHistory = Array.isArray(stored) ? stored.filter((item): item is string => typeof item === 'string') : [];
+            const nextHistory = [value, ...oldHistory.filter(i => i.toLowerCase() !== value.toLowerCase())].slice(0, 10);
+            localStorage.setItem('search_history', JSON.stringify(nextHistory));
+        } catch { /* Unavailable or malformed history must not turn a successful search into an error. */ }
     }
 
     useEffect(() => {
         const value = query.trim();
-        if (!value || !isExpanded) return;
+        if (!value || !isExpanded || isFeed) return;
 
         let isCurrent = true;
+        const controller = new AbortController();
         const timer = window.setTimeout(() => {
-            setIsLoading(true);
-            GetSearchResults(value, searchScope, api, settings.content.proxySearchThroughShikimori)
+            setResult({ key: searchKey, api, loading: true });
+            GetSearchResults(value, searchScope, api, settings.content.proxySearchThroughShikimori, controller.signal)
                 .then(data => {
                     if (!isCurrent) return;
                     setIsSearchOpen(true);
-                    setSearchResults(data);
+                    setResult({ key: searchKey, api, data, loading: false });
                     setHistory(value);
                 })
-                .catch(error => {
-                    if (isCurrent) console.error('Не удалось выполнить поиск:', error);
-                })
-                .finally(() => {
-                    if (isCurrent) setIsLoading(false);
+                .catch(() => {
+                    if (isCurrent) setResult({ key: searchKey, api, error: true, loading: false });
                 });
         }, 500)
 
         return () => {
             isCurrent = false;
+            controller.abort();
             window.clearTimeout(timer);
         };
-    }, [api, isExpanded, query, searchScope, settings.content.proxySearchThroughShikimori])
+    }, [api, isExpanded, isFeed, query, searchKey, searchScope, settings.content.proxySearchThroughShikimori, retryIndex])
 
     const isProfileSearch = searchScope.type === 'profiles';
     const isCollectionSearch = searchScope.type === 'collections';
-    const searchLabel = isProfileSearch ? t('search.users') : isCollectionSearch ? t('nav.collections') : t('search.anime');
+    const searchLabel = isFeed ? t('feed.search') : isProfileSearch ? t('search.users') : isCollectionSearch ? t('nav.collections') : t('search.anime');
     const profileResults = searchResults && 'profiles' in searchResults ? searchResults.profiles : [];
     const collectionResults = searchResults && 'collections' in searchResults ? searchResults.collections : [];
     const releaseResults = searchResults && 'releases' in searchResults ? searchResults : undefined;
 
     return (
         <div ref={searchRef} className={`${styles.search} ${isExpanded ? styles.expanded : ''}`}>
-            {!isExpanded ? <button
+            {!isExpanded || isFeed ? <button
                 type="button"
                 className={styles['search-trigger']}
-                onClick={() => setIsExpanded(true)}
+                onClick={() => {
+                    if (!isFeed) { setIsExpanded(true); return; }
+                    const field = document.getElementById('feed-search-input');
+                    if (field instanceof HTMLInputElement) { field.scrollIntoView({ block: 'center' }); field.focus(); }
+                    else navigate('/feed?search=1', { state: feedChildState(location) });
+                }}
                 aria-label={searchLabel}
                 title={searchLabel}
                 aria-expanded="false"
@@ -173,8 +184,7 @@ export default function SearchButton(){
                         setQuery(value);
                         setIsSearchOpen(Boolean(value.trim()));
                         if (!value.trim()) {
-                            setSearchResults(undefined);
-                            setIsLoading(false);
+                            setResult(undefined);
                         }
                     }}
                     placeholder={searchLabel}
@@ -187,11 +197,15 @@ export default function SearchButton(){
                     aria-label={t('search.clear')}
                 >×</button>}
             </label>}
-            {isSearchOpen && <div className={styles['search-overlay']} onMouseDown={event => {
+            {!isFeed && isSearchOpen && <div className={styles['search-overlay']} onMouseDown={event => {
                 if (event.target === event.currentTarget) collapseSearch();
             }}>
                 <div className={styles['search-content']}>
                     {isLoading && <p className={styles.message}>{t('search.waiting')}</p>}
+                    {currentResult?.error && <div className={styles.message} role="alert">
+                        <p>{t('search.error')}</p>
+                        <button type="button" onClick={() => { setResult(undefined); setRetryIndex(index => index + 1); }}>{t('page.retry')}</button>
+                    </div>}
                     {!isLoading && releaseResults?.related && <button type="button" className={styles['related-release']} onClick={() => {
                         collapseSearch();
                         navigate(`/franchise/${releaseResults.related?.id || 0}`, { state: { franchise: releaseResults.related } });
@@ -240,7 +254,7 @@ export default function SearchButton(){
                             <RemoteImage src={collection.image} alt="" />
                             <span className={styles['collection-info']}>
                                 <strong>{collection.title}</strong>
-                                {collection.description && <small>{collection.description}</small>}
+                                <small>{collection.description?.trim() || t('release.noDescription')}</small>
                             </span>
                             <span className={styles['collection-footer']}>
                                 <span className={styles['collection-creator']}>
@@ -263,6 +277,7 @@ async function GetSearchResults(
     searchScope: SearchScope,
     api: ReturnType<typeof useApi>,
     useShikimoriProxy: boolean,
+    signal: AbortSignal,
 ): Promise<SearchResults> {
     const endpoint = searchScope.type === 'profiles'
         ? '/search/profiles/0'
@@ -276,7 +291,7 @@ async function GetSearchResults(
                     ? `/search/profile/list/${searchScope.list}/0`
                     : '/search/releases/0';
     const searchQuery = useShikimoriProxy && searchScope.type === 'releases'
-        ? await getShikimoriSearchQuery(query)
+        ? await getShikimoriSearchQuery(query, signal)
         : query;
 
     const data = await api.post<{
@@ -289,7 +304,7 @@ async function GetSearchResults(
         total_count?: number;
         total_page_count?: number;
         current_page?: number;
-    }>(endpoint, { query: searchQuery, searchBy: 0 }, { 'Api-Version': 'v2' });
+    }>(endpoint, { query: searchQuery, searchBy: 0 }, { 'Api-Version': 'v2' }, { signal });
     if (data.code === 0) {
         if (searchScope.type === 'profiles') {
             const profiles = (data.profiles ?? data.content ?? []) as SearchProfile[];
@@ -332,10 +347,11 @@ type ShikimoriSearchResponse = {
     errors?: Array<{ message?: string }>;
 };
 
-async function getShikimoriSearchQuery(query: string) {
+async function getShikimoriSearchQuery(query: string, signal: AbortSignal) {
     try {
         const response = await fetch('https://shikimori.one/api/graphql', {
             method: 'POST',
+            signal,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 query: `query SearchAnime($search: String!) {
@@ -351,6 +367,7 @@ async function getShikimoriSearchQuery(query: string) {
         const anime = data.data?.animes?.[0];
         return anime?.russian?.trim() || anime?.name?.trim() || query;
     } catch {
+        signal.throwIfAborted();
         return query;
     }
 }

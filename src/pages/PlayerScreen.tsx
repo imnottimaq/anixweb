@@ -19,6 +19,7 @@ import { canUseAnime4KVideo, checkAnime4KVideoSupport, isSafariBrowser } from '.
 import { useTranslation } from '../shared/useTranslation';
 import { resolveRoomMedia } from '../shared/mediaResolver';
 import { PlaybackBridge } from '../shared/playbackBridge';
+import { roomPlaybackAccess } from '../shared/roomPermissions';
 import RoomPanel from '../components/RoomPanel';
 import ReactionOverlay from '../components/ReactionOverlay';
 import { useRoomPresence } from '../shared/contexts/roomContext';
@@ -27,6 +28,7 @@ import { createUpscalerScope } from '../shared/upscalerScope';
 import { getCorsProxyUrl } from '../shared/proxy';
 import {
     useEpisodeDownload,
+    getDownloadStreamOptions,
     isHlsStream,
     isDirectMp4Stream,
     formatBytes,
@@ -232,7 +234,10 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     const api = useApi();
     const { room: watchRoom, status: roomStatus, send, serverNow, self } = useRoomPresence();
     const roomProfileId = self?.profileId ?? userId;
-    const canControlRoom = !roomId || (roomStatus === 'connected' && Boolean(watchRoom?.participants.some(participant => participant.profileId === roomProfileId && participant.canControl)));
+    const roomAccess = roomPlaybackAccess(watchRoom, roomProfileId);
+    const canControlRoom = !roomId || (roomStatus === 'connected' && roomAccess.control);
+    const canPauseRoom = !roomId || (roomStatus === 'connected' && roomAccess.pause);
+    const canToggleRoomPlayback = canControlRoom || (canPauseRoom && watchRoom?.playback.intent === 'playing');
     const playerRef = useRef<HTMLDivElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const upscaleCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -315,6 +320,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     const keybindings = settings.player.keybindings ?? defaultPlayerKeybindings;
 
     const stream = sources[selectedQuality]?.[0];
+    const downloadOptions = getDownloadStreamOptions(sources);
 
     const timelineProgress = Number.isFinite(duration) && duration > 0
         ? Math.min((currentTime / duration) * 100, 100)
@@ -359,9 +365,9 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     }, [animeId, episodeKey, settings.content.rememberEpisodeTime]);
 
     const sendRoomPlayback = useCallback((type: 'play' | 'pause' | 'seek' | 'set_rate', position: number, rate?: number) => {
-        if (!roomId || !canControlRoom) return;
+        if (!roomId || !(type === 'pause' ? canPauseRoom : canControlRoom)) return;
         void send(type === 'set_rate' ? { type, position, rate: rate ?? 1 } : { type, position }).catch(error => setStreamError(String(error)));
-    }, [canControlRoom, roomId, send]);
+    }, [canControlRoom, canPauseRoom, roomId, send]);
 
     useEffect(() => {
         const video = videoRef.current;
@@ -384,7 +390,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
         wasAutoPausedRef.current = false;
         isAutoPausingRef.current = false;
         const video = videoRef.current;
-        if (!video || !canControlRoom) return;
+        if (!video || !canToggleRoomPlayback) return;
         if (roomId) { sendRoomPlayback(watchRoom?.playback.intent === 'playing' ? 'pause' : 'play', video.currentTime); return; }
         if (settings.player.autoFullscreen && !autoFullscreenTriggeredRef.current && !autoFullscreenPendingRef.current) {
             autoFullscreenPendingRef.current = true;
@@ -396,7 +402,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
             });
         }
         if (video.paused) void video.play(); else video.pause();
-    }, [canControlRoom, roomId, sendRoomPlayback, settings.player.autoFullscreen, watchRoom?.playback.intent]);
+    }, [canToggleRoomPlayback, roomId, sendRoomPlayback, settings.player.autoFullscreen, watchRoom?.playback.intent]);
     const seekTo = useCallback((position: number) => {
         if (!canControlRoom) return;
         if (roomId) { sendRoomPlayback('seek', position); return; }
@@ -914,7 +920,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                             <button
                                 type="button"
                                 className={styles['play-button']}
-                                disabled={!canControlRoom || (!roomId && isBuffering)}
+                                disabled={!canToggleRoomPlayback || (!roomId && isBuffering)}
                                 aria-label={roomId ? t(watchRoom?.playback.intent === 'playing' ? 'player.pause' : 'player.play') : isBuffering ? t('player.loading') : isPlaying ? t('player.pause') : t('player.play')}
                                 onClick={togglePlayback}
                             >
@@ -1068,12 +1074,17 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                         </div>
                         <button
                             type="button"
-                            className={`${styles['action-btn']} ${isDownloadModalOpen ? styles['action-btn-active'] : ''}`}
+                            className={`${styles['action-btn']} ${styles['download-icon-button']}`}
                             onClick={() => {
+                                resetDownload();
                                 setIsDownloadModalOpen(isOpen => !isOpen);
-                                setDownloadSelectedQuality(selectedQuality);
+                                const preferred = downloadOptions.find(option => option.quality === selectedQuality && option.isDirectMp4)
+                                    || downloadOptions.find(option => option.isDirectMp4);
+                                setDownloadSelectedQuality(preferred?.quality || selectedQuality);
                             }}
                             aria-label={t('roadmap.player.download')}
+                            aria-haspopup="dialog"
+                            aria-expanded={isDownloadModalOpen}
                             title={t('roadmap.player.download')}
                         >
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1264,9 +1275,9 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
 
                             <div className={styles['download-section-title']}>{t('roadmap.player.downloadSelectQuality')}</div>
                             <div className={styles['download-qualities']}>
-                                {qualities.map(q => {
-                                    const qStream = sources[q]?.[0];
-                                    const isDirect = qStream ? isDirectMp4Stream(qStream) : false;
+                                {downloadOptions.map(option => {
+                                    const q = option.quality;
+                                    const isDirect = option.isDirectMp4;
                                     const currentQ = downloadSelectedQuality || selectedQuality;
                                     const isSelected = currentQ === q;
 
@@ -1274,6 +1285,8 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                                         <button
                                             key={q}
                                             type="button"
+                                            disabled={downloadStatus === 'downloading'}
+                                            aria-pressed={isSelected}
                                             className={`${styles['download-quality-chip']} ${isSelected ? styles.selected : ''}`}
                                             onClick={() => {
                                                 setDownloadSelectedQuality(q);
@@ -1282,7 +1295,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                                         >
                                             <span>{q}p</span>
                                             <span className={isDirect ? styles['download-badge-mp4'] : styles['download-badge-hls']}>
-                                                {isDirect ? 'MP4' : qStream && isHlsStream(qStream) ? 'HLS' : '—'}
+                                                {isDirect ? 'MP4' : option.isHls ? 'HLS' : '—'}
                                             </span>
                                         </button>
                                     );
@@ -1291,19 +1304,19 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
 
                             {(() => {
                                 const activeQ = downloadSelectedQuality || selectedQuality;
-                                const activeStream = sources[activeQ]?.[0];
+                                const activeStream = downloadOptions.find(option => option.quality === activeQ);
                                 const isHls = activeStream ? isHlsStream(activeStream) : false;
                                 const isDirect = activeStream ? isDirectMp4Stream(activeStream) : false;
 
                                 if (downloadStatus === 'downloading') {
                                     return (
                                         <div className={styles['download-progress-wrap']}>
-                                            <div className={styles['download-progress-bar']}>
-                                                <div className={styles['download-progress-fill']} style={{ width: `${downloadProgress.percent}%` }} />
+                                            <div className={styles['download-progress-bar']} role="progressbar" aria-label={t('roadmap.player.download')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={downloadProgress.total > 0 || downloadProgress.totalSegments ? downloadProgress.percent : undefined}>
+                                                <div className={`${styles['download-progress-fill']} ${downloadProgress.total === 0 && !downloadProgress.totalSegments ? styles['download-progress-indeterminate'] : ''}`} style={downloadProgress.total > 0 || downloadProgress.totalSegments ? { width: `${downloadProgress.percent}%` } : undefined} />
                                             </div>
                                             <div className={styles['download-progress-text']}>
-                                                <span>{downloadProgress.total > 0 ? `${downloadProgress.percent}%` : t('roadmap.player.downloadStatusConnecting')}</span>
-                                                <span>{formatBytes(downloadProgress.loaded)} / {downloadProgress.total > 0 ? formatBytes(downloadProgress.total) : '…'}</span>
+                                                <span>{downloadProgress.total > 0 || downloadProgress.totalSegments ? `${downloadProgress.percent}%` : downloadProgress.loaded > 0 ? t('roadmap.player.downloadStatusIndeterminate', { loaded: formatBytes(downloadProgress.loaded) }) : t('roadmap.player.downloadStatusConnecting')}</span>
+                                                <span>{downloadProgress.totalSegments ? `${downloadProgress.completedSegments}/${downloadProgress.totalSegments} · ${formatBytes(downloadProgress.loaded)}` : `${formatBytes(downloadProgress.loaded)} / ${downloadProgress.total > 0 ? formatBytes(downloadProgress.total) : '…'}`}</span>
                                             </div>
                                         </div>
                                     );
@@ -1322,7 +1335,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                                 }
 
                                 if (isHls && !isDirect) {
-                                    return <div className={styles['download-warning']}>{t('roadmap.player.downloadHlsUnsupported')}</div>;
+                                    return <div className={styles['download-warning']}>{t('roadmap.player.downloadHlsInfo')}</div>;
                                 }
 
                                 return null;
@@ -1347,10 +1360,10 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                                         </button>
                                         {(() => {
                                             const activeQ = downloadSelectedQuality || selectedQuality;
-                                            const activeStream = sources[activeQ]?.[0];
-                                            const isDirect = activeStream ? isDirectMp4Stream(activeStream) : false;
+                                            const activeStream = downloadOptions.find(option => option.quality === activeQ);
+                                            const canDownload = activeStream && (activeStream.isDirectMp4 || activeStream.isHls);
 
-                                            if (isDirect && downloadStatus !== 'completed') {
+                                            if (canDownload && downloadStatus !== 'completed') {
                                                 return (
                                                     <button
                                                         type="button"

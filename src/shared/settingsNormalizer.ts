@@ -2,7 +2,9 @@ import type { AppSettings, CustomColorSettings } from './types/settings.ts';
 import {
     defaultAppSettings,
     playerKeybindingActions,
+    HOME_TAB_ORDER, FAVORITES_TAB_ORDER,
 } from './types/settings.ts';
+import { normalizeTabOrder } from './tabOrder.ts';
 import type { Filter } from './types/api.ts';
 
 export interface CloudSettingsPayload {
@@ -17,7 +19,7 @@ const KNOWN_LANGUAGES = new Set(['russian', 'english', 'ukrainian']);
 const KNOWN_THEMES = new Set(['system', 'dark', 'light']);
 const KNOWN_QUALITIES = new Set(['auto', '1080', '720', '480', '360']);
 const KNOWN_UPGRADE_MODES = new Set(['weak', 'medium', 'strong']);
-const KNOWN_HOME_TABS = new Set(['latest', 'my', 'ongoing', 'announced', 'finished', 'films']);
+const KNOWN_HOME_TABS = new Set<string>(HOME_TAB_ORDER);
 const KNOWN_FAVORITES_TABS = new Set([
     'collections', 'favorites', 'history', 'watching', 'planned', 'completed', 'hold_on', 'dropped',
 ]);
@@ -38,6 +40,7 @@ const PLAYER_KEYS = new Set([
     'keybindings', 'skipForwardSeconds', 'skipBackwardSeconds',
 ]);
 const CONTENT_KEYS = new Set([
+    'homeTabOrder', 'favoritesTabOrder',
     'defaultTabOnHome', 'defaultTabOnFavorites', 'rememberSource', 'rememberedSourceId',
     'rememberDub', 'rememberedDubId', 'rememberEpisodeTime', 'proxySearchThroughShikimori', 'proxyImages',
 ]);
@@ -401,6 +404,14 @@ export function parseImportedSettings(data: unknown, current?: AppSettings): Clo
         const contentRaw = rawSettings.content as Record<string, unknown>;
         assertUnknownKeys(contentRaw, CONTENT_KEYS, 'content');
 
+        for (const [key, defaults] of [['homeTabOrder', HOME_TAB_ORDER], ['favoritesTabOrder', FAVORITES_TAB_ORDER]] as const) {
+            const order = contentRaw[key];
+            if (order === undefined) continue;
+            if (!Array.isArray(order) || order.some(item => typeof item !== 'string' || !(defaults as readonly string[]).includes(item)) || new Set(order).size !== order.length) throw new Error(`Invalid content.${key}`);
+            if (key === 'homeTabOrder') content.homeTabOrder = normalizeTabOrder(order, HOME_TAB_ORDER);
+            else content.favoritesTabOrder = normalizeTabOrder(order, FAVORITES_TAB_ORDER);
+        }
+
         if (contentRaw.defaultTabOnHome !== undefined) {
             if (typeof contentRaw.defaultTabOnHome !== 'string' || !KNOWN_HOME_TABS.has(contentRaw.defaultTabOnHome)) {
                 throw new Error(`Invalid content.defaultTabOnHome: "${String(contentRaw.defaultTabOnHome)}"`);
@@ -715,6 +726,8 @@ export function normalizeLegacySettings(data: unknown, current?: AppSettings): A
         content: {
             defaultTabOnHome,
             defaultTabOnFavorites,
+            homeTabOrder: normalizeTabOrder(contentRaw.homeTabOrder ?? base.content.homeTabOrder, HOME_TAB_ORDER),
+            favoritesTabOrder: normalizeTabOrder(contentRaw.favoritesTabOrder ?? base.content.favoritesTabOrder, FAVORITES_TAB_ORDER),
             rememberSource,
             rememberedSourceId,
             rememberDub,

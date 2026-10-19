@@ -1,4 +1,7 @@
 export const roomUXRussian = {
+    'roomUX.pauseForEveryone': 'Пауза для всех',
+    'roomUX.pauseForEveryoneHint': 'Участники без прав управления могут ставить общую паузу.',
+    'roomUX.roomTab': 'Участники',
     'roomUX.joinTitle': 'Есть приглашение?', 'roomUX.joinHint': 'Вставьте восьмизначный код комнаты.',
     'roomUX.createHint': 'Выберите доступ и пригласите друзей после создания.',
     'roomUX.privateHint': 'Войти можно только по приглашению.', 'roomUX.publicHint': 'Комната появится в списке открытых комнат.',
@@ -18,7 +21,7 @@ export const roomUXRussian = {
     'roomUX.waitFor': 'Загружается: {names}', 'roomUX.playing': 'Смотрим вместе', 'roomUX.paused': 'На паузе',
     'roomUX.emptyMedia': 'Что будем смотреть?', 'roomUX.emptyMediaHint': 'Найдите аниме ниже и выберите серию — просмотр начнётся у всей комнаты.',
     'roomUX.waitHostHint': 'Как только ведущий выберет серию, здесь появится кнопка просмотра.',
-    'roomUX.chooseAnime': 'Выберите аниме', 'roomUX.changeAnime': 'Выбрать другое аниме',
+    'roomUX.chooseAnime': 'Что будем смотреть?', 'roomUX.changeAnime': 'Выбрать другое аниме',
     'roomUX.chooseEpisode': 'Выберите серию', 'roomUX.dub': 'Озвучка', 'roomUX.source': 'Источник',
     'roomUX.noDubs': 'Для этого аниме пока нет озвучек.', 'roomUX.noSources': 'Для выбранной озвучки нет доступных источников.',
     'roomUX.noEpisodes': 'В этом источнике пока нет серий.', 'roomUX.mediaLoadError': 'Не удалось загрузить варианты просмотра.',
@@ -40,6 +43,9 @@ export const roomUXRussian = {
     'roomUX.errorGeneric': 'Связь с комнатой потеряна. Подключение будет восстановлено автоматически.',
 };
 export const roomUXEnglish: Record<keyof typeof roomUXRussian, string> = {
+    'roomUX.pauseForEveryone': 'Everyone can pause',
+    'roomUX.pauseForEveryoneHint': 'Allow participants without playback controls to pause the room.',
+    'roomUX.roomTab': 'Members',
     'roomUX.joinTitle': 'Have an invitation?', 'roomUX.joinHint': 'Paste the eight-character room code.',
     'roomUX.createHint': 'Choose who can join, then invite your friends.',
     'roomUX.privateHint': 'An invitation is required to join.', 'roomUX.publicHint': 'Your room will appear in the public list.',
@@ -59,7 +65,7 @@ export const roomUXEnglish: Record<keyof typeof roomUXRussian, string> = {
     'roomUX.waitFor': 'Loading: {names}', 'roomUX.playing': 'Watching together', 'roomUX.paused': 'Paused',
     'roomUX.emptyMedia': 'What shall we watch?', 'roomUX.emptyMediaHint': 'Find an anime below and choose an episode to start watching together.',
     'roomUX.waitHostHint': 'The watch button will appear when the host selects an episode.',
-    'roomUX.chooseAnime': 'Choose an anime', 'roomUX.changeAnime': 'Choose another anime',
+    'roomUX.chooseAnime': 'What shall we watch?', 'roomUX.changeAnime': 'Choose another anime',
     'roomUX.chooseEpisode': 'Choose an episode', 'roomUX.dub': 'Dub', 'roomUX.source': 'Source',
     'roomUX.noDubs': 'No dubs are available for this anime yet.', 'roomUX.noSources': 'No sources are available for this dub.',
     'roomUX.noEpisodes': 'No episodes are available in this source yet.', 'roomUX.mediaLoadError': 'Could not load viewing options.',

@@ -2,9 +2,10 @@ import { Suspense, type ReactNode } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 import RootLayout from './RootLayout';
 import RouteLoader from '../components/RouteLoader';
+import RouteErrorPage from '../components/RouteErrorPage';
 
 import { HomepageScreen, OverviewScreen, FavoritesScreen, ReleaseScreen, PlayerScreen, FranchiseScreen,
-    PopularScreen, ScheduleScreen, AccountScreen, EditAccountScreen, LoginScreen, RecoverScreen, NewAccountScreen, RandomAnime, SettingsScreen,
+    PopularScreen, ScheduleScreen, AccountScreen, EditAccountScreen, LoginScreen, RecoverScreen, NewAccountScreen, RandomAnime, SettingsScreen, FeedScreen, FeedChannelScreen, FeedPostScreen, FeedStudioScreen, FeedComposeScreen,
     NotificationsScreen, NotificationSettingsScreen, ReleaseNotificationSettingsScreen, WatchRoomScreen, FilterSearchScreen,
     CollectionScreen, CollectionsScreen, FriendsPage
  } from './components';
@@ -15,15 +16,22 @@ function lazyPage(page: ReactNode) {
 
 const basename = import.meta.env.BASE_URL === '/'
     ? undefined
-    : import.meta.env.BASE_URL.replace(/\/$/, '');
+    : import.meta.env.BASE_URL;
 
 export const router = createBrowserRouter([
 {
     path: '/',
     element: <RootLayout />,
+    errorElement: <RouteErrorPage />,
     children: [
+    { errorElement: <RouteErrorPage />, children: [
     { index: true, element: lazyPage(<HomepageScreen />) },
     { path: 'overview', element: lazyPage(<OverviewScreen />) },
+    { path: 'feed', element: lazyPage(<FeedScreen />) },
+    { path: 'feed/channel/:channelId', element: lazyPage(<FeedChannelScreen />) },
+    { path: 'feed/post/:postId', element: lazyPage(<FeedPostScreen />) },
+    { path: 'feed/studio', element: lazyPage(<FeedStudioScreen />) },
+    { path: 'feed/compose', element: lazyPage(<FeedComposeScreen />) },
     { path: 'popular', element: lazyPage(<PopularScreen />) },
     { path: 'schedule', element: lazyPage(<ScheduleScreen />) },
     { path: 'filter', element: lazyPage(<FilterSearchScreen />) },
@@ -48,7 +56,9 @@ export const router = createBrowserRouter([
     { path: 'together', element: lazyPage(<WatchRoomScreen />) },
     { path: 'together/:roomId', element: lazyPage(<WatchRoomScreen />) },
     { path: 'collections', element: lazyPage(<CollectionsScreen />) },
-    { path: 'collection/:id', element: lazyPage(<CollectionScreen />)}
+    { path: 'collection/:id', element: lazyPage(<CollectionScreen />)},
+    { path: '*', element: <RouteErrorPage notFound /> },
+    ] },
     ],
 },
 ], { basename });

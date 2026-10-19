@@ -220,7 +220,7 @@ export type RelatedReleaseNotification = NotificationBase<'relatedRelease'> & {
 
 export type ArticleNotification = NotificationBase<'article'> & {
   '@id': number;
-  article: number;
+  article: number | { id: number; channel?: { id: number; title: string; avatar?: string } };
 };
 
 export type NotificationComment = {
@@ -238,6 +238,9 @@ export type ReleaseCommentNotification = NotificationBase<'releaseComment'> & {
   parentComment?: ReleaseNotificationComment;
   comment?: ReleaseNotificationComment;
 };
+export type FeedNotificationComment = NotificationComment & { article?: ArticleNotification['article'] };
+export type ArticleCommentNotification = NotificationBase<'articleComment'> & { comment?: FeedNotificationComment; parentComment?: FeedNotificationComment };
+export type MyArticleCommentNotification = NotificationBase<'myArticle'> & { article_comment?: FeedNotificationComment };
 
 export type CollectionCommentNotification = NotificationBase<'myCollection'> & {
   collection_comment: NotificationComment & {
@@ -250,6 +253,8 @@ export type AnixartNotification =
   | FriendNotification
   | RelatedReleaseNotification
   | ArticleNotification
+  | ArticleCommentNotification
+  | MyArticleCommentNotification
   | ReleaseCommentNotification
   | CollectionCommentNotification;
 

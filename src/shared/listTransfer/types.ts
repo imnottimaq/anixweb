@@ -23,6 +23,7 @@ export interface ParsedAnimeItem {
 export interface ImportPreviewItem extends ParsedAnimeItem {
     matchState: MatchState;
     matchedRelease: Anime | null;
+    autoMatched?: boolean;
     resolutionCandidates: Anime[];
     currentListStatus?: number; // 0 for none, 1-5 if already in user's list
     currentVote?: number; // 0 if unrated, 1-5 if user already rated it
@@ -70,8 +71,11 @@ export interface ExportProgress {
     error: string | null;
 }
 
+export type ExportAnime = Pick<Anime, 'id' | 'title_ru' | 'title_original'> &
+    Partial<Pick<Anime, 'your_vote' | 'my_vote' | 'episodes_total' | 'episodes_released' | 'category' | 'profile_list_status' | 'is_favorite'>>;
+
 export interface ExportListEntry {
-    anime: Anime;
+    anime: ExportAnime;
     status: AnixartListStatusId;
     externalId?: number; // Verified Shikimori / MAL Anime ID
 }
@@ -93,7 +97,7 @@ export interface ShikimoriCandidate {
 
 export interface ExportPreviewItem {
     id: string;
-    anime: Anime;
+    anime: ExportAnime;
     status: AnixartListStatusId;
     externalId?: number;
     manualInput?: string;

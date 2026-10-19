@@ -1,0 +1,56 @@
+.feedHome > header:first-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+    margin-bottom: 24px;
+}
+
+.headerActions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.headerActions a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 10px 14px; border-radius: var(--radius-control); font-weight: 700; font-size: 15px; text-decoration: none; }
+.compose { background: var(--accent-color); color: var(--feed-accent-foreground, #1d1f24); border: 1px solid transparent; }
+.compose:hover { background: var(--lighter-accent-color); }
+.manage { color: var(--text-secondary); border: 1px solid var(--surface-border); }
+.manage:hover { color: var(--text-color); background: var(--surface-muted); }
+.headerActions svg, .searchInput svg, .refresh svg { flex-shrink: 0; }
+.headerActions a:focus-visible, .refresh:focus-visible { outline: var(--focus-ring); outline-offset: 3px; }
+
+.searchForm { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 20px 0 6px; }
+.searchInput { display: flex; align-items: center; gap: 10px; flex: 1 1 210px; min-width: 0; padding: 0 13px; border: 1px solid var(--surface-border); border-radius: var(--radius-control); background: var(--card-bg); color: var(--text-secondary); }
+.searchInput:focus-within { outline: var(--focus-ring); outline-offset: 2px; }
+.searchInput input { flex: 1; width: 100%; min-width: 0; min-height: 46px; border: 0; padding: 10px 0; font: inherit; background: transparent; color: var(--text-color); outline: none; }
+.searchInput input::placeholder { color: var(--text-secondary); }
+.searchInput input:focus-visible { outline: none; }
+.searchForm > button { min-height: 46px; padding: 10px 18px; border: 1px solid var(--surface-border); border-radius: var(--radius-control); background: var(--surface-raised); color: var(--text-color); font: inherit; font-weight: 700; cursor: pointer; }
+.searchForm > button:hover { border-color: var(--text-secondary); }
+.searchForm > a { color: var(--text-secondary); font-size: 14px; text-underline-offset: 3px; }
+.period { max-width: 260px; }
+.period label { display: grid; gap: 6px; color: var(--text-secondary); font-size: 14px; }
+
+.refreshBar { display: flex; justify-content: flex-end; margin: 8px 0 14px; }
+.refresh { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 7px 2px 7px 10px; border: 0; background: transparent; color: var(--text-secondary); font: inherit; font-size: 14px; cursor: pointer; }
+.refresh:hover { color: var(--text-color); }
+.refresh:disabled { opacity: .55; cursor: wait; }
+.newPosts { padding: 8px 12px; border-radius: var(--radius-control); color: var(--text-color); background: color-mix(in srgb, var(--accent-color) 15%, var(--card-bg)); }
+
+.channelIdentity { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin: 20px 0; }
+.channelIdentity h1 { margin: 0; line-height: 1.15; }
+.channelIdentity p { margin: 7px 0 0; }
+.channelIdentity > div { flex: 1; min-width: 150px; }
+.channelDescription { max-width: 66ch; color: var(--text-secondary); }
+.commentForm { padding: 18px; background: var(--card-bg); border: 1px solid var(--surface-border-subtle); border-radius: var(--radius-card); }
+.commentForm button[type="submit"] { background: var(--accent-color); border-color: transparent; color: var(--feed-accent-foreground, #1d1f24); font-weight: 700; }
+.commentForm button[type="submit"]:hover { background: var(--lighter-accent-color); }
+
+@media (max-width: 620px) {
+    .feedHome > header:first-child { margin-bottom: 18px; gap: 16px; }
+    .headerActions { width: 100%; }
+    .headerActions .compose { flex: 1; }
+    .headerActions .manage { flex: 1; }
+    .headerActions a { padding-inline: 10px; }
+    .searchForm { gap: 8px; margin-top: 16px; }
+    .searchInput { flex-basis: 180px; }
+    .searchInput input { font-size: 15px; }
+    .searchForm > button { padding-inline: 12px; }
+    .searchForm > a { flex-basis: 100%; padding: 4px 0; }
+    .period { max-width: none; }
+    .commentForm { padding: 14px; }
+}

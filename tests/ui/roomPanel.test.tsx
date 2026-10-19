@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
@@ -122,7 +122,8 @@ describe('RoomPanel UI Component', () => {
         contextOverrides: Partial<RoomContextValue> = {},
         currentUserId = 1,
         compact = false,
-        settingsOverrides: Partial<AppSettings> = {}
+        settingsOverrides: Partial<AppSettings> = {},
+        showMembers = true
     ) => {
         const room = contextOverrides.room !== undefined ? contextOverrides.room : createRoomState();
         const defaultRoomContext: RoomContextValue = {
@@ -171,8 +172,31 @@ describe('RoomPanel UI Component', () => {
             </MemoryRouter>
         );
 
+        const membersTab = screen.queryByRole('tab', { name: /Members/i });
+        if (membersTab && showMembers) fireEvent.click(membersTab);
         return { ...result, roomContext: defaultRoomContext };
     };
+
+    it('opens chat first, preserves its draft across tabs and supports keyboard navigation', async () => {
+        const user = userEvent.setup();
+        renderRoomPanel({}, 1, false, {}, false);
+        const chat = screen.getByRole('tab', { name: 'Chat' });
+        const members = screen.getByRole('tab', { name: /Members/i });
+        expect(chat).toHaveAttribute('aria-selected', 'true');
+        expect(screen.queryByRole('button', { name: /Copy link/i })).toBeNull();
+        const input = screen.getByRole('textbox', { name: 'Chat' });
+        await user.type(input, 'Keep this message');
+        await user.click(members);
+        expect(input).not.toBeVisible();
+        await user.click(chat);
+        expect(input).toHaveValue('Keep this message');
+        await user.keyboard('{ArrowRight}');
+        expect(members).toHaveFocus();
+        expect(members).toHaveAttribute('aria-selected', 'true');
+        await user.keyboard('{Home}');
+        expect(chat).toHaveFocus();
+        expect(chat).toHaveAttribute('aria-selected', 'true');
+    });
 
     it('renders host view with full permissions and participant action menus', () => {
         const { container } = renderRoomPanel({}, 1); // Current user is Alice (Host, id: 1)
@@ -190,6 +214,23 @@ describe('RoomPanel UI Component', () => {
         expect(screen.getByText(/Alice \(Host\)/)).toBeInTheDocument();
         expect(screen.getByText(/Bob \(Viewer\)/)).toBeInTheDocument();
         expect(screen.getByText(/Charlie \(Controller\)/)).toBeInTheDocument();
+    });
+
+    it('lets only the host change the permission to pause for everyone', async () => {
+        const user = userEvent.setup();
+        const { roomContext, unmount } = renderRoomPanel({}, 1);
+        const permission = screen.getByRole('checkbox', { name: 'Everyone can pause' });
+        expect(permission).toBeChecked();
+        await user.click(permission);
+        expect(roomContext.send).toHaveBeenCalledWith({ type: 'set_pause_permission', allow: false });
+        unmount();
+        renderRoomPanel({}, 2);
+        expect(screen.queryByRole('checkbox', { name: 'Everyone can pause' })).toBeNull();
+    });
+
+    it('shows the host the current disabled pause policy', () => {
+        renderRoomPanel({ room: createRoomState({ allowParticipantPause: false }) }, 1);
+        expect(screen.getByRole('checkbox', { name: 'Everyone can pause' })).not.toBeChecked();
     });
 
     it('renders read-only viewer without action menus and exits directly on leave', async () => {
@@ -441,6 +482,21 @@ describe('RoomPanel UI Component', () => {
         await user.click(confirmBtn);
 
         expect(mockCloseRoom).toHaveBeenCalledTimes(1);
+        expect(mockNavigate).toHaveBeenCalledWith('/together');
+    });
+
+    it.each(['ROOM_DISCONNECTED', 'HOST_REQUIRED', 'COMMAND_TIMEOUT'])('keeps close confirmation open for retry after %s', async message => {
+        const user = userEvent.setup();
+        const closeRoom = vi.fn().mockRejectedValueOnce(new Error(message)).mockResolvedValueOnce(undefined);
+        renderRoomPanel({ closeRoom }, 1);
+        await user.click(screen.getByRole('button', { name: /^close room$/i }));
+        const dialog = screen.getByRole('dialog');
+        await user.click(within(dialog).getByRole('button', { name: /^close room$/i }));
+        expect(mockNavigate).not.toHaveBeenCalled();
+        expect(dialog).toHaveAttribute('open');
+        expect(within(dialog).getByRole('alert')).toBeInTheDocument();
+        await user.click(within(dialog).getByRole('button', { name: /^close room$/i }));
+        expect(closeRoom).toHaveBeenCalledTimes(2);
         expect(mockNavigate).toHaveBeenCalledWith('/together');
     });
 

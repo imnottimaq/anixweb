@@ -17,6 +17,11 @@ export const NotificationSettingsScreen = lazy(() => import('../pages/Notificati
 export const ReleaseNotificationSettingsScreen = lazy(() => import('../pages/ReleaseNotificationSettingsScreen'));
 export const FranchiseScreen = lazy(() => import('../pages/FranchiseScreen'));
 export const OverviewScreen = lazy(() => import('../pages/OverviewScreen'))
+export const FeedScreen = lazy(() => import('../pages/FeedScreen'));
+export const FeedChannelScreen = lazy(() => import('../pages/FeedChannelScreen'));
+export const FeedPostScreen = lazy(() => import('../pages/FeedPostScreen'));
+export const FeedStudioScreen = lazy(() => import('../pages/FeedStudioScreen'));
+export const FeedComposeScreen = lazy(() => import('../pages/FeedComposeScreen'));
 export const FilterSearchScreen = lazy(() => import('../pages/FilterSearchScreen'));
 export const CollectionScreen = lazy(() => import('../pages/CollectionScreen'));
 export const CollectionsScreen = lazy(() => import('../pages/CollectionsScreen'));

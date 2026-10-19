@@ -1,4 +1,4 @@
-import { Link, useNavigate, useParams } from "react-router-dom"
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom"
 import styles from './AccountScreen.module.css'
 import { useUser } from "../shared/contexts/userContext"
 import { useEffect, useState } from "react"
@@ -18,7 +18,7 @@ import ReleaseCard from "../components/ReleaseCard"
 import RemoteImage from '../components/RemoteImage'
 import { PageLayout } from '../components/PageLayout';
 import PageState from '../components/PageState';
-import { useApi } from '../shared/apiClient';
+import { ApiError, useApi } from '../shared/apiClient';
 import { Modal } from '../modals/ModalTemplate';
 import { saveRoomIdentity } from '../shared/roomParticipant';
 import { useAsyncLoad } from '../shared/useAsyncLoad';
@@ -32,7 +32,7 @@ interface ProfileAPIResponse{
 
 export default function AccountScreen(){
     const {id} = useParams<{id: string}>();
-    const {userToken, userId} = useUser()
+    const {userToken, userId, setUserToken, setUserId} = useUser()
     const api = useApi();
     const { setSearchScope } = useSearchScope();
     const { t, language, formatDate, formatNumber } = useTranslation();
@@ -48,7 +48,7 @@ export default function AccountScreen(){
     const [commentsTab, setCommentsTab] = useState<'release' | 'collection'>('release');
     const [commentsPage, setCommentsPage] = useState(0);
 
-    const navigate = useNavigate()
+    const navigate = useNavigate();
     const profileId = id ? Number(id) : userId;
     const isValidProfileId = Number.isInteger(profileId) && profileId > 0;
     const commentsPath = commentsTab === 'release'
@@ -60,9 +60,6 @@ export default function AccountScreen(){
         { enabled: isProfileCommentsOpen && isValidProfileId, initialData: { code: 0, content: [], total_count: 0, total_page_count: 0, current_page: 0 } },
     );
     const profileComments = profileCommentsData?.content ?? [];
-    useEffect(() => {
-        if (userToken === "") navigate('/account/login')
-    }, [navigate, userToken])
 
     useEffect(() => {
         setSearchScope({ type: 'profiles' });
@@ -83,6 +80,15 @@ export default function AccountScreen(){
             setLoadError(null);
             try {
                 const data = await api.get<ProfileAPIResponse>(`/profile/${profileId}`);
+                // Public profiles can be returned successfully even with an expired token.
+                // The account landing page must belong to the current session.
+                if (isCancelled) return;
+                if (!id && data.is_my_profile !== true) {
+                    setUserToken('');
+                    setUserId(0);
+                    localStorage.removeItem('user_room_identity');
+                    return;
+                }
                 const profile = data.profile;
                 setIsMyProfile(data.is_my_profile)
                 if (!profile) throw new Error('Invalid profile response');
@@ -91,6 +97,13 @@ export default function AccountScreen(){
                 }
                 if (!isCancelled) setUserObject(profile);
             } catch (error) {
+                if (isCancelled) return;
+                if (error instanceof ApiError && (error.status === 401 || error.code === 401)) {
+                    setUserToken('');
+                    setUserId(0);
+                    localStorage.removeItem('user_room_identity');
+                    return;
+                }
                 console.error('Не удалось загрузить профиль:', error);
                 if (!isCancelled) setLoadError(t('account.loadError'));
             } finally {
@@ -101,7 +114,7 @@ export default function AccountScreen(){
         void loadProfile();
 
         return () => { isCancelled = true; };
-    }, [api, profileId, userId, userToken, loadAttempt, t])
+    }, [api, id, profileId, userId, userToken, setUserToken, setUserId, loadAttempt, t])
 
     const watchDynamic = userObject?.watch_dynamics?.slice(-10) ?? [];
     const maxValue = Math.max(...watchDynamic.map(({ count }) => count), 1);
@@ -144,7 +157,7 @@ export default function AccountScreen(){
         return t('account.addFriend');
     };
 
-    if (!userToken) return <PageLayout size="wide"><PageState status="loading" message={t('account.redirecting')} /></PageLayout>;
+    if (!userToken) return <Navigate to="/account/login" replace />;
     if (!isValidProfileId) return <PageLayout size="wide"><PageState status="error" message={t('account.notFound')} /></PageLayout>;
     if (isLoading) return <PageLayout size="wide"><PageState status="loading" message={t('account.loading')} /></PageLayout>;
     if (loadError || !userObject) return <PageLayout size="wide">

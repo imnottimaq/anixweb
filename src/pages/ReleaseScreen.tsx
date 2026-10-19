@@ -35,6 +35,7 @@ import RecommendedRelease from "../components/RecommendedRelease";
 import { useApi } from "../shared/apiClient";
 import type { PagedResponse } from '../shared/types/api';
 import PageState from '../components/PageState';
+import ImageLightbox, { type LightboxImage } from '../components/ImageLightbox';
 
 export default function ReleaseScreen(){
     const {id} = useParams<{id: string}>();
@@ -53,6 +54,7 @@ export default function ReleaseScreen(){
     const [animeData, setAnimeData] = useState<Anime>(partialData);
     const [screenshots, setScreenshots] = useState<string[]>([]);
     const [activeScreenshotIndex, setActiveScreenshotIndex] = useState(0);
+    const [imageViewer, setImageViewer] = useState<{ releaseId: string | undefined; images: LightboxImage[]; index: number } | null>(null);
     const [loadedPoster, setLoadedPoster] = useState<string | null>(null);
     const [loadedScreenshots, setLoadedScreenshots] = useState<Record<string, boolean>>({});
     const [isDubScreenOpen, setIsDubScreenOpen] = useState(false);
@@ -320,14 +322,15 @@ export default function ReleaseScreen(){
     return(
         <div className={styles['body']}>
             <div className={styles['side-panel']}>
-                <div className={`${styles['poster-wrapper']} ${loadedPoster === animeData.image ? styles['media-loaded'] : styles['media-loading']}`}>
+                <button type="button" className={`${styles['poster-wrapper']} ${styles.imageTrigger} ${loadedPoster === animeData.image ? styles['media-loaded'] : styles['media-loading']}`} aria-label={t('imageViewer.open')} onClick={() => setImageViewer({ releaseId: id, images: [{ src: animeData.image, alt: animeData.title_ru || animeData.title_original }], index: 0 })}>
                     <RemoteImage
                         src={animeData.image}
+                        alt={animeData.title_ru || animeData.title_original}
                         className={styles.poster}
                         onLoad={() => setLoadedPoster(animeData.image)}
                         onError={() => setLoadedPoster(animeData.image)}
                     />
-                </div>
+                </button>
                 <div className={`${styles['action-panel']}`}>
                     <select id="watchlist-select" className={`${styles['list-select']} ${styles['action-btn']} ${styles[`status-${animeData?.profile_list_status ?? 0}`]}`} onChange={e => {
                             const newStatus = +e.target.value
@@ -462,7 +465,7 @@ export default function ReleaseScreen(){
                     {animeData.note && <div style={{display:"flex", flexDirection:"row"}}>
                         <a className={styles['note']}>{animeData.note.replace(/<br\s*\/?>/gi, '\n')}</a>
                         </div>}
-                    <p>{animeData.description}</p>
+                    <p>{animeData.description?.trim() || t('release.noDescription')}</p>
                 </div>
                     <div className={`${styles['release-details']} ${screenshots.length === 0 ? styles['release-details-no-screenshots'] : ''}`}>
                         <div className={styles['release-media']}>
@@ -472,7 +475,7 @@ export default function ReleaseScreen(){
                                         {visibleScreenshots.map((url, offset) => {
                                             const index = (activeScreenshotIndex + offset) % screenshots.length;
 
-                                            return <div key={url} className={`${styles['screenshot-wrapper']} ${loadedScreenshots[url] ? styles['media-loaded'] : styles['media-loading']}`}>
+                                            return <button type="button" key={url} className={`${styles['screenshot-wrapper']} ${styles.imageTrigger} ${loadedScreenshots[url] ? styles['media-loaded'] : styles['media-loading']}`} aria-label={t('release.screenshotAlt', { number: index + 1 })} onClick={() => setImageViewer({ releaseId: id, images: screenshots.map((src, imageIndex) => ({ src, alt: t('release.screenshotAlt', { number: imageIndex + 1 }) })), index })}>
                                                 <RemoteImage
                                                     src={url}
                                                     alt={t('release.screenshotAlt', { number: index + 1 })}
@@ -480,7 +483,7 @@ export default function ReleaseScreen(){
                                                     onLoad={() => setLoadedScreenshots(previous => ({ ...previous, [url]: true }))}
                                                     onError={() => setLoadedScreenshots(previous => ({ ...previous, [url]: true }))}
                                                 />
-                                            </div>;
+                                            </button>;
                                         })}
                                     </div>
                                     {screenshots.length > 1 && <>
@@ -594,7 +597,7 @@ export default function ReleaseScreen(){
                         onClick={() => void addReleaseToCollection(collection)}
                     >
                         <RemoteImage src={collection.image} alt="" />
-                        <span><strong>{collection.title}</strong><small>{collection.description || t('release.noDescription')}</small></span>
+                        <span><strong>{collection.title}</strong><small>{collection.description?.trim() || t('release.noDescription')}</small></span>
                         {collectionActionId === collection.id && <em>{t('release.addingCollection')}</em>}
                     </button>)}
                 </div>}
@@ -640,6 +643,7 @@ export default function ReleaseScreen(){
                     <button type="button" disabled={isNotificationSettingsLoading || isNotificationSettingsSaving} onClick={() => void saveReleaseNotifications()}>{isNotificationSettingsSaving ? t('collection.saving') : t('collection.saveChanges')}</button>
                 </div>
             </Modal>
+            {imageViewer && imageViewer.releaseId === id && <ImageLightbox images={imageViewer.images} initialIndex={imageViewer.index} onClose={() => setImageViewer(null)} />}
             {roomSelectionError && <p role="alert">{roomSelectionError}</p>}
             {(isDubScreenOpen) && <DubSelectModal
                 isOpen={isDubScreenOpen}
