@@ -762,12 +762,7 @@
     .download-progress-indeterminate { animation: none; width: 100%; opacity: .5; }
 }
 
-.action-btn.download-icon-button,
-.action-btn.download-icon-button:hover,
-.action-btn.download-icon-button:active {
-    color: #fff;
-    background: transparent;
-}
+.download-icon-button { color: #fff; }
 
 .download-quality-chip:disabled {
     opacity: .5;
@@ -866,11 +861,8 @@
 .download-close-btn:focus-visible, .download-quality-chip:focus-visible, .resume-prompt-actions button:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .resume-prompt, .download-modal-overlay { animation: none; } }
 
-.volumeToggle { border: 0; min-width: 24px; min-height: 32px; background: transparent; color: #fff; cursor: pointer; }
 .player button:focus-visible, .player input:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
-.player-controls:focus-within { opacity: 1; pointer-events: auto; }
 
-.volume-div { width: 62px; flex-shrink: 0; }
+.volume-div { flex-shrink: 0; }
 .volume-div .mute-button { flex-shrink: 0; }
-.volume-expanded { width: 162px; }
-@media (max-width: 540px) { .volume-expanded { overflow: visible; width: 62px; } .volume-div input { position: absolute; bottom: 48px; left: 0; width: 140px; height: 32px; padding: 6px; background: #202126; border-radius: 6px; } }
+@media (max-width: 540px) { .volume-expanded { overflow: visible; width: 38px; } .volume-div input { position: absolute; bottom: 48px; left: 0; width: 140px; height: 32px; padding: 6px; background: #202126; border-radius: 6px; } }

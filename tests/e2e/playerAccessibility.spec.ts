@@ -67,6 +67,7 @@ test('player initially focuses Back to release and contains keyboard focus with 
 test('focused player controls remain visible beyond the auto-hide timer during playback', async ({ page }) => {
   const player = await openPlayer(page);
   const settings = player.getByRole('button', { name: 'Player settings', exact: true });
+  await page.keyboard.press('Tab');
   await settings.focus();
   await page.clock.install();
   await player.locator('video').evaluate(video => {
@@ -90,7 +91,8 @@ test('player names episode, sound, skip, fullscreen, timeline, and volume contro
   await expect(player.getByRole('button', { name: 'Skip opening', exact: true })).toBeVisible();
   await expect(player.getByRole('button', { name: 'Enter fullscreen', exact: true })).toBeVisible();
   await expect(player.getByRole('slider', { name: 'Playback position', exact: true })).toBeAttached();
-  await player.getByRole('button', { name: 'Show volume control', exact: true }).click();
+  await expect(player.getByRole('button', { name: 'Show volume control', exact: true })).toHaveCount(0);
+  await player.getByRole('button', { name: 'Mute', exact: true }).focus();
   await expect(player.getByRole('slider', { name: 'Volume', exact: true })).toBeVisible();
 });
 
@@ -128,3 +130,40 @@ for (const sessionAnimeId of [null, 999]) {
     await expect(page.getByRole('dialog', { name: 'Video player', exact: true })).toHaveCount(0);
   });
 }
+
+test('playback controls hide after inactivity even when a mouse-clicked button retains focus', async ({ page }) => {
+  const player = await openPlayer(page);
+  const controls = player.locator('[data-player-controls]');
+  await page.clock.install();
+  await player.locator('video').evaluate(video => {
+    video.dispatchEvent(new Event('loadedmetadata'));
+    video.dispatchEvent(new Event('canplay'));
+    (video as HTMLVideoElement).pause();
+  });
+  await player.getByRole('button', { name: 'Play', exact: true }).click();
+  await page.clock.fastForward(3500);
+  await expect(controls).toHaveCSS('opacity', '0');
+  await page.mouse.move(100, 150);
+  await expect(controls).toHaveCSS('opacity', '1');
+});
+
+test('initial programmatic focus does not pin the playback overlay open', async ({ page }) => {
+  const player = await openPlayer(page);
+  await page.clock.install();
+  await player.locator('video').evaluate(video => {
+    video.dispatchEvent(new Event('loadedmetadata'));
+    video.dispatchEvent(new Event('canplay'));
+    void (video as HTMLVideoElement).play();
+  });
+  await page.clock.fastForward(3500);
+  await expect(player.locator('[data-player-controls]')).toHaveCSS('opacity', '0');
+});
+
+test('download has the same button background as the other playback actions', async ({ page }) => {
+  const player = await openPlayer(page);
+  const download = player.getByRole('button', { name: 'Download', exact: true });
+  const fullscreen = player.getByRole('button', { name: 'Enter fullscreen', exact: true });
+  const background = await fullscreen.evaluate(element => getComputedStyle(element).backgroundColor);
+  expect(background).not.toBe('rgba(0, 0, 0, 0)');
+  await expect(download).toHaveCSS('background-color', background);
+});

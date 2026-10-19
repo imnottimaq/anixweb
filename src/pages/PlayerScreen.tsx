@@ -265,6 +265,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     const videoRef = useRef<HTMLVideoElement>(null);
     const upscaleCanvasRef = useRef<HTMLCanvasElement>(null);
     const controlsTimeoutRef = useRef<number | null>(null);
+    const keyboardControlsRef = useRef(false);
     const { sources, animeId, animeName, episodeNumber, episodeName } = playerSession;
 
     useEffect(() => {
@@ -458,10 +459,10 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     const showControls = useCallback(() => {
         setAreControlsVisible(true);
         if (controlsTimeoutRef.current !== null) window.clearTimeout(controlsTimeoutRef.current);
-        if (!isPlaying || isPlayerSettingsOpen || resumePromptTime !== null || playerDialogRef.current?.querySelector('[data-player-controls]')?.contains(document.activeElement)) return;
+        if (!isPlaying || isPlayerSettingsOpen || resumePromptTime !== null || isDownloadModalOpen || (keyboardControlsRef.current && playerDialogRef.current?.querySelector('[data-player-controls]')?.contains(document.activeElement))) return;
 
-        controlsTimeoutRef.current = window.setTimeout(() => { if (!playerDialogRef.current?.querySelector('[data-player-controls]')?.contains(document.activeElement)) setAreControlsVisible(false); }, 2_500);
-    }, [isPlaying, isPlayerSettingsOpen, resumePromptTime]);
+        controlsTimeoutRef.current = window.setTimeout(() => { if (!keyboardControlsRef.current || !playerDialogRef.current?.querySelector('[data-player-controls]')?.contains(document.activeElement)) setAreControlsVisible(false); }, 2_500);
+    }, [isPlaying, isPlayerSettingsOpen, resumePromptTime, isDownloadModalOpen]);
 
     useEffect(() => {
         const updateFullscreen = () => setIsMaximized(Boolean(document.fullscreenElement || (document as WebKitFullscreenDocument).webkitFullscreenElement));
@@ -907,7 +908,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
 
     return (
         <div ref={playerDialogRef} tabIndex={-1} className={styles.overlay} role="dialog" aria-modal="true" aria-label={t('player.ariaLabel')}>
-            <div className={styles.player} ref={playerRef} onPointerMove={showControls} onPointerDown={showControls}>
+            <div className={styles.player} ref={playerRef} onKeyDownCapture={event => { if (event.key === 'Tab') { keyboardControlsRef.current = true; showControls(); } }} onPointerMove={() => { keyboardControlsRef.current = false; showControls(); }} onPointerDown={() => { keyboardControlsRef.current = false; showControls(); }}>
                 {Boolean(roomId && watchRoom?.roomId === roomId) && <ReactionOverlay />}
                 <div data-player-controls onFocusCapture={showControls} onBlurCapture={() => window.requestAnimationFrame(showControls)} className={`${styles['player-controls']} ${!areControlsVisible ? styles['player-controls-hidden'] : ''}`}>
                     <div className={styles['playback-buttons']}>
@@ -941,6 +942,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                         <div
                             className={`${styles['volume-div']} ${isVolumeDivExpanded ? styles['volume-expanded'] : ''}`}
                             onMouseEnter={() => setIsVolumeDivExpanded(true)}
+                            onPointerDown={event => { if (event.pointerType === 'touch') setIsVolumeDivExpanded(true); }}
                             onMouseLeave={event => { if (!event.currentTarget.contains(document.activeElement)) setIsVolumeDivExpanded(false); }}
                             onFocus={() => setIsVolumeDivExpanded(true)}
                             onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsVolumeDivExpanded(false); }}
@@ -955,7 +957,6 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                             >
                                 <img src={isMuted ? VolumeMuteIcon : VolumeMaxIcon} alt="" />
                             </button>
-                            <button type="button" className={styles.volumeToggle} aria-label={t('ux.volumeToggle')} aria-expanded={isVolumeDivExpanded} onClick={() => setIsVolumeDivExpanded(open => !open)}><svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12"><path d="m2 8 4-4 4 4" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg></button>
                             {isVolumeDivExpanded && (
                                 <input
                                     aria-label={t('ux.volume')} aria-valuetext={`${Math.round(volume * 100)}%`}
