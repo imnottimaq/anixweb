@@ -45,3 +45,8 @@
     .grid { grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); gap: 12px; }
     .horizontal { grid-template-columns: 1fr; }
 }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.chips button { min-height: 36px; padding: 6px 10px; border: 1px solid var(--surface-border); border-radius: var(--radius-pill); background: var(--card-bg); color: var(--text-color); font: inherit; cursor: pointer; overflow-wrap: anywhere; max-width: 100%; }
+.chips button:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.grid + button { margin-top: 20px; }

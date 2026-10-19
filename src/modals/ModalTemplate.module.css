@@ -263,3 +263,8 @@
 @media (max-height: 500px) {
     .modal { max-height: calc(100dvh - 24px); }
 }
+
+.with-footer { overflow: hidden; }
+.with-footer .modal-header { flex-shrink: 0; }
+.with-footer .modal-body { overflow-y: auto; min-height: 0; margin-bottom: 0; }
+.footer { flex-shrink: 0; padding-top: 14px; border-top: 1px solid var(--surface-border); background: var(--card-bg); }

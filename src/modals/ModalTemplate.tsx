@@ -18,6 +18,7 @@ type ModalProps = {
     title?: string;
     text?: string;
     actions?: ModalAction[];
+    footer?: React.ReactNode;
     children?: React.ReactNode | ((close: () => void) => React.ReactNode);
 
     size? : "small" | "medium" | "large" | "fullscreen";
@@ -28,7 +29,7 @@ type ModalProps = {
     contentStyle?: React.CSSProperties;
 };
 
-export function Modal({ isOpen, onClose, onCloseStart, title, text, actions, children, size, showCloseButton, stickyHeader = true, onBodyScroll, contentClassName, contentStyle }: ModalProps) {
+export function Modal({ isOpen, onClose, onCloseStart, title, text, actions, children, footer, size, showCloseButton, stickyHeader = true, onBodyScroll, contentClassName, contentStyle }: ModalProps) {
     const { t } = useTranslation();
     const [isClosing, setIsClosing] = useState(false);
     const titleId = useId();
@@ -71,6 +72,7 @@ export function Modal({ isOpen, onClose, onCloseStart, title, text, actions, chi
                 styles.modal,
                 `${ size ? styles[`size-${size ?? ''}`]: ""}`,
                 stickyHeader ? styles['sticky-header'] : '',
+                footer ? styles['with-footer'] : '',
                 contentClassName,
                 isClosing ? styles['modal-closing'] : '',
             ].filter(Boolean).join(' ')}
@@ -107,6 +109,7 @@ export function Modal({ isOpen, onClose, onCloseStart, title, text, actions, chi
                 </footer>
                 )}
             </div>
+            {footer && <footer className={styles.footer}>{footer}</footer>}
         </section>
         </div>
     );

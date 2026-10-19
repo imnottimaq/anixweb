@@ -2,15 +2,20 @@
 .fields { display: flex; flex-direction: column; gap: 14px; padding-top: 8px; }
 .field, .fieldset { display: flex; flex-direction: column; gap: 5px; min-width: 0; margin: 0; padding: 0; border: 0; }
 .field > span, .fieldset > legend { color: var(--text-secondary); font-size: 13px; }
-.field input, .field select { width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box; outline: none; color: var(--text-color); background: var(--background-color); font: inherit; }
+.field input, .field select { width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--control-border); border-radius: 8px; box-sizing: border-box; outline: none; color: var(--text-color); background: var(--background-color); font: inherit; }
 .field input:focus, .field select:focus { border-color: var(--accent-color); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color) 18%, transparent); }
 .field small { color: var(--text-secondary); font-size: 12px; line-height: 1.3; }
 .two-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .checkbox-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 2px; }
 .checkbox { display: inline-flex; align-items: center; gap: 7px; min-height: 24px; cursor: pointer; font-size: 13px; }
 .checkbox input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent-color); }
-.actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
+.actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 0; }
 .actions button { min-height: 38px; padding: 8px 14px; border-radius: 8px; cursor: pointer; font: inherit; font-weight: 700; }
 .reset { border: 1px solid var(--border-color); color: var(--text-color); background: transparent; }
 .apply { border: 0; color: var(--accent-foreground); background: var(--accent-color); }
 @media (max-width: 540px) { .two-columns { grid-template-columns: minmax(0, 1fr); } .checkbox-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) } .actions { flex-direction: column-reverse; } .actions button { width: 100%; } }
+
+.error { color: var(--error-color); margin: 0; }
+.advanced summary { min-height: 40px; padding-block: 10px; cursor: pointer; font-weight: 700; }
+.advanced summary:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.field [aria-invalid="true"] { border-color: var(--status-dropped); }
