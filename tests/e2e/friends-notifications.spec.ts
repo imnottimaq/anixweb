@@ -115,6 +115,24 @@ test.describe('Friends page flow', () => {
 });
 
 test.describe('Notifications page flow', () => {
+  test('shows a sign-in gate without reading or fetching private notifications for guests', async ({ page }) => {
+    await setupDeterministicNetwork(page);
+    await seedStorageState(page, { onboarded: true, isLoggedIn: false });
+    const privateRequests: string[] = [];
+    page.on('request', request => {
+      if (/\/notification\/(?:read|all)(?:\/|\?|$)/.test(request.url())) privateRequests.push(request.url());
+    });
+
+    await page.goto('/notifications');
+    await expect(page.getByRole('status').filter({ hasText: 'Anixart' })).toBeVisible();
+    expect(privateRequests).toEqual([]);
+    await expect(page.getByRole('combobox')).toHaveCount(0);
+    const loginLink = page.getByRole('link', { name: /^(Вход|Sign in)$/i });
+    await expect(loginLink).toHaveAttribute('href', '/account/login');
+    await loginLink.click();
+    await expect(page).toHaveURL(/\/account\/login/);
+  });
+
   test('displays empty state when there are no notifications', async ({ page }) => {
     await page.route('**/*', async route => {
       const url = route.request().url();
@@ -125,6 +143,14 @@ test.describe('Notifications page flow', () => {
         url.startsWith('blob:')
       ) {
         return route.continue();
+      }
+
+      if (url.includes('/profile/info')) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ code: 0, id: mockProfile.id, profile: { ...mockProfile, is_my_profile: true } }),
+        });
       }
 
       if (url.includes('/notification/read')) {
@@ -146,7 +172,7 @@ test.describe('Notifications page flow', () => {
       return route.abort();
     });
 
-    await seedStorageState(page, { onboarded: true });
+    await seedStorageState(page, { onboarded: true, isLoggedIn: true });
     await page.goto('/notifications');
 
     await expect(page.getByText(/нет уведомлений|no notifications/i)).toBeVisible();
@@ -164,6 +190,14 @@ test.describe('Notifications page flow', () => {
         url.startsWith('blob:')
       ) {
         return route.continue();
+      }
+
+      if (url.includes('/profile/info')) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ code: 0, id: mockProfile.id, profile: { ...mockProfile, is_my_profile: true } }),
+        });
       }
 
       if (url.includes('/notification/read')) {
@@ -192,7 +226,7 @@ test.describe('Notifications page flow', () => {
       return route.abort();
     });
 
-    await seedStorageState(page, { onboarded: true });
+    await seedStorageState(page, { onboarded: true, isLoggedIn: true });
     await page.goto('/notifications');
 
     const retryButton = page.getByRole('button', { name: /Попробовать снова|Retry/i });
@@ -216,6 +250,14 @@ test.describe('Notifications page flow', () => {
         return route.continue();
       }
 
+      if (url.includes('/profile/info')) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ code: 0, id: mockProfile.id, profile: { ...mockProfile, is_my_profile: true } }),
+        });
+      }
+
       if (url.includes('/notification/read')) {
         return route.fulfill({
           status: 200,
@@ -235,7 +277,7 @@ test.describe('Notifications page flow', () => {
       return route.abort();
     });
 
-    await seedStorageState(page, { onboarded: true });
+    await seedStorageState(page, { onboarded: true, isLoggedIn: true });
     await page.goto('/notifications');
 
     // Both episode notification and friend request notification should be visible under All

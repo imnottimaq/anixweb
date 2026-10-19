@@ -23,12 +23,12 @@ const { mockGet, mockPost, api } = vi.hoisted(() => {
 vi.mock('../../src/shared/apiClient', () => ({ useApi: () => api }));
 const englishSettings: AppSettings = { ...defaultAppSettings, appearance: { ...defaultAppSettings.appearance, language: 'english' } };
 const anime = { ...mockAnime1, title_original: 'First release', title_ru: 'Первый релиз' };
-function providers(ui: ReactElement, activeRoomId: string | null = null, settings = englishSettings) {
+function providers(ui: ReactElement, activeRoomId: string | null = null, settings = englishSettings, userToken = '') {
     const room: RoomContextValue = { activeRoomId, room: null, status: 'idle', error: null, self: null, reactions: [],
         join: vi.fn(async () => {}), joinByCode: vi.fn(async () => 'room'), create: vi.fn(async () => 'room'), leave: vi.fn(async () => {}),
         send: vi.fn(async () => {}), sendChat: vi.fn(async () => {}), sendReaction: vi.fn(async () => {}), serverNow: Date.now };
     return render(<MemoryRouter><SettingsContext.Provider value={{ settings, setSettings: vi.fn() }}>
-        <UserContext.Provider value={{ userToken: '', userId: 1, setUserToken: vi.fn(), setUserId: vi.fn() }}>
+        <UserContext.Provider value={{ userToken, userId: userToken ? 1 : 0, setUserToken: vi.fn(), setUserId: vi.fn() }}>
             <RoomContext.Provider value={room}><SearchContext.Provider value={{ searchScope: { type: 'releases' }, setSearchScope: vi.fn() }}>{ui}</SearchContext.Provider></RoomContext.Provider>
         </UserContext.Provider></SettingsContext.Provider></MemoryRouter>);
 }
@@ -117,10 +117,18 @@ describe('Schedule real weekday response', () => {
 });
 
 describe('Overview and shared navigation', () => {
+    it('gates personalized recommendations for guests without requesting them', async () => {
+        providers(<OverviewScreen />);
+        expect(screen.getByText('Sign in for personalized recommendations.')).toBeVisible();
+        expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/account/login');
+        await waitFor(() => expect(mockPost).toHaveBeenCalled());
+        expect(mockPost.mock.calls.some(call => call[0].includes('recommendations'))).toBe(false);
+        expect(screen.queryByText('Unable to load recommendations.')).not.toBeInTheDocument();
+    });
     it('uses the native POST contract and renders recommendations without waiting for other sections', async () => {
         mockPost.mockImplementation((path: string) => path.includes('recommendations')
             ? Promise.resolve({ code: 0, content: [anime] }) : new Promise(() => {}));
-        providers(<OverviewScreen />);
+        providers(<OverviewScreen />, null, englishSettings, 'test-token');
         expect(await screen.findByRole('link', { name: /First release/ })).toBeVisible();
         expect(mockPost).toHaveBeenCalledWith('/discover/recommendations/-1?previous_page=-1', undefined, undefined, { signal: expect.any(AbortSignal) });
         expect(mockGet).not.toHaveBeenCalled();
@@ -128,7 +136,7 @@ describe('Overview and shared navigation', () => {
     it('shows the native eligibility and daily refresh explanation even if another section fails', async () => {
         mockPost.mockImplementation((path: string) => path.includes('interesting')
             ? Promise.reject(new Error('Outage')) : Promise.resolve({ code: 0, content: [] }));
-        providers(<OverviewScreen />);
+        providers(<OverviewScreen />, null, englishSettings, 'test-token');
         expect(await screen.findByText(/Positively rate at least 20 releases/)).toHaveTextContent('once a day');
         expect(await screen.findByRole('alert')).toHaveTextContent('Some sections could not be loaded');
     });
@@ -137,7 +145,7 @@ describe('Overview and shared navigation', () => {
             { id: 2, profile: { login: 'Other' }, message: 'Full release', release: { '@id': 71, id: 9101, title_original: 'First season' } },
             { id: 3, profile: { login: 'Unknown' }, message: 'Unknown reference', release: 999 }]);
         mockPost.mockImplementation((path: string) => Promise.resolve({ code: 0, content: path === '/discover/comments' ? releases : [] }));
-        providers(<OverviewScreen />);
+        providers(<OverviewScreen />, null, englishSettings, 'test-token');
         expect(await screen.findByRole('link', { name: /Resolved comment/ })).toHaveAttribute('href', '/anime/9101');
         expect(screen.queryByRole('link', { name: /Unknown reference/ })).not.toBeInTheDocument();
         expect(screen.getByText('Unknown reference')).toBeVisible();
@@ -147,12 +155,12 @@ describe('Overview and shared navigation', () => {
     it('surfaces partial failure, retries it, and does not cache outages on remount', async () => {
         let fail = true;
         mockPost.mockImplementation((path: string) => path.includes('recommendations') && fail ? Promise.reject(new Error('Outage')) : Promise.resolve({ code: 0, content: path.includes('recommendations') ? [anime] : [] }));
-        const user = userEvent.setup(); const view = providers(<OverviewScreen />);
+        const user = userEvent.setup(); const view = providers(<OverviewScreen />, null, englishSettings, 'test-token');
         expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load recommendations.');
         fail = false; await user.click(screen.getByRole('button', { name: 'Try again' }));
         expect(await screen.findByRole('link', { name: /First release/ })).toBeVisible();
         expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-        view.unmount(); providers(<OverviewScreen />);
+        view.unmount(); providers(<OverviewScreen />, null, englishSettings, 'test-token');
         await screen.findByRole('link', { name: /First release/ });
         expect(mockPost.mock.calls.filter(call => call[0].includes('recommendations'))).toHaveLength(3);
     });
@@ -163,7 +171,7 @@ describe('Overview and shared navigation', () => {
         const nav = screen.getByRole('navigation', { name: 'Primary navigation' });
         expect(within(nav).queryByRole('link', { name: 'Popular' })).not.toBeInTheDocument();
         expect(within(nav).queryByRole('link', { name: 'Schedule' })).not.toBeInTheDocument();
-        for (const [name, path] of [['Home', '/'], ['Overview', '/overview'], ['Favorites', '/favorites']]) expect(within(nav).getByRole('link', { name })).toHaveAttribute('href', path);
+        for (const [name, path] of [['Home', '/'], ['Discover', '/overview'], ['Favorites', '/favorites']]) expect(within(nav).getByRole('link', { name })).toHaveAttribute('href', path);
         expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings');
         expect(screen.getByRole('link', { name: /return/i })).toHaveAttribute('href', '/together/active-room');
         const menu = screen.getByRole('button', { name: 'Menu' }); await user.click(menu);

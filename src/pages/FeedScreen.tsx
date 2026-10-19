@@ -48,7 +48,7 @@ export function FeedRecommendations() {
     const { data, isLoading, error, reload } = useAsyncLoad(signal => loadFeedRecommendations(api, signal), [api]);
     return <section className={styles.section} aria-label={t('feed.recommended')}>
         <h2>{t('feed.recommended')}</h2>
-        {isLoading ? <PageState status="loading" /> : error ? <PageState status="error" onRetry={reload} /> : <div className={styles.channels}>{data?.content.map(channel => <FeedChannelCard key={channel.id} channel={channel} />)}</div>}
+        {isLoading ? <PageState status="loading" /> : error ? <PageState status="error" onRetry={reload} /> : !data?.content.length ? <><PageState status="empty" message={t('ux.noRecommendations')} /><Link to="/feed/studio">{t('ux.browseChannels')}</Link></> : <div className={styles.channels}>{data.content.map(channel => <FeedChannelCard key={channel.id} channel={channel} />)}</div>}
     </section>;
 }
 

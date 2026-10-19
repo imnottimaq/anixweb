@@ -9,18 +9,26 @@ import {
 } from './fixtures/mockData';
 
 test.describe('Favorites and list tabs flow', () => {
-  test('displays signed-out dialog when visiting favorites without auth token', async ({ page }) => {
+  test('displays a page-level sign-in gate without private tabs or requests for guests', async ({ page }) => {
     await setupDeterministicNetwork(page);
     await seedStorageState(page, { onboarded: true, isLoggedIn: false });
+    const privateRequests: string[] = [];
+    page.on('request', request => {
+      const path = new URL(request.url()).pathname;
+      if (/\/(?:favorite|collection|history)\/|\/profile\/list\//.test(path)) privateRequests.push(path);
+    });
 
     await page.goto('/favorites');
 
-    const authDialog = page.getByRole('dialog', { name: /Вход/i });
-    await expect(authDialog).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Anixart' })).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.getByRole('tablist')).toHaveCount(0);
+    await expect(page.getByRole('tab')).toHaveCount(0);
+    expect(privateRequests).toEqual([]);
 
-    const loginButton = authDialog.getByRole('button', { name: /Вход/i });
-    await expect(loginButton).toBeVisible();
-    await loginButton.click();
+    const loginLink = page.getByRole('link', { name: /^(Вход|Sign in)$/i });
+    await expect(loginLink).toHaveAttribute('href', '/account/login');
+    await loginLink.click();
 
     await expect(page).toHaveURL(/\/account\/login/);
   });

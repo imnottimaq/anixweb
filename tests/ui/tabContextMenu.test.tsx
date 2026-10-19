@@ -397,6 +397,17 @@ describe('FavoritesScreen Tab Context Menu & Independent Defaults', () => {
         vi.restoreAllMocks();
     });
 
+    it('shows a page-level sign-in gate for guests without tabs or private requests', async () => {
+        const englishSettings: AppSettings = { ...defaultAppSettings, appearance: { ...defaultAppSettings.appearance, language: 'english' } };
+        render(<Providers settings={englishSettings}><FavoritesScreen /></Providers>);
+        await act(async () => {});
+        expect(screen.getByRole('status')).toHaveTextContent('Sign in to your Anixart account');
+        expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/account/login');
+        expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+        expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
     it('initializes with default tab specified in settings.content.defaultTabOnFavorites', () => {
         const customSettings: AppSettings = {
             ...defaultAppSettings,
@@ -407,7 +418,7 @@ describe('FavoritesScreen Tab Context Menu & Independent Defaults', () => {
         };
 
         render(
-            <Providers settings={customSettings}>
+            <Providers settings={customSettings} userToken="test-token" userId={1}>
                 <FavoritesScreen />
             </Providers>
         );
@@ -419,7 +430,7 @@ describe('FavoritesScreen Tab Context Menu & Independent Defaults', () => {
     it('opens context menu on Favorites tab right-click and updates defaultTabOnFavorites independently', () => {
         const setSettings = vi.fn();
         render(
-            <Providers setSettings={setSettings}>
+            <Providers setSettings={setSettings} userToken="test-token" userId={1}>
                 <FavoritesScreen />
             </Providers>
         );
@@ -446,7 +457,7 @@ describe('FavoritesScreen Tab Context Menu & Independent Defaults', () => {
 
     it('shows disabled "Вкладка по умолчанию" when the tab is already default in Favorites', () => {
         render(
-            <Providers>
+            <Providers userToken="test-token" userId={1}>
                 <FavoritesScreen />
             </Providers>
         );

@@ -1,3 +1,5 @@
+import RemoteMedia from '../components/RemoteMedia';
+import { useUser } from '../shared/contexts/userContext';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AnimeCard from '../components/AnimeCard';
@@ -37,13 +39,14 @@ const EMPTY_DATA: OverviewData = {
 
 export default function OverviewScreen() {
     const api = useApi();
+    const { userToken } = useUser();
     const { t, language } = useTranslation();
     const navigate = useNavigate();
     const [activeInterestingIndex, setActiveInterestingIndex] = useState(0);
 
     const recommendations = useAsyncLoad(
         signal => api.post<PagedResponse<Anime>>('/discover/recommendations/-1?previous_page=-1', undefined, undefined, { signal }),
-        [api],
+        [api], { enabled: Boolean(userToken) },
     );
     const recommendedReleases = recommendations.data?.content ?? [];
 
@@ -84,6 +87,7 @@ export default function OverviewScreen() {
 
         {!isLoading && !error && <>
             {data.failedSections > 0 && <div className={styles.partialError} role="alert"><span>{t('roadmap.discover.overview.partialError')}</span><button type="button" onClick={reload}>{t('page.retry')}</button></div>}
+            <div className={styles.discoveryLayout}>
             {(data.interesting.length > 0 || data.discussing.length > 0) && <div className={styles.topLayout}>
                 {data.interesting.length > 0 && <section className={styles.featured}>
                     <SectionTitle title={t('overview.interesting')} />
@@ -132,11 +136,12 @@ export default function OverviewScreen() {
                     <span>{t('overview.random')}</span>
                 </Link>
             </nav>
+            </div>
         </>}
 
             <section className={styles.section}>
                 <SectionTitle title={t('overview.recommended')} description={t('overview.recommendedDescription')} />
-                {recommendations.isLoading ? <PageState status="loading" message={t('overview.recommendationsLoading')} />
+                {!userToken ? <p>{t('ux.signInRecommendations')} <Link to="/account/login">{t('auth.login')}</Link></p> : recommendations.isLoading ? <PageState status="loading" message={t('overview.recommendationsLoading')} />
                     : recommendations.error ? <PageState status="error" message={t('overview.recommendationsError')} onRetry={recommendations.reload} />
                     : recommendedReleases.length > 0
                     ? <div className={styles.posterRail}>
@@ -177,18 +182,16 @@ function SectionTitle({ title, description }: { title: string; description?: str
 }
 
 function FeaturedItem({ item }: { item: DiscoverInteresting }) {
-    const content = <>
-        <RemoteImage src={item.image} alt="" />
+    const [loaded, setLoaded] = useState(false);
+    return <article className={styles.featuredItem}>
+        <RemoteMedia variant="landscape" src={item.image} alt={item.title} interactiveRetry onStateChange={state => setLoaded(state === 'loaded')} />
         <span className={styles.featuredShade} />
+        {loaded && item.action > 0 && <Link to={`/anime/${item.action}`} className={styles.featuredOpen} aria-label={item.title} />}
         <span className={styles.featuredText}>
-            <strong>{item.title}</strong>
+            <strong>{!loaded && item.action > 0 ? <Link to={`/anime/${item.action}`}>{item.title}</Link> : item.title}</strong>
             {item.description && <small>{item.description}</small>}
         </span>
-    </>;
-
-    return item.action > 0
-        ? <Link to={`/anime/${item.action}`} className={styles.featuredItem}>{content}</Link>
-        : <article className={styles.featuredItem}>{content}</article>;
+    </article>;
 }
 
 function CommentPreview({ comment, language }: { comment: DiscoverComment; language: 'russian' | 'english' }) {

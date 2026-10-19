@@ -230,7 +230,7 @@ test('mobile navigation fits the viewport, restores focus and opens the schedule
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await expect(toggle).toBeFocused();
   await toggle.click();
-  await navigation.getByRole('link', { name: 'Overview', exact: true }).click();
+  await navigation.getByRole('link', { name: 'Discover', exact: true }).click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await page.getByRole('link', { name: 'Schedule', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Release Schedule', exact: true })).toBeVisible();

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader, PageLayout } from '../components/PageLayout';
 import Toggle from '../components/Toggle';
@@ -50,6 +50,13 @@ export default function NotificationSettingsScreen() {
     const [allDubs, setAllDubs] = useState<Dub[]>([]);
     const [savingToggle, setSavingToggle] = useState<string | null>(null);
     const [saveError, setSaveError] = useState<string | null>(null);
+    const [loadState, setLoadState] = useState<'loading' | 'loaded' | 'error'>('loading');
+    const [loadAttempt, setLoadAttempt] = useState(0);
+    const [dubsState, setDubsState] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+    const [dubsAttempt, setDubsAttempt] = useState(0);
+    const [dubsSaveError, setDubsSaveError] = useState<string | null>(null);
+    const saving = useRef(false);
+    const editsDisabled = loadState !== 'loaded' || savingToggle !== null;
 
     const updateNotifications = (notifications: Partial<typeof settings.notifications>) => {
         setSettings(previous => ({
@@ -70,12 +77,17 @@ export default function NotificationSettingsScreen() {
         : t('notificationSettings.allDubs');
 
     useEffect(() => {
-        if (!isDubsModalOpen || allDubs.length > 0) return;
-
+        if (!isDubsModalOpen) return;
+        let cancelled = false;
         void api.get<{ code: number; types: Dub[] }>('/type/all')
-            .then(response => setAllDubs(response.types ?? []))
-            .catch(() => setAllDubs([]));
-    }, [api, allDubs.length, isDubsModalOpen]);
+            .then(response => {
+                if (cancelled) return;
+                setAllDubs(response.types ?? []);
+                setDubsState('loaded');
+            })
+            .catch(() => { if (!cancelled) setDubsState('error'); });
+        return () => { cancelled = true; };
+    }, [api, dubsAttempt, isDubsModalOpen]);
 
     useEffect(() => {
         let cancelled = false;
@@ -89,6 +101,7 @@ export default function NotificationSettingsScreen() {
                 const selectedDubs = response.profileTypeNotificationPreferences
                     .map(preference => preference.type);
 
+                setLoadState('loaded');
                 setSettings(previous => ({
                     ...previous,
                     notifications: {
@@ -106,12 +119,14 @@ export default function NotificationSettingsScreen() {
                     },
                 }));
             })
-            .catch(() => undefined);
+            .catch(() => { if (!cancelled) setLoadState('error'); });
 
         return () => { cancelled = true; };
-    }, [api, setSettings]);
+    }, [api, loadAttempt, setSettings]);
 
     const saveStatuses = async (mode: Exclude<NotificationMode, 'selected_releases'>, selectedLists: string[]) => {
+        if (loadState !== 'loaded' || saving.current) return false;
+        saving.current = true;
         const profileStatusNotificationPreferences = mode === 'all'
             ? [0, 1, 2, 3, 4, 5]
             : selectedLists.map(list => LIST_TO_STATUS[list]).filter((status): status is number => status !== undefined);
@@ -126,11 +141,13 @@ export default function NotificationSettingsScreen() {
             setSaveError(t('notificationSettings.saveError'));
             return false;
         } finally {
+            saving.current = false;
             setSavingToggle(null);
         }
     };
 
     const chooseMode = (mode: NotificationMode) => {
+        if (editsDisabled || saving.current) return;
         if (mode === 'selected_lists') {
             setDraftLists(settings.notifications.selectedLists ?? []);
             setIsListsModalOpen(true);
@@ -142,30 +159,40 @@ export default function NotificationSettingsScreen() {
             return;
         }
 
+        saving.current = true;
         setSavingToggle('statuses');
         setSaveError(null);
         void api.get<{ code: number }>('/profile/preference/notification/selected/releases/edit')
             .then(() => updateNotifications({ notificationsType: 'selected_releases' }))
             .catch(() => setSaveError(t('notificationSettings.saveError')))
-            .finally(() => setSavingToggle(null));
+            .finally(() => { saving.current = false; setSavingToggle(null); });
     };
 
     const saveLists = () => saveStatuses('selected_lists', draftLists);
 
     const saveDubs = async () => {
-        const body = { profileTypeNotificationPreferences: draftDubs.map(dub => dub.id) };
-
+        if (loadState !== 'loaded' || dubsState !== 'loaded' || saving.current) return false;
+        saving.current = true;
+        setSavingToggle('dubs');
+        setDubsSaveError(null);
         try {
-            await api.post<{ code: number }>('/profile/preference/notification/type/edit', body);
+            await api.post<{ code: number }>('/profile/preference/notification/type/edit', {
+                profileTypeNotificationPreferences: draftDubs.map(dub => dub.id),
+            });
+            updateNotifications({ selectedDubs: draftDubs });
+            return true;
         } catch {
+            setDubsSaveError(t('notificationSettings.saveError'));
             return false;
+        } finally {
+            saving.current = false;
+            setSavingToggle(null);
         }
-
-        updateNotifications({ selectedDubs: draftDubs });
-        return true;
     };
 
     const toggleRemoteSetting = async (key: string, endpoint: string, update: () => void) => {
+        if (loadState !== 'loaded' || saving.current) return;
+        saving.current = true;
         setSavingToggle(key);
         setSaveError(null);
 
@@ -176,6 +203,7 @@ export default function NotificationSettingsScreen() {
             setSaveError(t('notificationSettings.saveError'));
             return;
         } finally {
+            saving.current = false;
             setSavingToggle(null);
         }
 
@@ -185,6 +213,12 @@ export default function NotificationSettingsScreen() {
     return <PageLayout>
         <PageHeader title={t('notificationSettings.title')} description={t('notificationSettings.description')} back />
 
+        {loadState === 'loading' && <p role="status">{t('page.loading')}</p>}
+        {loadState === 'error' && <div>
+            <p className={styles.saveError} role="alert">{t('ux.preferencesLoadError')}</p>
+            <p>{t('ux.cachedPreferences')}</p>
+            <button type="button" onClick={() => { setLoadState('loading'); setLoadAttempt(value => value + 1); }}>{t('page.retry')}</button>
+        </div>}
         {saveError && <p className={styles.saveError} role="alert">{saveError}</p>}
 
         <SettingsGroup title={t('notificationSettings.episodes')}>
@@ -192,7 +226,7 @@ export default function NotificationSettingsScreen() {
                 title={t('notificationSettings.receive')}
                 description={t('notificationSettings.newEpisodes')}
                 checked={settings.notifications.recieveNotifications}
-                disabled={savingToggle === 'episodes'}
+                disabled={editsDisabled}
                 onChange={recieveNotifications => void toggleRemoteSetting(
                     'episodes',
                     '/profile/preference/notification/episode/edit',
@@ -202,21 +236,23 @@ export default function NotificationSettingsScreen() {
 
             {settings.notifications.recieveNotifications && <>
                 <div className={styles.modes} aria-label={t('notificationSettings.modeAria')}>
-                    <ModeCard label={t('notificationSettings.modeAll')} mode="all" active={notificationMode === 'all'} disabled={savingToggle === 'statuses'} onClick={() => chooseMode('all')} />
-                    <ModeCard label={t('notificationSettings.modeLists')} mode="selected_lists" active={notificationMode === 'selected_lists'} disabled={savingToggle === 'statuses'} onClick={() => chooseMode('selected_lists')} />
-                    <ModeCard label={t('notificationSettings.modeReleases')} mode="selected_releases" active={notificationMode === 'selected_releases'} disabled={savingToggle === 'statuses'} onClick={() => chooseMode('selected_releases')} />
+                    <ModeCard label={t('notificationSettings.modeAll')} mode="all" active={notificationMode === 'all'} disabled={editsDisabled} onClick={() => chooseMode('all')} />
+                    <ModeCard label={t('notificationSettings.modeLists')} mode="selected_lists" active={notificationMode === 'selected_lists'} disabled={editsDisabled} onClick={() => chooseMode('selected_lists')} />
+                    <ModeCard label={t('notificationSettings.modeReleases')} mode="selected_releases" active={notificationMode === 'selected_releases'} disabled={editsDisabled} onClick={() => chooseMode('selected_releases')} />
                 </div>
 
-                {notificationMode === 'selected_lists' && <button className={styles.summaryButton} type="button" onClick={() => chooseMode('selected_lists')}>
+                {notificationMode === 'selected_lists' && <button className={styles.summaryButton} type="button" disabled={editsDisabled} onClick={() => chooseMode('selected_lists')}>
                     <strong>{t('notificationSettings.listsSummary')}</strong>
                     <span>{selectedListsText}</span>
                 </button>}
-                {notificationMode === 'selected_releases' && <Link className={styles.summaryButton} to="/notifications/releases">
+                {notificationMode === 'selected_releases' && loadState === 'loaded' && <Link className={styles.summaryButton} to="/notifications/releases">
                     <strong>{t('notificationSettings.configureReleases')}</strong>
                 </Link>}
 
-                <button className={styles.summaryButton} type="button" onClick={() => {
+                <button className={styles.summaryButton} type="button" disabled={editsDisabled} onClick={() => {
                     setDraftDubs(settings.notifications.selectedDubs ?? []);
+                    setDubsSaveError(null);
+                    setDubsState('loading');
                     setIsDubsModalOpen(true);
                 }}>
                     <strong>{t('notificationSettings.dubs')}</strong>
@@ -226,7 +262,7 @@ export default function NotificationSettingsScreen() {
                     title={t('notificationSettings.onlyOne')}
                     description={t('notificationSettings.onlyOneDescription')}
                     checked={settings.notifications.getOnlyOneNotification}
-                    disabled={savingToggle === 'first-episode'}
+                    disabled={editsDisabled}
                     onChange={getOnlyOneNotification => void toggleRemoteSetting(
                         'first-episode',
                         '/profile/preference/notification/episode/first/edit',
@@ -241,7 +277,7 @@ export default function NotificationSettingsScreen() {
                 title={t('notificationSettings.receive')}
                 description={t('notificationSettings.relatedDescription')}
                 checked={settings.notifications.notificationOnRelatedRelease}
-                disabled={savingToggle === 'related-release'}
+                disabled={editsDisabled}
                 onChange={notificationOnRelatedRelease => void toggleRemoteSetting(
                     'related-release',
                     '/profile/preference/notification/related/release/edit',
@@ -255,7 +291,7 @@ export default function NotificationSettingsScreen() {
                 title={t('notificationSettings.replies')}
                 description={t('notificationSettings.repliesDescription')}
                 checked={settings.notifications.repliesNotifications}
-                disabled={savingToggle === 'comments'}
+                disabled={editsDisabled}
                 onChange={repliesNotifications => void toggleRemoteSetting(
                     'comments',
                     '/profile/preference/notification/comment/edit',
@@ -266,7 +302,7 @@ export default function NotificationSettingsScreen() {
                 title={t('notificationSettings.collectionComments')}
                 description={t('notificationSettings.collectionCommentsDescription')}
                 checked={settings.notifications.commentsOnCollectionNotification}
-                disabled={savingToggle === 'collection-comments'}
+                disabled={editsDisabled}
                 onChange={commentsOnCollectionNotification => void toggleRemoteSetting(
                     'collection-comments',
                     '/profile/preference/notification/my/collection/comment/edit',
@@ -277,15 +313,17 @@ export default function NotificationSettingsScreen() {
 
         <Modal
             isOpen={isListsModalOpen}
-            onClose={() => setIsListsModalOpen(false)}
+            onClose={() => { if (!saving.current) setIsListsModalOpen(false); }}
             title={t('notificationSettings.selectLists')}
             stickyHeader
         >
             {close => <>
+                {saveError && <p className={styles.saveError} role="alert">{saveError}</p>}
                 <div className={styles.checkList}>
                     {PROFILE_LISTS.map(list => <label key={list.id}>
                         <input
                             type="checkbox"
+                            disabled={editsDisabled}
                             checked={draftLists.includes(list.id)}
                             onChange={() => setDraftLists(previous => previous.includes(list.id)
                                 ? previous.filter(id => id !== list.id)
@@ -295,23 +333,30 @@ export default function NotificationSettingsScreen() {
                     </label>)}
                 </div>
                 <div className={styles.modalActions}>
-                    <button type="button" onClick={close}>{t('notificationSettings.cancel')}</button>
-                    <button className={styles.primaryAction} type="button" disabled={savingToggle === 'statuses'} onClick={() => void saveLists().then(saved => { if (saved) close(); })}>{t('notificationSettings.select')}</button>
+                    <button type="button" disabled={savingToggle !== null} onClick={close}>{t('notificationSettings.cancel')}</button>
+                    <button className={styles.primaryAction} type="button" disabled={editsDisabled} onClick={() => void saveLists().then(saved => { if (saved) close(); })}>{t('notificationSettings.select')}</button>
                 </div>
             </>}
         </Modal>
 
         <Modal
             isOpen={isDubsModalOpen}
-            onClose={() => setIsDubsModalOpen(false)}
+            onClose={() => { if (!saving.current) setIsDubsModalOpen(false); }}
             title={t('notificationSettings.selectDubs')}
             stickyHeader
         >
             {close => <>
+                {dubsSaveError && <p className={styles.saveError} role="alert">{dubsSaveError}</p>}
+                {dubsState === 'loading' && <p role="status">{t('page.loading')}</p>}
+                {dubsState === 'error' && <div>
+                    <p className={styles.saveError} role="alert">{t('notificationSettings.dubsError')}</p>
+                    <button type="button" onClick={() => { setDubsState('loading'); setDubsAttempt(value => value + 1); }}>{t('page.retry')}</button>
+                </div>}
                 <div className={styles.checkList}>
-                    {allDubs.map(dub => <label key={dub.id}>
+                    {dubsState === 'loaded' && allDubs.map(dub => <label key={dub.id}>
                         <input
                             type="checkbox"
+                            disabled={editsDisabled}
                             checked={draftDubs.some(item => item.id === dub.id)}
                             onChange={() => setDraftDubs(previous => previous.some(item => item.id === dub.id)
                                 ? previous.filter(item => item.id !== dub.id)
@@ -319,11 +364,11 @@ export default function NotificationSettingsScreen() {
                         />
                         <span>{dub.name}</span>
                     </label>)}
-                    {allDubs.length === 0 && <p className={styles.empty}>{t('notificationSettings.dubsError')}</p>}
+                    {dubsState === 'loaded' && allDubs.length === 0 && <p className={styles.empty} role="status">{t('page.empty')}</p>}
                 </div>
                 <div className={styles.modalActions}>
-                    <button type="button" onClick={close}>{t('notificationSettings.cancel')}</button>
-                    <button className={styles.primaryAction} type="button" onClick={() => void saveDubs().then(saved => { if (saved) close(); })}>{t('notificationSettings.select')}</button>
+                    <button type="button" disabled={savingToggle !== null} onClick={close}>{t('notificationSettings.cancel')}</button>
+                    <button className={styles.primaryAction} type="button" disabled={editsDisabled || dubsState !== 'loaded'} onClick={() => void saveDubs().then(saved => { if (saved) close(); })}>{t('notificationSettings.select')}</button>
                 </div>
             </>}
         </Modal>

@@ -121,7 +121,7 @@ a.notification:hover {
 }
 
 .error {
-  color: var(--status-dropped);
+  color: var(--error-color);
 }
 
 @media (max-width: 560px) {
@@ -149,3 +149,5 @@ a.notification:hover {
     padding-right: 8px;
   }
 }
+
+.loginAction { display: table; margin: 0 auto; min-height: 40px; padding: 10px 16px; border-radius: var(--radius-control); background: var(--accent-color); color: var(--accent-foreground); text-decoration: none; }

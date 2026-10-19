@@ -1,3 +1,4 @@
+import { useUser } from '../shared/contexts/userContext';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import RemoteImage from '../components/RemoteImage';
@@ -16,6 +17,13 @@ const FILTERS: NotificationFilter[] = ['all', 'episode', 'comments', 'friend', '
 type T = (key: TranslationKey, params?: TranslationParams) => string;
 
 export default function NotificationsScreen() {
+    const { userToken } = useUser();
+    const { t } = useTranslation();
+    if (!userToken) return <PageLayout><PageHeader title={t('notifications.title')} /><PageState status="empty" message={t('auth.loginTitle')} /><Link className={styles.loginAction} to="/account/login">{t('auth.login')}</Link></PageLayout>;
+    return <NotificationsContent />;
+}
+
+function NotificationsContent() {
     const api = useApi();
     const { t, language, formatRelativeTime } = useTranslation();
     const [notifications, setNotifications] = useState<AnixartNotification[]>([]);

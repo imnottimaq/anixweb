@@ -1,6 +1,8 @@
+import { PageHeader, PageLayout } from '../components/PageLayout';
+import PageState from '../components/PageState';
 import { useReleaseChanges } from '../shared/contexts/releaseActionsContext';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import AnimeCard from '../components/AnimeCard';
 import AnimeCardHorizontal from '../components/AnimeCardHorizontal';
 import CollectionCard from '../components/CollectionCard';
@@ -97,6 +99,9 @@ function createTabs(): FavoritesTabs {
 
 export default function FavoritesScreen() {
     const { profileId } = useParams<{ profileId?: string }>();
+    const { userToken } = useUser();
+    const { t } = useTranslation();
+    if (!userToken && !profileId) return <PageLayout><PageHeader title={t('nav.favorites')} /><PageState status="empty" message={t('auth.loginTitle')} /><Link className={styles.loginAction} to="/account/login">{t('auth.login')}</Link></PageLayout>;
     return <FavoritesScreenContent key={profileId ?? 'own'} profileId={profileId} />;
 }
 
