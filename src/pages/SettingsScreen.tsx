@@ -2,7 +2,7 @@ import ToggleSettingsItem from '../components/ToggleSettingsItem'
 import { PageHeader, PageLayout } from '../components/PageLayout'
 import { useSettings } from '../shared/contexts/settingsContext'
 import { useUser } from '../shared/contexts/userContext'
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { canUseAnime4KVideo, checkAnime4KVideoSupport, isSafariBrowser } from '../shared/anime4kSupport'
 import { useTranslation } from '../shared/useTranslation'
@@ -21,10 +21,13 @@ import { AnimeListTransfer } from '../components/AnimeListTransfer'
 import KeybindingsModal from '../modals/KeybindingsModal'
 import type { Filter } from '../shared/types/api'
 import styles from './SettingsScreen.module.css'
+import { moveTab } from '../shared/discover/tabs'
 
 type SettingsTab = 'appearance' | 'content' | 'player' | 'data';
+const SETTINGS_TABS: readonly SettingsTab[] = ['appearance', 'content', 'player', 'data'];
 
 export default function SettingsScreen(){
+    const tabGroupId = useId()
     const {settings, setSettings} = useSettings()
     const { userToken, userId } = useUser()
     const { t } = useTranslation()
@@ -237,7 +240,11 @@ export default function SettingsScreen(){
                     <button
                         type="button"
                         role="tab"
+                        id={`${tabGroupId}-tab-appearance`}
+                        aria-controls={`${tabGroupId}-panel`}
                         aria-selected={activeTab === 'appearance'}
+                        tabIndex={activeTab === 'appearance' ? 0 : -1}
+                        onKeyDown={event => moveTab(event, SETTINGS_TABS, 'appearance', setActiveTab)}
                         className={`${styles['tab-button']} ${activeTab === 'appearance' ? styles.active : ''}`}
                         onClick={() => setActiveTab('appearance')}
                     >
@@ -246,7 +253,11 @@ export default function SettingsScreen(){
                     <button
                         type="button"
                         role="tab"
+                        id={`${tabGroupId}-tab-content`}
+                        aria-controls={`${tabGroupId}-panel`}
                         aria-selected={activeTab === 'content'}
+                        tabIndex={activeTab === 'content' ? 0 : -1}
+                        onKeyDown={event => moveTab(event, SETTINGS_TABS, 'content', setActiveTab)}
                         className={`${styles['tab-button']} ${activeTab === 'content' ? styles.active : ''}`}
                         onClick={() => setActiveTab('content')}
                     >
@@ -255,7 +266,11 @@ export default function SettingsScreen(){
                     <button
                         type="button"
                         role="tab"
+                        id={`${tabGroupId}-tab-player`}
+                        aria-controls={`${tabGroupId}-panel`}
                         aria-selected={activeTab === 'player'}
+                        tabIndex={activeTab === 'player' ? 0 : -1}
+                        onKeyDown={event => moveTab(event, SETTINGS_TABS, 'player', setActiveTab)}
                         className={`${styles['tab-button']} ${activeTab === 'player' ? styles.active : ''}`}
                         onClick={() => setActiveTab('player')}
                     >
@@ -264,7 +279,11 @@ export default function SettingsScreen(){
                     <button
                         type="button"
                         role="tab"
+                        id={`${tabGroupId}-tab-data`}
+                        aria-controls={`${tabGroupId}-panel`}
                         aria-selected={activeTab === 'data'}
+                        tabIndex={activeTab === 'data' ? 0 : -1}
+                        onKeyDown={event => moveTab(event, SETTINGS_TABS, 'data', setActiveTab)}
                         className={`${styles['tab-button']} ${activeTab === 'data' ? styles.active : ''}`}
                         onClick={() => setActiveTab('data')}
                     >
@@ -273,7 +292,7 @@ export default function SettingsScreen(){
                 </div>
             </div>
 
-            <div className={styles['content']}>
+            <div className={styles['content']} role="tabpanel" id={`${tabGroupId}-panel`} aria-labelledby={`${tabGroupId}-tab-${activeTab}`} tabIndex={0}>
                 {activeTab === 'appearance' && (
                     <section className={styles['settings-section-tab']}>
                         <h2 className={styles.sectionTitle}>{t('settings.appearance')}</h2>
@@ -702,7 +721,7 @@ export default function SettingsScreen(){
                             )}
 
                             {accountSyncStatus && (
-                                <div className={accountSyncStatus.isError ? styles['status-error'] : styles['status-success']} role="alert">
+                                <div className={accountSyncStatus.isError ? styles['status-error'] : styles['status-success']} role={accountSyncStatus.isError ? 'alert' : 'status'}>
                                     {accountSyncStatus.message}
                                 </div>
                             )}
@@ -725,7 +744,7 @@ export default function SettingsScreen(){
                                 </label>
                             </div>
                             {backupStatus && (
-                                <div className={backupStatus.isError ? styles['status-error'] : styles['status-success']} role="alert">
+                                <div className={backupStatus.isError ? styles['status-error'] : styles['status-success']} role={backupStatus.isError ? 'alert' : 'status'}>
                                     {backupStatus.message}
                                 </div>
                             )}

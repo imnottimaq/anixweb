@@ -57,6 +57,8 @@ export default function SearchButton(){
     const [isExpanded, setIsExpanded] = useState(false);
     const searchRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const restoreTriggerFocus = useRef(false);
     const searchKey = JSON.stringify([query.trim(), searchScope, settings.content.proxySearchThroughShikimori]);
     const currentResult = result?.key === searchKey && result.api === api ? result : undefined;
     const searchResults = currentResult?.data;
@@ -76,16 +78,25 @@ export default function SearchButton(){
     }, []);
 
     const collapseSearch = useCallback(() => {
+        restoreTriggerFocus.current = false;
         setQuery('');
         setResult(undefined);
         setIsSearchOpen(false);
         setIsExpanded(false);
     }, []);
 
-    useEffect(() => {
-        if (!isExpanded) return;
+    const dismissSearch = useCallback(() => {
+        collapseSearch();
+        restoreTriggerFocus.current = true;
+    }, [collapseSearch]);
 
-        const frame = window.requestAnimationFrame(() => inputRef.current?.focus());
+    useEffect(() => {
+        if (!isExpanded && !restoreTriggerFocus.current) return;
+        const frame = window.requestAnimationFrame(() => {
+            if (isExpanded) inputRef.current?.focus();
+            else if (restoreTriggerFocus.current) triggerRef.current?.focus();
+            restoreTriggerFocus.current = false;
+        });
         return () => window.cancelAnimationFrame(frame);
     }, [isExpanded]);
 
@@ -96,7 +107,10 @@ export default function SearchButton(){
             if (!searchRef.current?.contains(event.target as Node)) collapseSearch();
         };
         const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') collapseSearch();
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                dismissSearch();
+            }
         };
 
         document.addEventListener('mousedown', handlePointerDown);
@@ -105,7 +119,7 @@ export default function SearchButton(){
             document.removeEventListener('mousedown', handlePointerDown);
             document.removeEventListener('keydown', handleKeyDown);
         };
-    }, [collapseSearch, isExpanded]);
+    }, [collapseSearch, dismissSearch, isExpanded]);
 
     useEffect(() => {
         if (previousPathname.current !== pathname) collapseSearch();
@@ -157,10 +171,16 @@ export default function SearchButton(){
     const profileResults = searchResults && 'profiles' in searchResults ? searchResults.profiles : [];
     const collectionResults = searchResults && 'collections' in searchResults ? searchResults.collections : [];
     const releaseResults = searchResults && 'releases' in searchResults ? searchResults : undefined;
+    const resultCount = isProfileSearch ? profileResults.length : isCollectionSearch ? collectionResults.length : releaseResults?.releases.length ?? 0;
+    const searchStatus = !isFeed && isExpanded && query.trim()
+        ? currentResult?.loading ? t('search.waiting')
+            : searchResults ? resultCount ? t('search.resultCount', { count: resultCount }) : t('search.empty') : ''
+        : '';
 
     return (
         <div ref={searchRef} className={`${styles.search} ${isExpanded ? styles.expanded : ''}`}>
             {!isExpanded || isFeed ? <button
+                ref={triggerRef}
                 type="button"
                 className={styles['search-trigger']}
                 onClick={() => {
@@ -174,6 +194,7 @@ export default function SearchButton(){
                 aria-expanded="false"
             >
                 <img className={styles['search-icon']} src={SearchIcon} alt="" />
+                <span className={styles['trigger-label']}>{searchLabel}</span>
             </button> : <label className={styles['search-field']}>
                 <img className={styles['search-icon']} src={SearchIcon} alt="" />
                 <input
@@ -197,8 +218,9 @@ export default function SearchButton(){
                     aria-label={t('search.clear')}
                 >×</button>}
             </label>}
+            <span className={styles['search-status']} role={isExpanded && query.trim() ? 'status' : undefined} aria-live="polite" aria-atomic="true">{searchStatus}</span>
             {!isFeed && isSearchOpen && <div className={styles['search-overlay']} onMouseDown={event => {
-                if (event.target === event.currentTarget) collapseSearch();
+                if (event.target === event.currentTarget) dismissSearch();
             }}>
                 <div className={styles['search-content']}>
                     {isLoading && <p className={styles.message}>{t('search.waiting')}</p>}

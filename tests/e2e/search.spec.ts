@@ -10,6 +10,40 @@ import {
 } from './fixtures/mockData';
 
 test.describe('Header search bar flow', () => {
+  test('announces debounced loading, result counts, and empty results', async ({ page }) => {
+    await setupDeterministicNetwork(page);
+    let finishSearch!: () => void;
+    const pendingSearch = new Promise<void>(resolve => { finishSearch = resolve; });
+    await page.route('**/search/releases/*', async route => {
+      const query = route.request().postDataJSON().query as string;
+      if (query === 'Titan') await pendingSearch;
+      await route.fulfill({ json: { code: 0, releases: query === 'Titan' ? [mockAnime1] : [] } });
+    });
+    await seedStorageState(page, { settings: { appearance: { language: 'english' } } });
+    await page.goto('/settings');
+    await page.getByRole('button', { name: 'Search anime' }).click();
+    const input = page.getByRole('textbox', { name: 'Search anime' });
+    const status = page.locator('span[role="status"]');
+    await input.fill('Titan');
+    await expect(status).toHaveText('Searching...');
+    finishSearch();
+    await expect(status).toHaveText('Results: 1');
+    await input.fill('Missing');
+    await expect(status).toHaveText('Nothing found');
+  });
+
+  test('shows the search label on desktop and a compact trigger on narrower screens', async ({ page }) => {
+    await setupDeterministicNetwork(page);
+    await seedStorageState(page, { settings: { appearance: { language: 'english' } } });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/settings');
+    const trigger = page.getByRole('button', { name: 'Search anime' });
+    await expect(trigger.getByText('Search anime')).toBeVisible();
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await expect(trigger).toBeVisible();
+    await expect(trigger.getByText('Search anime')).not.toBeVisible();
+  });
+
   test('hides earlier results after a failed new query and retries the current query', async ({ page }) => {
     await setupDeterministicNetwork(page);
     const queries: string[] = [];
@@ -239,6 +273,7 @@ test.describe('Header search bar flow', () => {
     // Search input should collapse and trigger should be restored
     await expect(searchInput).not.toBeVisible();
     await expect(searchTrigger).toBeVisible();
+    await expect(searchTrigger).toBeFocused();
   });
 
   test('clear button clears the input query', async ({ page }) => {
@@ -312,6 +347,7 @@ test.describe('Header search bar flow', () => {
     await resultLink.click();
 
     await expect(page).toHaveURL(new RegExp(`/anime/${mockAnime1.id}`));
+    await expect(searchTrigger).not.toBeFocused();
   });
 
   test('navigates to user profile when searching in profile scope', async ({ page }) => {
@@ -338,7 +374,7 @@ test.describe('Header search bar flow', () => {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ code: 0, profile: mockProfile }),
+          body: JSON.stringify({ code: 0, profile: mockProfile, is_my_profile: true }),
         });
       }
 

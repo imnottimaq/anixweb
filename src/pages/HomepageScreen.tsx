@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import AnimeCard from '../components/AnimeCard';
 import AnimeCardHorizontal from '../components/AnimeCardHorizontal';
 import { type Anime, type Filter } from '../shared/types/api';
@@ -13,6 +13,7 @@ import { HOME_TAB_ORDER, type HomeTabKey } from '../shared/types/settings';
 import { normalizeTabOrder } from '../shared/tabOrder';
 import { useReorderableTabs } from '../shared/useReorderableTabs';
 import TabDragHandle from '../components/TabDragHandle';
+import { moveTab } from '../shared/discover/tabs';
 
 const PAGE_ITEMS: { page: Page; buttonText: 'home.my' | 'home.latest' | 'home.donghua' | 'home.ongoing' | 'home.announced' | 'home.completed' | 'home.films' }[] = [
     { page: 'donghua', buttonText: 'home.donghua' },
@@ -96,6 +97,8 @@ function getMyFilters(): Filter {
 }
 
 export default function HomepageScreen() {
+    const tabGroupId = useId();
+    const [tabOrientation, setTabOrientation] = useState<'horizontal' | 'vertical'>(() => window.matchMedia('(max-width: 900px)').matches ? 'horizontal' : 'vertical');
     const { userToken } = useUser();
     const { settings, setSettings } = useSettings();
     const { t } = useTranslation();
@@ -119,6 +122,13 @@ export default function HomepageScreen() {
     const isMyTabUnconfigured = activePage === 'my' && Object.keys(myFilters).length === 0;
     const isInitialLoading = activeTab.isLoading && activeTab.releases.length === 0;
     const isLoadingMore = activeTab.isLoading && activeTab.releases.length > 0;
+
+    useEffect(() => {
+        const media = window.matchMedia('(max-width: 900px)');
+        const updateOrientation = () => setTabOrientation(media.matches ? 'horizontal' : 'vertical');
+        media.addEventListener('change', updateOrientation);
+        return () => media.removeEventListener('change', updateOrientation);
+    }, []);
 
     useEffect(() => {
         if (isMyTabUnconfigured || !activeTab.hasMore || currentPageIsLoaded) return;
@@ -208,13 +218,17 @@ export default function HomepageScreen() {
 
     return (
         <div className={styles.body}>
-            <div className={styles['side-panel']} role="tablist" aria-label={t('home.catalogAria')}>
+            <div className={styles['side-panel']} role="tablist" aria-label={t('home.catalogAria')} aria-orientation={tabOrientation}>
                 {orderedItems.map(({ page, buttonText }) => (
                     <button
                         {...reorder.props(page)}
                         key={page}
+                        type="button"
                         role="tab"
+                        id={`${tabGroupId}-tab-${page}`}
+                        aria-controls={`${tabGroupId}-panel`}
                         aria-selected={activePage === page}
+                        tabIndex={activePage === page ? 0 : -1}
                         aria-haspopup="menu"
                         className={`${reorder.tabClass} ${activePage === page ? styles.active : ''}`}
                         onClick={() => setActivePage(page)}
@@ -229,6 +243,7 @@ export default function HomepageScreen() {
                         }}
                         onKeyDown={(e) => {
                             if (reorder.onKeyDown(e, page)) return;
+                            moveTab(e, orderedItems.map(item => item.page), page, setActivePage, tabOrientation);
                             if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
                                 e.preventDefault();
                                 const rect = e.currentTarget.getBoundingClientRect();
@@ -250,7 +265,7 @@ export default function HomepageScreen() {
 
             <span className={reorder.announcementClass} aria-live="polite" aria-atomic="true">{reorder.announcement}</span>
 
-            <div className={styles.content}>
+            <div className={styles.content} role="tabpanel" id={`${tabGroupId}-panel`} aria-labelledby={`${tabGroupId}-tab-${activePage}`} tabIndex={0}>
                 {isMyTabUnconfigured ? (
                     <div className={styles['empty-my-tab']}>
                         <button type="button" className={styles['configure-button']} onClick={() => setIsFilterModalOpen(true)}>{t('misc.configure')}</button>
