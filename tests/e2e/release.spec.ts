@@ -148,7 +148,7 @@ test.describe('Release screen flow', () => {
     await page.screenshot({ path: 'test-results/roadmap-dub-picker-mobile.png', animations: 'disabled' });
 
     // Close modal via close button
-    const closeBtn = page.getByRole('img', { name: /Закрыть|Close/i });
+    const closeBtn = picker.getByRole('button', { name: /Закрыть|Close/i });
     await closeBtn.click();
     await expect(modalHeading).not.toBeVisible();
   });

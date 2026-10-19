@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import RemoteMedia from '../components/RemoteMedia';
+import { getReleaseTitle } from '../shared/releaseTitle';
+import { useEffect, useRef, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom"
 import styles from './ReleaseScreen.module.css'
 import { type Anime, type Collection } from "../shared/types/api";
@@ -57,7 +59,9 @@ export default function ReleaseScreen(){
     const [imageViewer, setImageViewer] = useState<{ releaseId: string | undefined; images: LightboxImage[]; index: number } | null>(null);
     const [loadedPoster, setLoadedPoster] = useState<string | null>(null);
     const [loadedScreenshots, setLoadedScreenshots] = useState<Record<string, boolean>>({});
-    const [isDubScreenOpen, setIsDubScreenOpen] = useState(false);
+    const [isDubScreenOpen, setIsDubScreenOpen] = useState(() => Boolean(location.state?.openEpisodePicker));
+    const playRef = useRef<HTMLButtonElement>(null);
+    const [entryNotice] = useState(() => Boolean(location.state?.openEpisodePicker));
     const [isCollectionPickerOpen, setIsCollectionPickerOpen] = useState(false);
     const [isReleaseNotificationsOpen, setIsReleaseNotificationsOpen] = useState(false);
     const [releaseNotificationMode, setReleaseNotificationMode] = useState<'none' | 'all_dubs' | 'selected_dubs'>('none');
@@ -80,6 +84,13 @@ export default function ReleaseScreen(){
     const [releaseLoadAttempt, setReleaseLoadAttempt] = useState(0);
     const [isCommentsOpen, setIsCommentsOpen] = useState(false);
     const [commentsInitialAction, setCommentsInitialAction] = useState<{ type: 'compose' } | { type: 'reply' | 'edit'; comment: CommentType } | null>(null);
+
+    useEffect(() => {
+        if (!location.state?.openEpisodePicker && !location.state?.focusPlay) return;
+        if (!animeData) return;
+        if (location.state?.focusPlay) window.requestAnimationFrame(() => playRef.current?.focus());
+        navigate(location.pathname + location.search, { replace: true, state: { ...location.state, openEpisodePicker: false, focusPlay: false } });
+    }, [animeData, location, navigate]);
 
     const releaseAttemptKey = `${requestKey}:${releaseLoadAttempt}`;
     const isReleaseLoading = loadedRequestKey !== releaseAttemptKey;
@@ -312,6 +323,7 @@ export default function ReleaseScreen(){
         return <div className={styles['body']}>{t('release.loadError')}</div>;
     }
 
+    const displayTitle = getReleaseTitle(animeData, settings.appearance.language);
     const isReleaseNotStarted = !animeData.episodes_released;
     const currentVote = selectedReleaseVote ?? animeData.your_vote ?? animeData.my_vote ?? 0;
     const comingSoonText = getComingSoonText(animeData, settings.appearance.language, t('release.soon'));
@@ -322,15 +334,10 @@ export default function ReleaseScreen(){
     return(
         <div className={styles['body']}>
             <div className={styles['side-panel']}>
-                <button type="button" className={`${styles['poster-wrapper']} ${styles.imageTrigger} ${loadedPoster === animeData.image ? styles['media-loaded'] : styles['media-loading']}`} aria-label={t('imageViewer.open')} onClick={() => setImageViewer({ releaseId: id, images: [{ src: animeData.image, alt: animeData.title_ru || animeData.title_original }], index: 0 })}>
-                    <RemoteImage
-                        src={animeData.image}
-                        alt={animeData.title_ru || animeData.title_original}
-                        className={styles.poster}
-                        onLoad={() => setLoadedPoster(animeData.image)}
-                        onError={() => setLoadedPoster(animeData.image)}
-                    />
-                </button>
+                <div className={styles['poster-wrapper']}>
+                    <RemoteMedia src={animeData.image} alt={displayTitle} interactiveRetry onStateChange={state => setLoadedPoster(state === 'loaded' ? animeData.image : null)} />
+                    {loadedPoster === animeData.image && <button type="button" className={styles.imageOpenOverlay} aria-label={t('imageViewer.open')} onClick={() => setImageViewer({ releaseId: id, images: [{ src: animeData.image, alt: displayTitle }], index: 0 })} />}
+                </div>
                 <div className={`${styles['action-panel']}`}>
                     <select id="watchlist-select" className={`${styles['list-select']} ${styles['action-btn']} ${styles[`status-${animeData?.profile_list_status ?? 0}`]}`} onChange={e => {
                             const newStatus = +e.target.value
@@ -395,7 +402,7 @@ export default function ReleaseScreen(){
                     {isReleaseNotStarted ? (
                         <button type="button" disabled className={`${styles['watch-btn']} ${styles['watch-btn-soon']}`}>{comingSoonText}</button>
                     ) : (
-                        <button onClick={() => setIsDubScreenOpen(true)} className={styles['watch-btn']}>{t('release.play')}</button>
+                        <button onClick={() => setIsDubScreenOpen(true)} ref={playRef} className={styles['watch-btn']}>{t('release.play')}</button>
                     )}
                 </div>
                 <div className={styles['ratings-panel']}>
@@ -447,9 +454,9 @@ export default function ReleaseScreen(){
             </div>
             <div className={styles['release-info']}>
                 <div className={styles['release-header']}>
-                    <h2>{animeData.title_ru}</h2>
+                    <h1>{displayTitle}</h1>
                     <div className={styles['release-title-row']}>
-                        <p>{animeData.title_original}</p>
+                        <p>{settings.appearance.language === 'english' ? animeData.title_ru : animeData.title_original}</p>
                         <a className={styles['age-rating']}>{
                                 ({
                                     1: "0+",
@@ -475,15 +482,11 @@ export default function ReleaseScreen(){
                                         {visibleScreenshots.map((url, offset) => {
                                             const index = (activeScreenshotIndex + offset) % screenshots.length;
 
-                                            return <button type="button" key={url} className={`${styles['screenshot-wrapper']} ${styles.imageTrigger} ${loadedScreenshots[url] ? styles['media-loaded'] : styles['media-loading']}`} aria-label={t('release.screenshotAlt', { number: index + 1 })} onClick={() => setImageViewer({ releaseId: id, images: screenshots.map((src, imageIndex) => ({ src, alt: t('release.screenshotAlt', { number: imageIndex + 1 }) })), index })}>
-                                                <RemoteImage
-                                                    src={url}
-                                                    alt={t('release.screenshotAlt', { number: index + 1 })}
-                                                    className={styles['screenshot-img']}
-                                                    onLoad={() => setLoadedScreenshots(previous => ({ ...previous, [url]: true }))}
-                                                    onError={() => setLoadedScreenshots(previous => ({ ...previous, [url]: true }))}
-                                                />
-                                            </button>;
+                                            return <div key={url} className={styles['screenshot-wrapper']}>
+                                                <RemoteMedia src={url} alt={t('release.screenshotAlt', { number: index + 1 })} interactiveRetry onStateChange={state => setLoadedScreenshots(previous => ({ ...previous, [url]: state === 'loaded' }))} />
+                                                {loadedScreenshots[url] && <button type="button" className={styles.imageOpenOverlay} aria-label={t('release.screenshotAlt', { number: index + 1 })} onClick={() => setImageViewer({ releaseId: id, images: screenshots.map((src, imageIndex) => ({ src, alt: t('release.screenshotAlt', { number: imageIndex + 1 }) })), index })} />}
+                                            </div>;
+
                                         })}
                                     </div>
                                     {screenshots.length > 1 && <>
@@ -508,7 +511,7 @@ export default function ReleaseScreen(){
                                     "Китай": <div className={styles["china-flag"]}></div>
                                 } as Record<string, React.ReactNode>)[animeData.country]
                                 }
-                                <p>{animeData.country}, {(["зима","весна","лето","осень"])[animeData.season]} {animeData.year} г.</p>
+                                <p>{({ '\u042f\u043f\u043e\u043d\u0438\u044f': t('country.japan'), '\u041a\u0438\u0442\u0430\u0439': t('country.china'), '\u042e\u0436\u043d\u0430\u044f \u041a\u043e\u0440\u0435\u044f': t('country.southKorea') } as Record<string, string>)[animeData.country] ?? animeData.country}, {[t('seasons.winter'), t('seasons.spring'), t('seasons.summer'), t('seasons.autumn')][animeData.season - 1]} {animeData.year}</p>
                                 </div>
                                 <div className={styles['fact-row']}>
                                     <img src={albumIcon} className={styles['icon']} />
@@ -520,7 +523,7 @@ export default function ReleaseScreen(){
                                 </div>
                                 <div className={styles['fact-row']}> 
                                     <img src={peopleIcon} className={styles['icon']} />
-                                    <p>{t('misc.studio')} {animeData.studio}{animeData.author ? `, ${t('misc.author')} ${animeData.author}`:""}{animeData.director ? `, ${t('misc.director')} ${animeData.director}`:""}</p>
+                                    <p>{t('ux.studio')}: {animeData.studio}{animeData.author ? `, ${t('ux.author')}: ${animeData.author}`:""}{animeData.director ? `, ${t('ux.director')}: ${animeData.director}`:""}</p>
                                 </div>
                                 <div className={styles['fact-row']}>
                                     <img src={tagsIcon} className={styles['icon']} />
@@ -644,6 +647,7 @@ export default function ReleaseScreen(){
                 </div>
             </Modal>
             {imageViewer && imageViewer.releaseId === id && <ImageLightbox images={imageViewer.images} initialIndex={imageViewer.index} onClose={() => setImageViewer(null)} />}
+            {entryNotice && <p role="status">{t('ux.selectEpisodeAgain')}</p>}
             {roomSelectionError && <p role="alert">{roomSelectionError}</p>}
             {(isDubScreenOpen) && <DubSelectModal
                 isOpen={isDubScreenOpen}
@@ -658,7 +662,7 @@ export default function ReleaseScreen(){
                             if (room?.roomId !== roomId || roomStatus !== 'connected') throw new Error('Сначала подключитесь к комнате');
                             await sendRoom({ type: 'set_media', media: {
                                 releaseId: animeData.id,
-                                releaseName: settings.appearance.language === 'english' ? animeData.title_original : animeData.title_ru,
+                                releaseName: getReleaseTitle(animeData, settings.appearance.language),
                                 dubId, sourceId, episode: episode.position, episodeName: episode.name,
                             } });
                             setIsDubScreenOpen(false);
@@ -670,7 +674,7 @@ export default function ReleaseScreen(){
                     setPlayerSession({
                         sources,
                         animeId: animeData.id,
-                        animeName: settings.appearance.language === 'english' ? animeData.title_original : animeData.title_ru,
+                        animeName: getReleaseTitle(animeData, settings.appearance.language),
                         episodeNumber: episode.position,
                         episodeName: episode.name,
                         episodes,

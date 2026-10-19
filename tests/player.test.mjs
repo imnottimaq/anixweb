@@ -32,7 +32,7 @@ const media = { releaseId: 1, dubId: 3, sourceId: 4, episode: 1, releaseName: 'A
 const room = overrides => ({ roomId: 'room', hostId: 99, syncEpoch: 1, media, participants: [{profileId:7,canControl:true,connected:true}], playback: { position: 0, paused: true, intent:'paused', rate: 1.5, updatedAt:0 }, ...overrides });
 
 function harness(options = {}) {
-    const state = {}, refs = {}, effects = [], navigation = [], sessions = [], saved = [], sockets = [];
+    const state = {}, refs = {}, effects = [], navigation = [], sessions = [], saved = [], sockets = [], dialogHooks = [];
     let stateIndex = 0, refIndex = 0, tree, sessionCleared = false;
     const eventTarget = () => {
         const listeners = new Map();
@@ -80,6 +80,9 @@ function harness(options = {}) {
             return refs[name] ??= { current: initial };
         },
         useMemo: fn => fn(), useCallback: fn => fn, useEffect: fn => effects.push(fn),
+        // DOM focus ownership is exercised by playerAccessibility browser tests.
+        // Keep the shared hook at its import boundary in this media-only harness.
+        useDialogFocus: (ref, open, onClose, captureKeys) => dialogHooks.push({ ref, open, onClose, captureKeys }),
         useNavigate: () => path => navigation.push(path),
         useSettings: () => ({ settings, setSettings: fn => Object.assign(settings, fn(settings)) }),
         useTranslation: () => ({ t: key => key }), useUser: () => ({ userToken: '', userId: 7 }),
@@ -106,6 +109,7 @@ function harness(options = {}) {
     function render() {
         stateIndex = refIndex = 0;
         effects.length = 0;
+        dialogHooks.length = 0;
         tree = run(props);
         refs.videoRef.current = video;
         return tree;
@@ -122,7 +126,7 @@ function harness(options = {}) {
         return fn();
     };
     render();
-    return { state, refs, video, settings, props, render, find, effect, effects, navigation, sessions, saved, sockets,
+    return { state, refs, video, settings, props, render, find, effect, effects, navigation, sessions, saved, sockets, dialogHooks,
         document: documentDouble, window: windowDouble, download: downloadDouble, downloadCalls,
         requestFullscreen: compiled.requestFullscreenElement, exitFullscreen: compiled.exitFullscreenElement,
         HTMLElement: HTMLElementDouble,
@@ -267,23 +271,17 @@ test('download dialog selects an available MP4 and saves that source instead of 
     assert.equal(h.find(node => node.props?.role === 'progressbar').props['aria-valuenow'], undefined);
 });
 
-test('download dialog focuses inside, wraps Tab, handles Escape and restores its trigger', () => {
-    const h=harness(); h.state.isDownloadModalOpen=true; h.render();
-    const focusNode=()=>{const node=new h.HTMLElement();node.isConnected=true;node.focus=()=>{h.document.activeElement=node;};return node;};
-    const trigger=focusNode(), first=focusNode(), last=focusNode();
-    h.document.activeElement=trigger;
-    h.refs.downloadDialogRef.current={querySelectorAll:()=>[first,last],contains:node=>[first,last].includes(node),focus(){}};
-    const cleanup=h.effect('dialog.querySelectorAll');
-    assert.equal(h.document.activeElement,first);
-    let prevented=false;
-    h.document.dispatch('keydown',{key:'Tab',shiftKey:true,preventDefault(){prevented=true;}});
-    assert.equal(prevented,true); assert.equal(h.document.activeElement,last);
-    h.document.dispatch('keydown',{key:'Tab',preventDefault(){}});
-    assert.equal(h.document.activeElement,first);
-    h.document.dispatch('keydown',{key:'Escape',preventDefault(){},stopPropagation(){}});
-    assert.equal(h.state.isDownloadModalOpen,false);
-    assert.deepEqual(h.downloadCalls,[{type:'reset'}]);
-    cleanup(); assert.equal(h.document.activeElement,trigger);
+test('download dialog delegates focus and Escape ownership to the shared hook and resets on dismissal', () => {
+    const h = harness();
+    const dialogHook = () => h.dialogHooks.find(call => call.ref === h.refs.downloadDialogRef);
+    assert.equal(dialogHook().open, false);
+    h.state.isDownloadModalOpen = true; h.render();
+    assert.equal(dialogHook().open, true);
+    assert.equal(dialogHook().captureKeys, true, 'nested dialog owns Escape before player shortcuts');
+    dialogHook().onClose();
+    assert.equal(h.state.isDownloadModalOpen, false);
+    assert.deepEqual(h.downloadCalls, [{type:'reset'}]);
+    h.render(); assert.equal(dialogHook().open, false);
 });
 
 test('HLS-only episode exposes download and forwards the playlist to the download hook', () => {
@@ -400,8 +398,8 @@ test('viewing registration waits for confirmed member state and retries new medi
     const env = {
         useState: initial => { const id=si++; if (!(id in values)) values[id]=typeof initial==='function'?initial():initial; return [values[id],()=>{}]; },
         useRef: initial => refs[ri++] ??= {current:initial}, useEffect: fn=>effects.push(fn),useCallback:fn=>fn,
-        getPlayerSession:()=>null,useSearchParams:()=>[new URLSearchParams('room=room')],useRoomPresence:()=>presence,
-        useUser:()=>({userId:7}),useApi:()=>api,useNavigate:()=>()=>{},RoomPanel:()=>null,styles:{},
+        getPlayerSession:()=>null,useParams:()=>({id:'1'}),useSearchParams:()=>[new URLSearchParams('room=room')],useRoomPresence:()=>presence,
+        useUser:()=>({userId:7}),useApi:()=>api,useNavigate:()=>()=>{},RoomPanel:()=>null,PlayerPortal:()=>null,PlayerLoadingDialog:()=>null,styles:{},
         React:{createElement:()=>({})},
     };
     const run = new Function(...Object.keys(env),code+'\nreturn PlayerScreen;')(...Object.values(env));

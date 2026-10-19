@@ -1,5 +1,7 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams, useParams } from 'react-router-dom';
+import { createPortal } from 'react-dom';
+import { useDialogFocus } from '../shared/useDialogFocus';
 import Hls, {
     XhrLoader,
     type FragmentLoaderConstructor,
@@ -152,6 +154,7 @@ class CorsFallbackFragmentLoader extends XhrLoader {
 }
 
 export default function PlayerScreen() {
+    const { id: routeId } = useParams();
     const [playerSession, setCurrentPlayerSession] = useState(getPlayerSession);
     const [searchParams] = useSearchParams();
     const roomId = searchParams.get('room');
@@ -213,17 +216,35 @@ export default function PlayerScreen() {
 
     if (roomId) {
         if (resolved?.roomId === roomId && resolved.version === version && roomMedia) {
-            return <PlayerContent key={roomId + ':' + version} playerSession={resolved.session} onSessionChange={updateSession} roomId={roomId} />;
+            return <PlayerPortal><PlayerContent key={roomId + ':' + version} playerSession={resolved.session} onSessionChange={updateSession} roomId={roomId} /></PlayerPortal>;
         }
-        return <div className={styles.overlay}><div className={styles['room-loading']}>
+        return <PlayerPortal><PlayerLoadingDialog onClose={() => navigate('/together/' + encodeURIComponent(roomId))}><div className={styles['room-loading']}>
             <RoomPanel compact />
             <p role="status">{resolveError || error || (!roomMedia && status === 'connected' ? 'В комнате ещё не выбрана серия' : 'Загрузка видео…')}</p>
             {resolveError && <button onClick={() => setReload(value => value + 1)}>Повторить</button>}
             <button onClick={() => navigate('/together/' + encodeURIComponent(roomId))}>Вернуться в комнату</button>
-        </div></div>;
+        </div></PlayerLoadingDialog></PlayerPortal>;
     }
-    if (!playerSession) return <Navigate to="/" replace />;
-    return <PlayerContent playerSession={playerSession} onSessionChange={updateSession} roomId={null} />;
+    if (!playerSession || playerSession.animeId !== Number(routeId)) return <Navigate to={`/anime/${routeId}`} state={{ openEpisodePicker: true }} replace />;
+    return <PlayerPortal><PlayerContent playerSession={playerSession} onSessionChange={updateSession} roomId={null} /></PlayerPortal>;
+}
+
+function PlayerPortal({ children }: { children: React.ReactNode }) {
+    useEffect(() => {
+        const root = document.getElementById('root');
+        if (!root) return;
+        const previous = root.inert;
+        root.inert = true;
+        return () => { root.inert = previous; };
+    }, []);
+    return createPortal(children, document.body);
+}
+
+function PlayerLoadingDialog({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+    const ref = useRef<HTMLDivElement>(null);
+    const { t } = useTranslation();
+    useDialogFocus(ref, true, onClose, true);
+    return <div ref={ref} tabIndex={-1} className={styles.overlay} role="dialog" aria-modal="true" aria-label={t('player.ariaLabel')}>{children}</div>;
 }
 
 function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSession: PlayerSession; onSessionChange: (session: PlayerSession) => void; roomId: string | null }) {
@@ -239,6 +260,8 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     const canPauseRoom = !roomId || (roomStatus === 'connected' && roomAccess.pause);
     const canToggleRoomPlayback = canControlRoom || (canPauseRoom && watchRoom?.playback.intent === 'playing');
     const playerRef = useRef<HTMLDivElement>(null);
+    const playerDialogRef = useRef<HTMLDivElement>(null);
+    const resumeDialogRef = useRef<HTMLDivElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const upscaleCanvasRef = useRef<HTMLCanvasElement>(null);
     const controlsTimeoutRef = useRef<number | null>(null);
@@ -429,15 +452,15 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
         episodeRequestRef.current += 1;
         saveEpisodeTime();
         clearPlayerSession();
-        navigate(roomId ? `/together/${encodeURIComponent(roomId)}` : `/anime/${animeId}`);
+        navigate(roomId ? `/together/${encodeURIComponent(roomId)}` : `/anime/${animeId}`, { state: { focusPlay: true } });
     };
 
     const showControls = useCallback(() => {
         setAreControlsVisible(true);
         if (controlsTimeoutRef.current !== null) window.clearTimeout(controlsTimeoutRef.current);
-        if (!isPlaying || isPlayerSettingsOpen || resumePromptTime !== null) return;
+        if (!isPlaying || isPlayerSettingsOpen || resumePromptTime !== null || playerDialogRef.current?.querySelector('[data-player-controls]')?.contains(document.activeElement)) return;
 
-        controlsTimeoutRef.current = window.setTimeout(() => setAreControlsVisible(false), 2_500);
+        controlsTimeoutRef.current = window.setTimeout(() => { if (!playerDialogRef.current?.querySelector('[data-player-controls]')?.contains(document.activeElement)) setAreControlsVisible(false); }, 2_500);
     }, [isPlaying, isPlayerSettingsOpen, resumePromptTime]);
 
     useEffect(() => {
@@ -527,34 +550,25 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
         };
     }, [resumePromptTime, roomId, settings.player.autoPauseOnTabSwitch]);
 
-    useEffect(() => {
-        if (!isDownloadModalOpen) return;
-        const dialog = downloadDialogRef.current;
-        if (!dialog) return;
-        const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-        const focusable = () => Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]'));
-        (focusable()[0] ?? dialog).focus();
-        const keydown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') {
-                event.preventDefault(); event.stopPropagation();
-                resetDownload(); setIsDownloadModalOpen(false);
-            } else if (event.key === 'Tab') {
-                const items = focusable();
-                const index = items.indexOf(document.activeElement as HTMLElement);
-                if (items.length === 0) { event.preventDefault(); dialog.focus(); }
-                else if (event.shiftKey && index <= 0) { event.preventDefault(); items[items.length - 1].focus(); }
-                else if (!event.shiftKey && (index < 0 || index === items.length - 1)) { event.preventDefault(); items[0].focus(); }
-            }
-        };
-        const containFocus = (event: FocusEvent) => { if (!dialog.contains(event.target as Node)) (focusable()[0] ?? dialog).focus(); };
-        document.addEventListener('keydown', keydown, true);
-        document.addEventListener('focusin', containFocus);
-        return () => {
-            document.removeEventListener('keydown', keydown, true);
-            document.removeEventListener('focusin', containFocus);
-            if (previous?.isConnected) previous.focus();
-        };
-    }, [isDownloadModalOpen, resetDownload]);
+    const startFrom = (time: number) => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        video.currentTime = time;
+        resumePendingRef.current = false;
+        autoplayAttemptedRef.current = true;
+        setCurrentTime(time);
+        setResumePromptTime(null);
+        void video.play().catch(error => console.error('Не удалось запустить видео:', error));
+    };
+
+    useDialogFocus(playerDialogRef, true, () => {
+        if (isPlayerSettingsOpen) { setIsPlayerSettingsOpen(false); return; }
+        if (document.fullscreenElement || (document as WebKitFullscreenDocument).webkitFullscreenElement) { void exitFullscreenElement(); return; }
+        closePlayer();
+    }, true);
+    useDialogFocus(downloadDialogRef, isDownloadModalOpen, () => { resetDownload(); setIsDownloadModalOpen(false); }, true);
+    useDialogFocus(resumeDialogRef, resumePromptTime !== null, () => { if (resumePromptTime !== null) startFrom(resumePromptTime); }, true);
 
     useEffect(() => {
         return () => { resetDownload(); };
@@ -826,17 +840,6 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
         }
     }, [animeId, animeName, api, canControlRoom, onSessionChange, playerSession, roomId, send, userToken, saveEpisodeTime, t]);
 
-    const startFrom = (time: number) => {
-        const video = videoRef.current;
-        if (!video) return;
-
-        video.currentTime = time;
-        resumePendingRef.current = false;
-        autoplayAttemptedRef.current = true;
-        setCurrentTime(time);
-        setResumePromptTime(null);
-        void video.play().catch(error => console.error('Не удалось запустить видео:', error));
-    };
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -888,7 +891,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [changeEpisode, isDownloadModalOpen, resumePromptTime, keybindings, nextEpisode, previousEpisode, seekTo, togglePlayback, setSettings, settings.player.showSkipOpeningButton, settings.player.skipOpeningValue, showControls]);
 
-    if (!stream) return <div className={styles.overlay} role="dialog" aria-modal="true" aria-label={t('player.ariaLabel')}>
+    if (!stream) return <div ref={playerDialogRef} tabIndex={-1} className={styles.overlay} role="dialog" aria-modal="true" aria-label={t('player.ariaLabel')}>
         <div className={styles.player}>
             <div className={styles['resume-prompt']}>
                 <div className={styles['resume-prompt-card']} role="alert">
@@ -903,10 +906,10 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     </div>;
 
     return (
-        <div className={styles.overlay} role="dialog" aria-modal="true" aria-label={t('player.ariaLabel')}>
+        <div ref={playerDialogRef} tabIndex={-1} className={styles.overlay} role="dialog" aria-modal="true" aria-label={t('player.ariaLabel')}>
             <div className={styles.player} ref={playerRef} onPointerMove={showControls} onPointerDown={showControls}>
                 {Boolean(roomId && watchRoom?.roomId === roomId) && <ReactionOverlay />}
-                <div className={`${styles['player-controls']} ${!areControlsVisible ? styles['player-controls-hidden'] : ''}`}>
+                <div data-player-controls onFocusCapture={showControls} onBlurCapture={() => window.requestAnimationFrame(showControls)} className={`${styles['player-controls']} ${!areControlsVisible ? styles['player-controls-hidden'] : ''}`}>
                     <div className={styles['playback-buttons']}>
                         <div className={styles['top-bar']}>
                             <button className={styles['back-button']} aria-label={roomId ? t('room.return') : t('player.backToRelease')} onClick={closePlayer}><img src={BackIcon} alt="" /></button>
@@ -916,7 +919,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                             </div>
                         </div>
                         <div className={styles['flow-buttons']}>
-                            <button type="button" className={styles['next-prev-buttons']} disabled={!canControlRoom || !previousEpisode || isEpisodeChanging} onClick={() => previousEpisode && void changeEpisode(previousEpisode)}><img src={PrevIcon} /></button>
+                            <button type="button" aria-label={t('ux.previousEpisode')} className={styles['next-prev-buttons']} disabled={!canControlRoom || !previousEpisode || isEpisodeChanging} onClick={() => previousEpisode && void changeEpisode(previousEpisode)}><img src={PrevIcon} alt="" /></button>
                             <button
                                 type="button"
                                 className={styles['play-button']}
@@ -924,9 +927,9 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                                 aria-label={roomId ? t(watchRoom?.playback.intent === 'playing' ? 'player.pause' : 'player.play') : isBuffering ? t('player.loading') : isPlaying ? t('player.pause') : t('player.play')}
                                 onClick={togglePlayback}
                             >
-                                {isBuffering ? <span className={styles.spinner} aria-hidden="true" /> : <img src={isPlaying ? PauseIcon : PlayIcon} />}
+                                {isBuffering ? <span className={styles.spinner} aria-hidden="true" /> : <img src={isPlaying ? PauseIcon : PlayIcon} alt="" />}
                             </button>
-                            <button type="button" className={styles['next-prev-buttons']} disabled={!canControlRoom || !nextEpisode || isEpisodeChanging} onClick={() => nextEpisode && void changeEpisode(nextEpisode)}><img src={NextIcon} /></button>
+                            <button type="button" aria-label={t('ux.nextEpisode')} className={styles['next-prev-buttons']} disabled={!canControlRoom || !nextEpisode || isEpisodeChanging} onClick={() => nextEpisode && void changeEpisode(nextEpisode)}><img src={NextIcon} alt="" /></button>
                         </div>
                     </div>
 
@@ -938,20 +941,24 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                         <div
                             className={`${styles['volume-div']} ${isVolumeDivExpanded ? styles['volume-expanded'] : ''}`}
                             onMouseEnter={() => setIsVolumeDivExpanded(true)}
-                            onMouseLeave={() => setIsVolumeDivExpanded(false)}
+                            onMouseLeave={event => { if (!event.currentTarget.contains(document.activeElement)) setIsVolumeDivExpanded(false); }}
+                            onFocus={() => setIsVolumeDivExpanded(true)}
+                            onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsVolumeDivExpanded(false); }}
                         >
                             <button
-                                className={`${styles['action-btn']} ${styles['mute-button']}`}
+                                aria-label={t(isMuted ? 'ux.unmute' : 'ux.mute')} className={`${styles['action-btn']} ${styles['mute-button']}`}
                                 onClick={() => {
                                     const video = videoRef.current;
                                     if (!video) return;
                                     video.muted = !video.muted;
                                 }}
                             >
-                                <img src={isMuted ? VolumeMuteIcon : VolumeMaxIcon} />
+                                <img src={isMuted ? VolumeMuteIcon : VolumeMaxIcon} alt="" />
                             </button>
+                            <button type="button" className={styles.volumeToggle} aria-label={t('ux.volumeToggle')} aria-expanded={isVolumeDivExpanded} onClick={() => setIsVolumeDivExpanded(open => !open)}><svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12"><path d="m2 8 4-4 4 4" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg></button>
                             {isVolumeDivExpanded && (
                                 <input
+                                    aria-label={t('ux.volume')} aria-valuetext={`${Math.round(volume * 100)}%`}
                                     type="range"
                                     min="0"
                                     max="1"
@@ -971,7 +978,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                         </div>
 
                         {settings.player.showSkipOpeningButton && (
-                            <button
+                            <button aria-label={t('ux.skipOpening')}
                                 className={styles['action-btn']}
                                 onClick={() => {
                                     const video = videoRef.current;
@@ -984,7 +991,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                                     seekTo(nextTime);
                                 }}
                             >
-                                <img src={SkipIcon} />
+                                <img src={SkipIcon} alt="" />
                             </button>
                         )}
                         <div className={styles['player-settings-wrap']}>
@@ -994,7 +1001,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                                 onClick={() => setIsPlayerSettingsOpen(isOpen => !isOpen)}
                                 aria-label={t('player.settings')}
                                 aria-expanded={isPlayerSettingsOpen}
-                            ><img src={SettingsIcon} /></button>
+                            ><img src={SettingsIcon} alt="" /></button>
                             {isPlayerSettingsOpen && <div className={styles['player-settings-menu']}>
                                 <section>
                                     <span className={styles['settings-label']}>{t('player.quality')}</span>
@@ -1094,6 +1101,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                             </svg>
                         </button>
                         <button
+                            aria-label={t(isMaximized ? 'ux.exitFullscreen' : 'ux.enterFullscreen')}
                             className={styles['action-btn']}
                             onClick={() => {
                                 if (document.fullscreenElement !== null || (document as WebKitFullscreenDocument).webkitFullscreenElement) void exitFullscreenElement();
@@ -1105,6 +1113,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                     </div>
                     <div className={styles.timeline}>
                         <input
+                            aria-label={t('ux.timeline')} aria-valuetext={`${formatTime(currentTime)} / ${formatTime(duration)}`}
                             type="range"
                             min="0"
                             max={Number.isFinite(duration) ? duration : 0}
@@ -1245,7 +1254,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                 {roomId && isRoomPanelOpen && <div id="watch-room-panel" className={styles['room-panel']}><RoomPanel compact /></div>}
                 {roomId && streamError?.includes('Браузер') && <button className={styles['unlock-playback']} onClick={() => { void videoRef.current?.play().then(() => setStreamError(null)).catch(() => {}); }}>Включить видео</button>}
                 {streamError && <div className={styles['stream-error']} role="status">{streamError}</div>}
-                {resumePromptTime !== null && <div className={styles['resume-prompt']} role="dialog" aria-modal="true" aria-label={t('misc.continue')}>
+                {resumePromptTime !== null && <div ref={resumeDialogRef} tabIndex={-1} className={styles['resume-prompt']} role="dialog" aria-modal="true" aria-label={t('misc.continue')}>
                     <div className={styles['resume-prompt-card']}>
                         <h2>{t('misc.continue')}?</h2>
                         <p>{t('dubSelect.watchedUntil')} {formatTime(resumePromptTime)}.</p>
