@@ -1,11 +1,11 @@
 import { releaseMenuAttributes, useReleaseAnime } from '../shared/contexts/releaseActionsContext';
 import { Link } from "react-router-dom";
-import { useState } from 'react';
 import styles from "./AnimeCard.module.css"
 import { type Anime } from "../shared/types/api";
 import { profileListStatus } from "../shared/profileListStatus"
 import starIcon from '../assets/icons/star.svg'
-import RemoteImage from './RemoteImage';
+import RemoteMedia from './RemoteMedia';
+import { getReleaseTitle } from '../shared/releaseTitle';
 import { useSettings } from '../shared/contexts/settingsContext';
 import { useTranslation } from '../shared/useTranslation';
 
@@ -16,21 +16,15 @@ export default function AnimeCard({ anime: originalAnime }: AnimeCardProps) {
   const { settings } = useSettings();
   const { t } = useTranslation();
   const listStatus = profileListStatus[anime.profile_list_status as 0 | 1 | 2 | 3 | 4 | 5];
-  const [loadedImage, setLoadedImage] = useState<string | null>(null);
-  const isImageLoaded = loadedImage === anime.image;
-  const title = settings.appearance.language === 'english' && anime.title_original
-    ? anime.title_original
-    : anime.title_ru;
+  const title = getReleaseTitle(anime, settings.appearance.language);
 
   return (
     <Link {...releaseMenuAttributes(anime)} to={`/anime/${anime.id}`} state={{partialAnime: anime}} key={anime.id} className={styles.card}>
-      <div className={`${styles.poster} ${isImageLoaded ? styles['poster-loaded'] : styles['poster-loading']}`}>
-        <RemoteImage
+      <div className={styles.poster}>
+        <RemoteMedia
           src={anime.image}
           alt={title}
           loading="lazy"
-          onLoad={() => setLoadedImage(anime.image)}
-          onError={() => setLoadedImage(anime.image)}
         />
         {listStatus && <span className={`${styles['list-status']} ${styles[`status-${listStatus.color}`]}`}>{t(listStatus.labelKey)}</span>}
       </div>

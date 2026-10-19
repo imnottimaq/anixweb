@@ -60,8 +60,8 @@ test('theme color calculations produce correct contrast and luminance', () => {
     assert.equal(lightResult.isDark, false);
     assert.equal(lightResult.textColor, '#1d1f24');
 
-    // Accent button text policy: user white policy
-    assert.equal(getAccentTextColor('#ffff00'), '#ffffff');
+    // Accent labels choose a foreground that passes ordinary-text contrast.
+    assert.ok(getContrastRatio('#ffff00', getAccentTextColor('#ffff00')) >= 4.5);
     assert.equal(getAccentTextColor('#101010'), '#ffffff');
 
     // Test contrast ratio calculations
@@ -69,12 +69,12 @@ test('theme color calculations produce correct contrast and luminance', () => {
     const coralContrastWithDark = getContrastRatio('#FF6060', '#121212');
     assert.ok(coralContrastWithDark > 6.0, `Expected dark contrast > 6.0, got ${coralContrastWithDark}`);
     assert.ok(coralContrastWithWhite < 3.2, `Expected white contrast < 3.2, got ${coralContrastWithWhite}`);
-    assert.equal(getAccentTextColor('#FF6060'), '#ffffff'); // Default coral brand with user white text policy
+    assert.ok(getContrastRatio('#FF6060', getAccentTextColor('#FF6060')) >= 4.5);
 
-    // Presets contrast verification under user white text policy
+    // Every preset must support readable action labels.
     for (const preset of ACCENT_COLOR_PRESETS) {
         const actual = getAccentTextColor(preset.color);
-        assert.equal(actual, '#ffffff', `Preset ${preset.label} (${preset.color}) expected white text`);
+        assert.ok(getContrastRatio(preset.color, actual) >= 4.5, `Preset ${preset.label} (${preset.color}) needs contrast >= 4.5`);
     }
 
     // Presets exist

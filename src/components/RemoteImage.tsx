@@ -1,44 +1,51 @@
-import { useState, type ComponentProps } from 'react';
+import { useEffect, useEffectEvent, useRef, useState, type ComponentProps } from 'react';
 import { useSettings } from '../shared/contexts/settingsContext';
 
-type RemoteImageProps = Omit<ComponentProps<'img'>, 'src'> & {
+export type ImageLoadState = 'loading' | 'loaded' | 'error';
+export type RemoteImageProps = Omit<ComponentProps<'img'>, 'src'> & {
     src?: string | null;
+    retryKey?: number;
+    onStateChange?: (state: ImageLoadState) => void;
 };
 
-function normalizeUrl(url: string) {
-    return url.startsWith('//') ? `https:${url}` : url;
-}
-
-function getMirrorUrl(url: string) {
-    return normalizeUrl(url).replace(
-        /^https:\/\/s\.anixmirai\.com\//,
-        'https://mirror-s.anixmirai.com/',
-    );
-}
-
-function getOptimizedUrl(url: string) {
-    return `https://images.weserv.nl/?url=${encodeURIComponent(url)}`;
-}
-
-export default function RemoteImage({ src, onError, ...props }: RemoteImageProps) {
+export default function RemoteImage({ src, retryKey = 0, ...props }: RemoteImageProps) {
     const { settings } = useSettings();
-    const [failedSource, setFailedSource] = useState<string | null>(null);
-    const originalUrl = src ? normalizeUrl(src) : '';
-    const mirrorUrl = originalUrl.includes('s.anixmirai.com/') ? getMirrorUrl(originalUrl) : null;
-    const isUsingMirror = failedSource === originalUrl;
-    const useImageProxy = settings.content.proxyImages;
+    if (!src) return null;
+    const original = src.startsWith('//') ? `https:${src}` : src;
+    const proxy = settings.content.proxyImages;
+    const sources = proxy ? [`https://images.weserv.nl/?url=${encodeURIComponent(original)}`]
+        : [original, ...(/^https:\/\/s\.anixmirai\.com\//.test(original) ? [original.replace('https://s.anixmirai.com/', 'https://mirror-s.anixmirai.com/')] : [])];
+    return <ImageAttempt key={`${original}:${proxy}:${retryKey}`} {...props} sources={sources} />;
+}
 
-    if (!originalUrl) return null;
-
-    return <img
-        {...props}
-        src={isUsingMirror && mirrorUrl ? mirrorUrl : useImageProxy ? getOptimizedUrl(originalUrl) : originalUrl}
+function ImageAttempt({ sources, onStateChange, onLoad, onError, loading, ...props }: Omit<RemoteImageProps, 'src' | 'retryKey'> & { sources: string[] }) {
+    const [index, setIndex] = useState(0);
+    const [state, setState] = useState<ImageLoadState>('loading');
+    const [started, setStarted] = useState(() => loading !== 'lazy' || typeof IntersectionObserver === 'undefined');
+    const ref = useRef<HTMLImageElement>(null);
+    const notify = useEffectEvent((next: ImageLoadState) => onStateChange?.(next));
+    useEffect(() => { notify(state); }, [state]);
+    useEffect(() => {
+        if (started || !ref.current) return;
+        const observer = new IntersectionObserver(entries => {
+            if (entries.some(entry => entry.isIntersecting)) { setStarted(true); observer.disconnect(); }
+        }, { rootMargin: '200px' });
+        observer.observe(ref.current);
+        return () => observer.disconnect();
+    }, [started]);
+    useEffect(() => {
+        if (!started || state !== 'loading') return;
+        const timer = window.setTimeout(() => {
+            if (index + 1 < sources.length) setIndex(index + 1);
+            else setState('error');
+        }, 8000);
+        return () => window.clearTimeout(timer);
+    }, [started, state, index, sources.length]);
+    return <img {...props} ref={ref} key={index} src={sources[index]} loading={loading}
+        onLoad={event => { if (event.currentTarget !== ref.current || state === 'error') return; setState('loaded'); onLoad?.(event); }}
         onError={event => {
-            if (!isUsingMirror && mirrorUrl && !useImageProxy) {
-                setFailedSource(originalUrl);
-                return;
-            }
-            onError?.(event);
-        }}
-    />;
+            if (event.currentTarget !== ref.current || state !== 'loading') return;
+            if (index + 1 < sources.length) setIndex(index + 1);
+            else { setState('error'); onError?.(event); }
+        }} />;
 }

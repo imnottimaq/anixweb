@@ -144,7 +144,7 @@
 }
 
 .moreButton:disabled { cursor: wait; opacity: .65; }
-.error { color: var(--status-dropped); }
+.error { color: var(--error-color); }
 .empty { color: var(--text-secondary); }
 
 @media (max-width: 620px) {

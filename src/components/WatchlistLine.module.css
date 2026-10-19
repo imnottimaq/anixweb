@@ -129,7 +129,7 @@
 .status-plan { color: var(--status-plan); }
 .status-completed { color: var(--status-completed); }
 .status-hold { color: var(--status-hold); }
-.status-dropped { color: var(--status-dropped); }
+.status-dropped { color: var(--error-color); }
 
 @media (max-width: 560px) {
     .watchlist-hint {

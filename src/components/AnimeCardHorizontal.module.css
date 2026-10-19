@@ -142,3 +142,6 @@
 @media (prefers-reduced-motion: reduce) {
   .poster-loading::before { animation: none; }
 }
+
+.status-completed, .status-dropped { color: #121212; }
+[data-theme="light"] .status-plan { color: #121212; }

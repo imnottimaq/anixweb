@@ -47,7 +47,7 @@
     min-width: 0;
     max-width: 100%;
     box-sizing: border-box;
-    border: 1px solid var(--surface-border);
+    border: 1px solid var(--control-border);
     height: 38px;
     padding: 0 12px;
     color: var(--text-color);
@@ -107,7 +107,7 @@
     min-width: 0;
     height: 38px;
     padding: 0 12px;
-    border: 1px solid var(--surface-border);
+    border: 1px solid var(--control-border);
     border-radius: var(--radius-control);
     background: var(--card-bg, var(--background-color));
     color: var(--text-color);

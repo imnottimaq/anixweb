@@ -252,7 +252,7 @@ test.describe('Design Inspection Screenshots', () => {
     await expect(page.getByRole('tab', { name: /Внешний вид|Appearance/i })).toBeVisible();
     await page.screenshot({ path: 'test-results/style-revert-settings-desktop-light.png', animations: 'disabled' });
 
-    // 9. Settings Desktop Dark & rectangular tabs + white accent label check
+    // 9. Settings Desktop Dark & rectangular tabs with readable accent labels
     await switchTheme(page, 'dark');
     await page.goto('/settings');
     await expect(page.getByRole('tab', { name: /Внешний вид|Appearance/i })).toBeVisible();
@@ -260,12 +260,24 @@ test.describe('Design Inspection Screenshots', () => {
     await expect(activeTab).toBeVisible();
     const activeTabStyle = await activeTab.evaluate(el => {
       const cs = window.getComputedStyle(el);
+      const context = document.createElement('canvas').getContext('2d')!;
+      const luminance = (color: string) => {
+        context.clearRect(0, 0, 1, 1);
+        context.fillStyle = color;
+        context.fillRect(0, 0, 1, 1);
+        const channels = [...context.getImageData(0, 0, 1, 1).data].slice(0, 3).map(value => {
+          const normalized = value / 255;
+          return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+        });
+        return .2126 * channels[0] + .7152 * channels[1] + .0722 * channels[2];
+      };
+      const foreground = luminance(cs.color), background = luminance(cs.backgroundColor);
       return {
-        color: cs.color,
+        contrast: (Math.max(foreground, background) + .05) / (Math.min(foreground, background) + .05),
         borderRadius: parseFloat(cs.borderRadius),
       };
     });
-    expect(activeTabStyle.color).toBe('rgb(255, 255, 255)');
+    expect(activeTabStyle.contrast).toBeGreaterThanOrEqual(4.5);
     expect(activeTabStyle.borderRadius).toBeLessThanOrEqual(10);
 
     await page.screenshot({ path: 'test-results/style-revert-settings-desktop-dark.png', animations: 'disabled' });

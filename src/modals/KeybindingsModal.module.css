@@ -5,7 +5,7 @@
 .row > span { min-width: 0; }
 .actions button, .reset { flex-shrink: 0; min-height: 36px; padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-color); background: var(--background-color); font: inherit; cursor: pointer; }
 .binding { min-width: 88px; font-weight: 600; }
-.actions button:hover, .reset:hover, .capturing { border-color: var(--accent-color); color: var(--accent-color); }
+.actions button:hover, .reset:hover, .capturing { border-color: var(--accent-color); color: var(--accent-link-color); }
 .actions button:focus-visible, .reset:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 2px; }
 @media (max-width: 480px) { .toolbar { align-items: flex-start; flex-wrap: wrap; } .row { gap: 12px; }  }
 

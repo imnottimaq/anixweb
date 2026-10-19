@@ -58,7 +58,7 @@
 .toolbarButton:hover,
 .toolbarButtonActive {
     border-color: color-mix(in srgb, var(--accent-color) 62%, var(--border-color));
-    color: var(--accent-color);
+    color: var(--accent-link-color);
     background: transparent;
 }
 
@@ -88,7 +88,7 @@
     width: 100%;
     box-sizing: border-box;
     padding: 9px 10px;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--control-border);
     border-radius: 8px;
     outline: 0;
     resize: vertical;
@@ -342,7 +342,7 @@
 .loadMoreTrigger { height: 1px; }
 .loadingMore { margin: 20px 0 0; color: var(--text-secondary); text-align: center; }
 
-.error { color: var(--status-dropped); }
+.error { color: var(--error-color); }
 
 @media (max-width: 980px) {
     .list { grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -5,7 +5,7 @@
 .menu button:disabled {opacity:.5; cursor:default;}
 .submenu {margin:2px 6px 6px; padding:4px 0; border-block:1px solid var(--border-color);}
 .submenu button {justify-content:flex-start;}
-.submenu button > span {width:14px; flex-shrink:0; color:var(--accent-color);}
+.submenu button > span {width:14px; flex-shrink:0; color: var(--accent-link-color);}
 .note, .error {margin:8px; font-size:13px; line-height:1.4;}
 .note {color:var(--text-secondary);}
 .error {color:var(--status-dropped, #d33);}

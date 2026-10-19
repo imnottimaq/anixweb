@@ -151,7 +151,7 @@
 
 .side-panel button:hover.active {
   background-color: var(--lighter-accent-color);
-}
+ color: var(--accent-hover-foreground); }
 
 .side-panel button:focus-visible {
   outline: var(--focus-ring);
@@ -203,7 +203,7 @@
   margin: 12px 0;
 }
 
-.filter-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; border: 1px dashed color-mix(in srgb, var(--status-dropped) 55%, transparent); border-radius: 12px; color: var(--status-dropped); }
+.filter-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; border: 1px dashed color-mix(in srgb, var(--status-dropped) 55%, transparent); border-radius: 12px; color: var(--error-color); }
 .filter-error button { padding: 8px 12px; border: 0; border-radius: 8px; color: var(--accent-foreground); background: var(--accent-color); cursor: pointer; font: inherit; font-weight: 700; }
 .filter-error button:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 2px; }
 .filter-empty { color: var(--text-secondary); }
@@ -211,7 +211,7 @@
 .configure-button:hover {
   background: var(--lighter-accent-color);
   transform: translateY(-1px);
-}
+ color: var(--accent-hover-foreground); }
 
 .configure-button:focus-visible {
   outline: 2px solid var(--accent-color);

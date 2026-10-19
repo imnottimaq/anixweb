@@ -15,9 +15,9 @@
 .card { min-width: 0; padding: 24px; border: 1px solid var(--border-color); border-radius: 16px; background: var(--card-bg); }
 .card h2 { margin: 0 0 10px; font-size: 21px; line-height: 1.25; }
 .card > p { margin: 0 0 16px; }
-.step { display: inline-flex; padding: 5px 9px; margin-bottom: 14px; border-radius: 6px; color: var(--accent-color); background: color-mix(in srgb, var(--accent-color) 10%, transparent); font-size: 12px; font-weight: 700; }
+.step { display: inline-flex; padding: 5px 9px; margin-bottom: 14px; border-radius: 6px; color: var(--accent-link-color); background: color-mix(in srgb, var(--accent-color) 10%, transparent); font-size: 12px; font-weight: 700; }
 .field { display: flex; flex-direction: column; gap: 8px; margin: 18px 0 12px; font-size: 14px; font-weight: 600; }
-.field input, .field select { width: 100%; height: 44px; min-width: 0; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 9px; color: var(--text-color); background: var(--background-color); font: inherit; font-weight: 400; }
+.field input, .field select { width: 100%; height: 44px; min-width: 0; padding: 10px 12px; border: 1px solid var(--control-border); border-radius: 9px; color: var(--text-color); background: var(--background-color); font: inherit; font-weight: 400; }
 .fieldHint { margin: 8px 0 20px !important; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
 .card button, .primaryLink { min-height: 40px; padding: 10px 14px; border: 1px solid transparent; border-radius: 9px; background: var(--accent-color); color: var(--accent-text-color); font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; }
 .primaryLink { display: inline-flex; align-items: center; justify-content: center; gap: 12px; white-space: nowrap; }
@@ -104,13 +104,13 @@
 .card .reactionBtn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
 .chatSection { margin-top: 12px; display: flex; flex-direction: column; min-width: 0; }
 .panelFooter { display: flex; justify-content: flex-end; border-top: 1px solid var(--border-color); margin-top: 18px; padding-top: 14px; }
-.card .leaveButton { min-height: 36px; padding: 7px 12px; color: var(--status-dropped); background: transparent; border-color: color-mix(in srgb, var(--status-dropped) 30%, transparent); font-size: 13px; }
+.card .leaveButton { min-height: 36px; padding: 7px 12px; color: var(--error-color); background: transparent; border-color: color-mix(in srgb, var(--status-dropped) 30%, transparent); font-size: 13px; }
 .waiting { padding: 14px; margin: 0 0 18px; border: 1px solid color-mix(in srgb, var(--status-hold) 35%, transparent); border-radius: 10px; background: color-mix(in srgb, var(--status-hold) 8%, transparent); }
 .waiting strong { font-size: 14px; }
 .waiting p, .waiting small { display: block; margin: 7px 0 0; font-size: 12px; line-height: 1.5; color: var(--text-secondary); overflow-wrap: anywhere; }
 .waitProgress { height: 3px; overflow: hidden; margin-top: 12px; background: var(--border-color); border-radius: 4px; }
 .waitProgress span { display: block; height: 100%; background: var(--status-hold); transition: width .25s linear; }
-.inlineError { color: var(--status-dropped); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.inlineError { color: var(--error-color); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
 .success { color: var(--status-watching); font-size: 13px; line-height: 1.5; }
 .notice { margin-bottom: 18px; font-size: 13px; }
 .confirmDialog { width: min(440px, calc(100vw - 32px)); padding: 26px; border: 1px solid var(--border-color); border-radius: 16px; background: var(--card-bg); color: var(--text-color); box-shadow: 0 20px 80px #0005; }

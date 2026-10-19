@@ -47,7 +47,7 @@
 .activeTab:hover {
     background: var(--lighter-accent-color);
     border-color: var(--lighter-accent-color);
-}
+ color: var(--accent-hover-foreground); }
 
 .tabPanel {
     min-width: 0;

@@ -55,7 +55,7 @@ function FeedImage({ src, images = [src] }: { src: string; images?: string[] }) 
     const [open, setOpen] = useState(false);
     const { t } = useTranslation();
     if (failed) return <div className={styles.mediaError} role="status"><p>{t('feed.mediaError')}</p><button type="button" onClick={() => { setFailed(false); setAttempt(value => value + 1); }}>{t('feed.retryImage')}</button></div>;
-    return <><button type="button" className={styles.mediaTrigger} aria-label={t('imageViewer.open')} onClick={() => setOpen(true)}><RemoteImage key={attempt} src={src} alt={t('feed.image')} loading="lazy" className={styles.image} onError={() => setFailed(true)} /></button>
+    return <><button type="button" className={styles.mediaTrigger} aria-label={t('imageViewer.open')} onClick={() => setOpen(true)}><RemoteImage key={attempt} src={src} alt={t('feed.image')} loading="lazy" className={styles.image} onStateChange={state => { if (state === 'error') setFailed(true); }} onError={() => setFailed(true)} /></button>
         {open && <ImageLightbox images={images.map(url => ({ src: url, alt: t('feed.image') }))} initialIndex={Math.max(0, images.indexOf(src))} onClose={() => setOpen(false)} />}</>;
 }
 

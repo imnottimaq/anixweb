@@ -65,12 +65,26 @@ export function getAutoTextColor(bgHex: string): { textColor: string; secondaryT
     };
 }
 
-export function getAccentTextColor(
-    _accentHex?: string,
-    _darkCandidate?: string,
-    whiteCandidate = '#ffffff'
-): string {
-    return whiteCandidate;
+export function getAccentTextColor(accentHex = '#FF6060', darkCandidate = '#1d1f24', whiteCandidate = '#ffffff'): string {
+    const candidates = [darkCandidate, whiteCandidate, '#000000'];
+    return candidates.find(color => getContrastRatio(accentHex, color) >= 4.5)
+        ?? candidates.reduce((best, color) => getContrastRatio(accentHex, color) > getContrastRatio(accentHex, best) ? color : best);
+}
+
+export function mixHex(first: string, second: string, amount: number): string {
+    const expand = (value: string) => value.length === 4 ? '#' + [...value.slice(1)].map(c => c + c).join('') : value;
+    const a = expand(first), b = expand(second);
+    return '#' + [1, 3, 5].map(offset => Math.round(parseInt(a.slice(offset, offset + 2), 16) * (1 - amount) + parseInt(b.slice(offset, offset + 2), 16) * amount).toString(16).padStart(2, '0')).join('');
+}
+
+export function getAccessibleAccent(accent: string, background: string, minimum = 4.5): string {
+    if (getContrastRatio(accent, background) >= minimum) return accent;
+    const target = getContrastRatio('#000000', background) > getContrastRatio('#ffffff', background) ? '#000000' : '#ffffff';
+    for (let step = 1; step <= 100; step++) {
+        const mixed = mixHex(accent, target, step / 100);
+        if (getContrastRatio(mixed, background) >= minimum) return mixed;
+    }
+    return target;
 }
 
 const CUSTOM_STYLE_PROPERTIES = [
@@ -86,6 +100,11 @@ const CUSTOM_STYLE_PROPERTIES = [
     '--accent-text-color',
     '--accent-foreground',
     '--focus-ring-color',
+    '--accent-link-color',
+    '--accent-hover-foreground',
+    '--feed-accent-foreground',
+    '--control-border',
+    '--error-color',
 ];
 
 export function applyTheme(appearance: AppSettings['appearance']): () => void {
@@ -114,7 +133,7 @@ export function applyTheme(appearance: AppSettings['appearance']): () => void {
         // 2. Resolve effective theme and apply color properties
         let effectiveTheme: 'light' | 'dark';
 
-        if (customColors?.enabled) {
+        if (customColors?.enabled && !highContrast) {
             root.dataset.customColors = 'true';
 
             const bgLuminance = getLuminance(customColors.backgroundColor);
@@ -142,10 +161,16 @@ export function applyTheme(appearance: AppSettings['appearance']): () => void {
             root.style.setProperty('--text-color', finalTextColor);
             root.style.setProperty('--text-secondary', finalSecondaryTextColor);
             root.style.setProperty('--accent-color', customColors.accentColor);
-            root.style.setProperty('--lighter-accent-color', `color-mix(in srgb, ${customColors.accentColor} 85%, white 15%)`);
+            const hoverAccent = mixHex(customColors.accentColor, '#ffffff', .15);
+            root.style.setProperty('--lighter-accent-color', hoverAccent);
+            root.style.setProperty('--accent-hover-foreground', getAccentTextColor(hoverAccent));
+            root.style.setProperty('--accent-link-color', getAccessibleAccent(customColors.accentColor, customColors.backgroundColor));
+            root.style.setProperty('--feed-accent-foreground', accentText);
+            root.style.setProperty('--control-border', getAccessibleAccent('#777777', customColors.backgroundColor, 3));
+            root.style.setProperty('--error-color', getAccessibleAccent('#eb5757', customColors.backgroundColor));
             root.style.setProperty('--accent-text-color', accentText);
             root.style.setProperty('--accent-foreground', accentText);
-            root.style.setProperty('--focus-ring-color', `color-mix(in srgb, ${customColors.accentColor} 72%, transparent)`);
+            root.style.setProperty('--focus-ring-color', getAccessibleAccent(customColors.accentColor, customColors.backgroundColor, 3));
 
             if (isBgDark) {
                 root.style.setProperty('--card-bg', `color-mix(in srgb, ${customColors.backgroundColor} 92%, white 8%)`);
@@ -176,7 +201,7 @@ export function applyTheme(appearance: AppSettings['appearance']): () => void {
 
     update();
 
-    if (appearance.theme === 'system' && !appearance.customColors?.enabled) {
+    if (appearance.theme === 'system' && (!appearance.customColors?.enabled || appearance.highContrast)) {
         mediaQuery.addEventListener('change', update);
         return () => mediaQuery.removeEventListener('change', update);
     }

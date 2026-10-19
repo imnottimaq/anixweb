@@ -44,7 +44,7 @@
 
 .uploadLabel svg {
     flex: 0 0 auto;
-    color: var(--accent-color);
+    color: var(--accent-link-color);
 }
 
 .composeForm.composeForm .uploadLabel input[type="file"] {
@@ -167,7 +167,7 @@
 }
 
 .blockToolbar svg {
-    color: var(--accent-color);
+    color: var(--accent-link-color);
 }
 
 .publishBar {

@@ -1,4 +1,5 @@
-import { Link, Navigate, useNavigate, useParams } from "react-router-dom"
+import RemoteMedia from '../components/RemoteMedia';
+import { Link, Navigate, useNavigate, useParams, useLocation } from "react-router-dom"
 import styles from './AccountScreen.module.css'
 import { useUser } from "../shared/contexts/userContext"
 import { useEffect, useState } from "react"
@@ -15,7 +16,6 @@ import DiscordIcon from '../assets/icons/discord.svg'
 import InstIcon from '../assets/icons/instagram.svg'
 import TtIcon from '../assets/icons/tiktok.svg'
 import ReleaseCard from "../components/ReleaseCard"
-import RemoteImage from '../components/RemoteImage'
 import { PageLayout } from '../components/PageLayout';
 import PageState from '../components/PageState';
 import { ApiError, useApi } from '../shared/apiClient';
@@ -49,6 +49,7 @@ export default function AccountScreen(){
     const [commentsPage, setCommentsPage] = useState(0);
 
     const navigate = useNavigate();
+    const location = useLocation();
     const profileId = id ? Number(id) : userId;
     const isValidProfileId = Number.isInteger(profileId) && profileId > 0;
     const commentsPath = commentsTab === 'release'
@@ -166,13 +167,14 @@ export default function AccountScreen(){
 
     return (
         <PageLayout size="wide">
+            {location.state?.authStatus && <p role="status">{String(location.state.authStatus)}</p>}
             <div className={styles['body']} key={userObject.id}>
             <div className={styles['profile-grid']}>
                 <div className={styles['profile-card']}>
                     <div className="flex-row">
                         <div className="flex-column">
                             <div className={styles['user-short']}>
-                                <RemoteImage src={userObject?.avatar} />
+                                <RemoteMedia src={userObject?.avatar} variant="avatar" className={styles.profileAvatar} alt={userObject.login} />
                                 <div className={styles['user-info']}>
                                     <div className={styles['user-name-row']}>
                                         <p>{userObject?.login}</p>

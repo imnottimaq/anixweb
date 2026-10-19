@@ -70,7 +70,7 @@
   padding: 6px 8px;
   box-sizing: border-box;
   color: #fff;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1;
   text-align: center;
@@ -100,7 +100,7 @@
   gap: 4px;
   margin: 0;
   color: color-mix(in srgb, var(--text-color) 65%, transparent);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.2;
 }
 
@@ -109,7 +109,7 @@
   align-items: center;
   gap: 3px;
   margin-left: 3px;
-  color: var(--accent-color);
+  color: var(--accent-link-color);
   font-weight: 700;
 }
 
@@ -123,7 +123,7 @@
   margin: 0;
   overflow: hidden;
   color: color-mix(in srgb, var(--text-color) 68%, transparent);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.35;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
@@ -143,3 +143,6 @@
 @media (prefers-reduced-motion: reduce) {
   .poster-loading::before { animation: none; }
 }
+
+.status-completed, .status-dropped { color: #121212; }
+[data-theme="light"] .status-plan { color: #121212; }

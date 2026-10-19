@@ -190,7 +190,7 @@
     min-width: 165px;
     min-height: 40px;
     padding: 0 10px;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--control-border);
     border-radius: 9px;
     color: var(--text-color);
     background: var(--background-color);
@@ -217,7 +217,7 @@
     width: 70px;
     min-height: 38px;
     padding: 0 8px;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--control-border);
     border-radius: 8px;
     box-sizing: border-box;
     color: var(--text-color);
@@ -325,7 +325,7 @@
 }
 
 .card-type-select button.active {
-    color: var(--accent-color);
+    color: var(--accent-link-color);
 }
 
 .card-type-select button.active .list-preview,
@@ -368,7 +368,7 @@
 
 .select button{
     appearance: none;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--control-border);
     min-height: 40px;
     padding: 8px 12px;
     color: var(--text-color);
@@ -383,7 +383,7 @@
     border-color: var(--lighter-accent-color);
     background-color: var(--lighter-accent-color);
     color: var(--accent-foreground);
-}
+ color: var(--accent-hover-foreground); }
 
 .action-setting {
     display: flex;
@@ -530,7 +530,7 @@
     align-items: center;
     gap: 8px;
     padding: 4px 8px;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--control-border);
     border-radius: 8px;
     background: var(--background-color);
 }
@@ -553,7 +553,7 @@
 }
 
 .color-input::-webkit-color-swatch {
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--control-border);
     border-radius: 6px;
 }
 

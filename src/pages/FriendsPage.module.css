@@ -163,7 +163,7 @@
     align-items: center;
     gap: 8px;
     margin: 0 0 14px;
-    color: var(--status-dropped);
+    color: var(--error-color);
     font-size: 14px;
 }
 

@@ -267,11 +267,12 @@ describe('RemoteImage Component (src/components/RemoteImage.tsx)', () => {
         fireEvent.error(image);
 
         // Should switch to mirror without calling external onError
-        expect(image).toHaveAttribute('src', 'https://mirror-s.anixmirai.com/posters/999.jpg');
+        const mirrorImage = screen.getByRole('img', { name: 'Mirror test image' });
+        expect(mirrorImage).toHaveAttribute('src', 'https://mirror-s.anixmirai.com/posters/999.jpg');
         expect(onError).not.toHaveBeenCalled();
 
         // Trigger second error on mirror
-        fireEvent.error(image);
+        fireEvent.error(mirrorImage);
 
         // Now external onError should be called
         expect(onError).toHaveBeenCalledTimes(1);

@@ -401,8 +401,20 @@ test('compiled production Vite bundle preserves production worker URLs in browse
             const chunkUrl = `${pathToFileURL(resolve(join(assetsDir, apiClientFile))).href}?t=${Date.now()}`;
             const apiClientMod = await import(chunkUrl);
 
-            // apiClient exports: mod.i = getProxyServerUrl, mod.n = getAgentProxyUrl, mod.r = getCorsProxyUrl
-            const proxyBase = apiClientMod.i();
+            // Vite assigns export aliases across the whole module graph, so unrelated
+            // UI imports can change them. Identify the exported production helpers by
+            // their distinctive environment property or route, never by alias order.
+            const exportedHelper = (marker, name) => {
+                const matches = Object.values(apiClientMod).filter(value => typeof value === 'function'
+                    && Function.prototype.toString.call(value).includes(marker));
+                assert.equal(matches.length, 1, `Expected one exported ${name} helper containing ${marker}`);
+                return matches[0];
+            };
+            const compiledGetProxyServerUrl = exportedHelper('VITE_PROXY_SERVER_URL', 'getProxyServerUrl');
+            const compiledGetAgentProxyUrl = exportedHelper('/agentproxy?url=', 'getAgentProxyUrl');
+            const compiledGetCorsProxyUrl = exportedHelper('/corsproxy?url=', 'getCorsProxyUrl');
+            assert.equal(compiledGetProxyServerUrl.length, 0, 'Proxy base getter takes no target URL');
+            const proxyBase = compiledGetProxyServerUrl();
             assert.equal(
                 proxyBase,
                 'https://anixweb-server.imnottimaq.workers.dev',
@@ -410,14 +422,14 @@ test('compiled production Vite bundle preserves production worker URLs in browse
             );
             assert.notEqual(proxyBase, 'http://localhost:8787', 'getProxyServerUrl must not fallback to localhost');
 
-            const agentUrl = apiClientMod.n('https://api-s.anixsekai.com/profile/1');
+            const agentUrl = compiledGetAgentProxyUrl('https://api-s.anixsekai.com/profile/1');
             assert.ok(
                 agentUrl.startsWith('https://anixweb-server.imnottimaq.workers.dev/agentproxy?url='),
                 `Agent proxy URL must use production worker: ${agentUrl}`
             );
             assert.ok(!agentUrl.includes('localhost'), 'Agent proxy URL must not contain localhost');
 
-            const corsUrl = apiClientMod.r('https://kodikplayer.com/ftor');
+            const corsUrl = compiledGetCorsProxyUrl('https://kodikplayer.com/ftor');
             assert.ok(
                 corsUrl.startsWith('https://anixweb-server.imnottimaq.workers.dev/corsproxy?url='),
                 `CORS proxy / media helper URL must use production worker: ${corsUrl}`

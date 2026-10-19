@@ -56,7 +56,7 @@
     text-align: center;
 }
 .state p { margin: 0; }
-.stateError { color: var(--status-dropped); }
+.stateError { color: var(--error-color); }
 .state button {
     min-height: var(--control-height);
     padding: 0 14px;

@@ -99,7 +99,7 @@
 .field textarea,
 .selectField select {
     box-sizing: border-box;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--control-border);
     border-radius: 9px;
     color: var(--text-color);
     background: var(--background-color);
@@ -200,7 +200,7 @@
     font-size: 14px;
 }
 
-.footer .error { color: var(--status-dropped); }
+.footer .error { color: var(--error-color); }
 
 .modalForm {
     display: flex;
@@ -233,7 +233,7 @@
     width: 100%;
     min-height: 42px;
     padding: 0 11px;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--control-border);
     border-radius: 9px;
     color: var(--text-color);
     background: var(--background-color);
@@ -279,7 +279,7 @@
 
 .modalError {
     margin: 0;
-    color: var(--status-dropped) !important;
+    color: var(--error-color) !important;
 }
 
 .modalActions {

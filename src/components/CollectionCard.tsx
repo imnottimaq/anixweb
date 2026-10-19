@@ -1,3 +1,4 @@
+import RemoteMedia from './RemoteMedia';
 import { Link } from 'react-router-dom';
 import type { Collection } from '../shared/types/api';
 import RemoteImage from './RemoteImage';
@@ -12,7 +13,7 @@ export default function CollectionCard({ collection }: CollectionCardProps) {
     const { t, selectPlural } = useTranslation();
     return <article className={styles.card}>
         <Link className={styles.mainLink} to={`/collection/${collection.id}`} aria-label={t('collection.open', { title: collection.title })}>
-            <RemoteImage src={collection.image} className={styles.poster} alt={collection.title} />
+            <RemoteMedia src={collection.image} className={styles.poster} alt={collection.title} />
             <div className={styles.content}>
                 <h2>{collection.title}</h2>
                 <p>{collection.description?.trim() || t('release.noDescription')}</p>

@@ -5,9 +5,14 @@
   --text-color: #f4f5f7;
   --text-secondary: #aeb3bd;
   --border-color: #383b44;
+  --control-border: #737985;
+  --error-color: #ff9a9a;
   --accent-color: #FF6060;
   --lighter-accent-color: #ff8585;
-  --accent-text-color: #ffffff;
+  --accent-text-color: #1d1f24;
+  --accent-hover-foreground: #1d1f24;
+  --accent-link-color: #ff8585;
+  --feed-accent-foreground: var(--accent-text-color);
 
   /* Shared layout and component tokens. Existing variables above remain aliases' sources. */
   --page-gutter: clamp(14px, 3vw, 28px);
@@ -33,7 +38,7 @@
   --popup-background: var(--card-bg);
   --popup-shadow: var(--elevation-high);
 
-  --focus-ring-color: color-mix(in srgb, var(--accent-color) 75%, transparent);
+  --focus-ring-color: var(--accent-link-color);
   --focus-ring: 2px solid var(--focus-ring-color);
   --focus-ring-offset: 2px;
   --accent-foreground: var(--accent-text-color);
@@ -59,8 +64,12 @@
   --text-secondary: #686e7b;
   --card-bg: #f7f8fa;
   --border-color: #d5d8df;
+  --control-border: #858a94;
+  --error-color: #b42334;
   --accent-color: #FF6060;
-  --accent-text-color: #ffffff;
+  --accent-text-color: #1d1f24;
+  --accent-link-color: #b82436;
+  --accent-hover-foreground: #1d1f24;
   --accent-foreground: var(--accent-text-color);
   --lighter-accent-color: #ff8a8a;
 
@@ -85,6 +94,8 @@
 
 [data-high-contrast="true"] {
   --border-color: currentColor;
+  --control-border: currentColor;
+  --error-color: currentColor;
   --surface-border: currentColor;
   --surface-border-subtle: currentColor;
   --focus-ring-offset: 3px;
@@ -281,6 +292,8 @@ button, input, select, textarea {
 @media (forced-colors: active) {
   :root {
     --border-color: ButtonBorder;
+    --control-border: ButtonBorder;
+    --error-color: CanvasText;
     --surface-border: ButtonBorder;
     --surface-border-subtle: ButtonBorder;
     --accent-color: Highlight;
@@ -293,3 +306,6 @@ button, input, select, textarea {
 @media (max-width: 540px) {
   :root { --dialog-padding: 16px; }
 }
+
+[data-high-contrast="true"][data-theme="light"] { --accent-link-color: #c90000; --accent-hover-foreground: #fff; }
+[data-high-contrast="true"][data-theme="dark"] { --accent-link-color: #ff8f8f; --accent-hover-foreground: #000; }

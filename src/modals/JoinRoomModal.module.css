@@ -28,7 +28,7 @@
 }
 
 .signInLink {
-    color: var(--accent-color);
+    color: var(--accent-link-color);
     font-weight: 600;
     text-decoration: none;
     white-space: nowrap;
@@ -78,7 +78,7 @@
 
 .error {
     margin: 0;
-    color: var(--status-dropped);
+    color: var(--error-color);
     font-size: 13px;
     line-height: 1.5;
 }

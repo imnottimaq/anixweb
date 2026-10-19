@@ -36,7 +36,7 @@ export default function ImageLightbox({ images, initialIndex = 0, onClose }: {
             </button>
         </header>
         {failedSource === image.src ? <div className={styles.error} role="alert"><p>{t('feed.mediaError')}</p><button className={styles.retry} type="button" onClick={() => { setFailedSource(null); setAttempt(value => value + 1); }}>{t('page.retry')}</button></div>
-            : <RemoteImage key={`${image.src}:${attempt}`} src={image.src} alt={image.alt} className={styles.image} onError={() => setFailedSource(image.src)} onClick={event => {
+            : <RemoteImage key={`${image.src}:${attempt}`} src={image.src} alt={image.alt} className={styles.image} onStateChange={state => { if (state === 'error') setFailedSource(image.src); }} onError={() => setFailedSource(image.src)} onClick={event => {
                 // object-fit leaves dark space inside the img box; treat it as backdrop.
                 const element = event.currentTarget;
                 if (!element.naturalWidth || !element.naturalHeight) return;

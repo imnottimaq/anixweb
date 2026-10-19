@@ -112,7 +112,7 @@
 }
 
 .comment-menu-options .delete-comment-option {
-    color: var(--status-dropped);
+    color: var(--error-color);
 }
 
 .verified-badge {
@@ -299,7 +299,7 @@
 
 .vote .vote-neutral { color: var(--text-color); }
 .vote .vote-positive { color: var(--status-watching); }
-.vote .vote-negative { color: var(--status-dropped); }
+.vote .vote-negative { color: var(--error-color); }
 
 .vote button {
     display: grid;

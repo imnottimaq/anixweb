@@ -4,6 +4,7 @@ import { roadmapPlayerRu, roadmapPlayerEn } from './translations/roadmapPlayer';
 import { roadmapDiscoverRu, roadmapDiscoverEn } from './translations/roadmapDiscover';
 import { roomUXRussian, roomUXEnglish } from './roomUX';
 import { feedRu, feedEn } from './translations/feed';
+import { uxRu, uxEn } from './translations/ux';
 
 export const russian = {
     'home.donghua': 'Дунхуа',
@@ -13,6 +14,7 @@ export const russian = {
     'imageViewer.previous': 'Предыдущее изображение',
     'imageViewer.next': 'Следующее изображение',
     ...feedRu,
+    ...uxRu,
     ...roadmapSettingsRu,
     ...roadmapImportsRu, ...roadmapPlayerRu, ...roadmapDiscoverRu,
     ...roomUXRussian,
@@ -611,6 +613,7 @@ export const english: Translation = {
     'imageViewer.previous': 'Previous image',
     'imageViewer.next': 'Next image',
     ...feedEn,
+    ...uxEn,
     ...roadmapSettingsEn,
     ...roadmapImportsEn, ...roadmapPlayerEn, ...roadmapDiscoverEn,
     ...roomUXEnglish,
@@ -670,7 +673,7 @@ export const english: Translation = {
     'date.invalid': 'Invalid date',
     'dubSelect.optionMeta': '{episodes} eps. | {views} views',
     'search.collectionStats': '{comments} comments · {favorites} saves',
-    'nav.home': 'Home', 'nav.overview': 'Overview', 'nav.favorites': 'Favorites', 'nav.account': 'Account', 'nav.random': 'Random anime', 'nav.settings': 'Settings',
+    'nav.home': 'Home', 'nav.overview': 'Discover', 'nav.favorites': 'Favorites', 'nav.account': 'Account', 'nav.random': 'Random anime', 'nav.settings': 'Settings',
     'home.my': 'My tab', 'home.myTabHint': 'Right-click to configure filters', 'home.latest': 'Latest', 'home.ongoing': 'Ongoing', 'home.announced': 'Announcements', 'home.completed': 'Completed', 'home.films': 'Movies', 'home.history': 'History',
     'status.watching': 'Watching', 'status.planned': 'Plan to watch', 'status.watched': 'Completed', 'status.hold_on': 'On hold', 'status.dropped': 'Dropped',
     'search.error': 'Search failed. Try again.',

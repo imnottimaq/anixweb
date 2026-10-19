@@ -6,7 +6,7 @@
 }
 
 .message { margin: 20px 0; color: var(--text-secondary); text-align: center; }
-.error { margin: 0; color: var(--status-dropped); font-size: 13px; }
+.error { margin: 0; color: var(--error-color); font-size: 13px; }
 
 .composer {
     position: sticky;
@@ -29,7 +29,7 @@
     width: 100%;
     min-height: 104px;
     padding: 10px 11px;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--control-border);
     border-radius: 9px;
     outline: none;
     resize: none;
@@ -41,7 +41,7 @@
 
 .composer textarea:focus { border-color: var(--accent-color); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 24%, transparent); }
 .context { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 9px; border-radius: 8px; color: var(--text-color); background: color-mix(in srgb, var(--accent-color) 14%, var(--background-color)); font-size: 13px; }
-.context strong { color: var(--accent-color); }
+.context strong { color: var(--accent-link-color); }
 .context button { display: grid; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; place-items: center; cursor: pointer; color: var(--text-color); background: transparent; font-size: 19px; line-height: 1; }
 .context button:hover { background: color-mix(in srgb, var(--text-color) 10%, transparent); }
 .controls { display: flex; align-items: center; gap: 10px; }
