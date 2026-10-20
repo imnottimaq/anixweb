@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import styles from './DubSelectModal.module.css';
 import { extractVideoLinks } from '../utils/LinkParser';
 import type { VideoSources } from '../shared/types/video';
@@ -69,7 +69,6 @@ export default function DubSelectModal({
     const [isSourcesLoading, setIsSourcesLoading] = useState(false);
     const [isEpisodesLoading, setIsEpisodesLoading] = useState(false);
     const [loadError, setLoadError] = useState<string | null>(null);
-    const [filterQuery, setFilterQuery] = useState('');
     const [focusedEpisodeIndex, setFocusedEpisodeIndex] = useState(-1);
     const [isSelecting, setIsSelecting] = useState(false);
     const selectionRef = useRef<{ id: number; controller: AbortController } | null>(null);
@@ -205,7 +204,6 @@ export default function DubSelectModal({
             sourcesRequestRef.current += 1;
             episodesRequestRef.current += 1;
             autoSelectedRef.current = null;
-            setFilterQuery('');
             setFocusedEpisodeIndex(-1);
             return;
         }
@@ -256,13 +254,6 @@ export default function DubSelectModal({
         void selectEpisode(episode, false).catch(error => console.error('Не удалось открыть серию комнаты:', error));
     }, [autoDubId, autoEpNumber, autoSrcId, episodesData, isDubsLoading, isEpisodesLoading, isOpen, isSourcesLoading, loadError, releaseId, selectEpisode, selectedDub, selectedSource]);
 
-    const filteredEpisodes = useMemo(() => {
-        if (!filterQuery.trim()) return episodesData;
-        const query = filterQuery.trim().toLowerCase();
-        return episodesData.filter(episode =>
-            episode.name.toLowerCase().includes(query) || String(episode.position).includes(query)
-        );
-    }, [episodesData, filterQuery]);
 
     useEffect(() => {
         if (activeEpisodeRef.current && typeof activeEpisodeRef.current.scrollIntoView === 'function') {
@@ -279,17 +270,17 @@ export default function DubSelectModal({
     }, [focusedEpisodeIndex]);
 
     const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-        if (event.target !== event.currentTarget || event.defaultPrevented || event.nativeEvent.isComposing || isSelecting || isDubsLoading || isSourcesLoading || isEpisodesLoading || loadError || filteredEpisodes.length === 0) return;
+        if (event.target !== event.currentTarget || event.defaultPrevented || event.nativeEvent.isComposing || isSelecting || isDubsLoading || isSourcesLoading || isEpisodesLoading || loadError || episodesData.length === 0) return;
 
         if (event.key === 'ArrowDown') {
             event.preventDefault();
-            setFocusedEpisodeIndex(prev => (prev < filteredEpisodes.length - 1 ? prev + 1 : 0));
+            setFocusedEpisodeIndex(prev => (prev < episodesData.length - 1 ? prev + 1 : 0));
         } else if (event.key === 'ArrowUp') {
             event.preventDefault();
-            setFocusedEpisodeIndex(prev => (prev > 0 ? prev - 1 : filteredEpisodes.length - 1));
-        } else if (event.key === 'Enter' && focusedEpisodeIndex >= 0 && focusedEpisodeIndex < filteredEpisodes.length) {
+            setFocusedEpisodeIndex(prev => (prev > 0 ? prev - 1 : episodesData.length - 1));
+        } else if (event.key === 'Enter' && focusedEpisodeIndex >= 0 && focusedEpisodeIndex < episodesData.length) {
             event.preventDefault();
-            const target = filteredEpisodes[focusedEpisodeIndex];
+            const target = episodesData[focusedEpisodeIndex];
             if (target) void selectEpisode(target, true).catch(err => console.error(err));
         }
     };
@@ -306,10 +297,7 @@ export default function DubSelectModal({
                 isOpen={isOpen}
                 title={t('dubSelect.title')}
                 stickyHeader
-                contentStyle={{
-                    '--modal-width': 'min(640px, 92vw)',
-                    '--modal-max-height': 'min(580px, calc(100dvh - 24px))',
-                } as React.CSSProperties}
+                contentClassName={styles.modal}
             >
                     <>
                         <div className={styles['picker-controls']}>
@@ -366,30 +354,12 @@ export default function DubSelectModal({
                                 )}
                         </div>
 
-                        {episodesData.length > 6 && (
-                            <div className={styles['filter-bar']}>
-                                <input
-                                    type="search"
-                                    className={styles['filter-input']}
-                                    placeholder={t('roadmap.player.pickerFilterPlaceholder') || 'Поиск серии…'}
-                                    value={filterQuery}
-                                    onChange={e => {
-                                        setFilterQuery(e.target.value);
-                                        setFocusedEpisodeIndex(-1);
-                                    }}
-                                />
-                                <span className={styles['keyboard-hint']}>
-                                    {t('roadmap.player.pickerKeyboardHint') || '↑↓ Enter'}
-                                </span>
-                            </div>
-                        )}
-
                         <div
                             ref={episodeListRef}
                             className={styles.episodes}
                             tabIndex={0}
                             role="listbox"
-                            aria-activedescendant={filteredEpisodes[focusedEpisodeIndex] ? `episode-option-${releaseId}-${selectedDub}-${selectedSource}-${filteredEpisodes[focusedEpisodeIndex].position}` : undefined}
+                            aria-activedescendant={episodesData[focusedEpisodeIndex] ? `episode-option-${releaseId}-${selectedDub}-${selectedSource}-${episodesData[focusedEpisodeIndex].position}` : undefined}
                             aria-label={t('dubSelect.title')}
                             onKeyDown={handleKeyDown}
                         >
@@ -415,13 +385,13 @@ export default function DubSelectModal({
                                 </div>
                             )}
 
-                            {!isLoading && !loadError && filteredEpisodes.length === 0 && (
+                            {!isLoading && !loadError && episodesData.length === 0 && (
                                 <div className={styles['state-container']}>
-                                    <p>{filterQuery ? (t('roadmap.player.pickerEmptyEpisodes') || 'Серии не найдены') : (t('page.empty') || 'Здесь пока ничего нет.')}</p>
+                                    <p>{t('page.empty')}</p>
                                 </div>
                             )}
 
-                            {!isLoading && !loadError && filteredEpisodes.map((episode, index) => {
+                            {!isLoading && !loadError && episodesData.map((episode, index) => {
                                 const savedTime = episodeProgress[String(episode.position)];
                                 const hasProgress = typeof savedTime === 'number' && savedTime > 0;
                                 const isFullWatched = savedTime === -1 || episode.is_watched;

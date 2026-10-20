@@ -1,3 +1,8 @@
+.modal {
+    --modal-width: min(640px, 92vw);
+    --modal-max-height: min(580px, calc(100dvh - 24px));
+}
+
 .picker-root {
     display: contents;
 }
@@ -92,39 +97,6 @@
     height: 22px;
     cursor: pointer;
     display: block;
-}
-
-.filter-bar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 10px;
-    flex: 0 0 auto;
-}
-
-.filter-input {
-    flex: 1;
-    min-width: 0;
-    height: 38px;
-    padding: 0 12px;
-    border: 1px solid var(--control-border);
-    border-radius: var(--radius-control);
-    background: var(--card-bg, var(--background-color));
-    color: var(--text-color);
-    font-size: 0.88rem;
-    transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
-}
-
-.filter-input:focus-visible {
-    outline: var(--focus-ring);
-    outline-offset: var(--focus-ring-offset);
-    border-color: var(--accent-color);
-}
-
-.keyboard-hint {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    white-space: nowrap;
 }
 
 .episodes {
@@ -280,9 +252,6 @@ button.seen img {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .filter-bar {
-        flex-wrap: wrap;
-    }
 }
 
 @media (max-width: 540px) {
@@ -291,4 +260,43 @@ button.seen img {
     .episode-meta { margin-left: 0; padding-left: 0; }
     .episode-meta:empty { display: none; }
     button.seen { min-width: 40px; min-height: 40px; justify-content: center; }
+}
+
+[data-compact="true"] .modal {
+    --modal-width: min(560px, 92vw);
+    --modal-sticky-header-padding-top: 8px;
+    --modal-sticky-header-padding-bottom: 8px;
+}
+
+[data-compact="true"] .picker-controls {
+    gap: 8px;
+    margin-top: 8px;
+}
+
+[data-compact="true"] .picker-field {
+    gap: 4px;
+}
+
+[data-compact="true"] .episodes {
+    gap: 4px;
+    margin-top: 8px;
+}
+
+@media (min-width: 541px) {
+    [data-compact="true"] .picker-field select {
+        height: 32px;
+        padding: 0 10px;
+    }
+
+    [data-compact="true"] .episode-row {
+        min-height: 34px;
+    }
+
+    [data-compact="true"] button.episode {
+        padding: 6px 10px;
+    }
+
+    [data-compact="true"] button.seen {
+        padding: 4px 8px;
+    }
 }
