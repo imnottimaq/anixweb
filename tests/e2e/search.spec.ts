@@ -478,11 +478,11 @@ test.describe('Header search bar flow', () => {
     // Navigate to /collections which activates collection search scope
     await page.goto('/collections');
 
-    const searchTrigger = page.getByRole('button', { name: /^Коллекции$|^Collections$/i });
+    const searchTrigger = page.getByRole('button', { name: /^Поиск коллекций$|^Search collections$/i });
     await expect(searchTrigger).toBeVisible();
     await searchTrigger.click();
 
-    const searchInput = page.getByRole('textbox', { name: /^Коллекции$|^Collections$/i });
+    const searchInput = page.getByRole('textbox', { name: /^Поиск коллекций$|^Search collections$/i });
     await searchInput.fill('Fantasy');
 
     const collectionButton = page.getByRole('button', { name: new RegExp(mockCollection1.title, 'i') });

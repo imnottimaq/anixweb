@@ -6,6 +6,7 @@ import starIcon from '../assets/icons/star.svg';
 import RemoteImage from './RemoteImage';
 import { useSettings } from '../shared/contexts/settingsContext';
 import { useTranslation } from '../shared/useTranslation';
+import { localizeCategory } from '../shared/releaseTitle';
 
 type RelatedReleaseCardProps = {
     variant: 'related';
@@ -44,7 +45,7 @@ export default function ReleaseCard(props: ReleaseCardProps) {
                         <span>{t('release.year', { year: props.anime.year })}</span>
                         <span className={styles['release-rating']}><img src={starIcon} alt="" />{props.anime.grade.toFixed(2)}</span>
                     </div>
-                    {props.anime.category?.name && <span className={styles.category}>{props.anime.category.name}</span>}
+                    {props.anime.category?.name && <span className={styles.category}>{localizeCategory(props.anime.category.name, t)}</span>}
                 </> : <div className={styles['meta-row']}>
                     {props.variant === 'rated'
                         ? <span className={styles.stars} aria-label={t('release.gradeAria', { grade: props.grade })}>

@@ -1,5 +1,5 @@
 import RemoteMedia from '../components/RemoteMedia';
-import { getReleaseTitle } from '../shared/releaseTitle';
+import { getReleaseTitle, localizeCategory, localizeReleaseStatus } from '../shared/releaseTitle';
 import { useEffect, useRef, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom"
 import styles from './ReleaseScreen.module.css'
@@ -113,7 +113,7 @@ export default function ReleaseScreen(){
 
     const openCollectionPicker = async () => {
         if (!userToken || !userId) {
-            alert(t('release.loginToChangeStatus'));
+            setReleaseVoteError(t('release.loginToChangeStatus'));
             return;
         }
 
@@ -156,7 +156,7 @@ export default function ReleaseScreen(){
 
     const openReleaseNotifications = async () => {
         if (!userToken) {
-            alert(t('release.loginToChangeStatus'));
+            setReleaseVoteError(t('release.loginToChangeStatus'));
             return;
         }
 
@@ -212,7 +212,7 @@ export default function ReleaseScreen(){
     const rateRelease = async (grade: number) => {
         if (isReleaseVoteLoading) return;
         if (!userToken) {
-            alert(t('release.loginToChangeStatus'));
+            setReleaseVoteError(t('release.loginToChangeStatus'));
             return;
         }
 
@@ -342,7 +342,7 @@ export default function ReleaseScreen(){
                     <select id="watchlist-select" className={`${styles['list-select']} ${styles['action-btn']} ${styles[`status-${animeData?.profile_list_status ?? 0}`]}`} onChange={e => {
                             const newStatus = +e.target.value
                             if (!userToken){
-                                alert(t('release.loginToChangeStatus'))
+                                setReleaseVoteError(t('release.loginToChangeStatus'));
                                 return
                             }
                             setAnimeData((prev: Anime) => ({
@@ -363,7 +363,7 @@ export default function ReleaseScreen(){
                     <button className={`${styles['favorite-btn']} ${styles['action-btn']} ${animeData.is_favorite ? styles['favorited'] : ''}`}
                             onClick={async () => {
                                 if (!userToken) {
-                                    alert(t('release.loginToFavorite'));
+                                    setReleaseVoteError(t('release.loginToFavorite'));
                                     return;
                                 }
                                 try {
@@ -511,7 +511,11 @@ export default function ReleaseScreen(){
                                     "Китай": <div className={styles["china-flag"]}></div>
                                 } as Record<string, React.ReactNode>)[animeData.country]
                                 }
-                                <p>{({ '\u042f\u043f\u043e\u043d\u0438\u044f': t('country.japan'), '\u041a\u0438\u0442\u0430\u0439': t('country.china'), '\u042e\u0436\u043d\u0430\u044f \u041a\u043e\u0440\u0435\u044f': t('country.southKorea') } as Record<string, string>)[animeData.country] ?? animeData.country}, {[t('seasons.winter'), t('seasons.spring'), t('seasons.summer'), t('seasons.autumn')][animeData.season - 1]} {animeData.year}</p>
+                                <p>{({ '\u042f\u043f\u043e\u043d\u0438\u044f': t('country.japan'), '\u041a\u0438\u0442\u0430\u0439': t('country.china'), '\u042e\u0436\u043d\u0430\u044f \u041a\u043e\u0440\u0435\u044f': t('country.southKorea') } as Record<string, string>)[animeData.country] ?? animeData.country}, {(() => {
+                                    const s = [t('seasons.winter'), t('seasons.spring'), t('seasons.summer'), t('seasons.autumn')][animeData.season - 1];
+                                    const cap = s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+                                    return cap ? `${cap} ${animeData.year}` : animeData.year;
+                                })()}</p>
                                 </div>
                                 <div className={styles['fact-row']}>
                                     <img src={albumIcon} className={styles['icon']} />
@@ -519,7 +523,7 @@ export default function ReleaseScreen(){
                                 </div>
                                 <div className={styles['fact-row']}>
                                     <img src={calendarIcon} className={styles['icon']} />
-                                    <p>{animeData.category.name}, {animeData.status.name.toLocaleLowerCase()}</p>
+                                    <p>{animeData.category.name ? localizeCategory(animeData.category.name, t) : ''}, {animeData.status.name ? localizeReleaseStatus(animeData.status.name, t).toLocaleLowerCase() : ''}</p>
                                 </div>
                                 <div className={styles['fact-row']}> 
                                     <img src={peopleIcon} className={styles['icon']} />

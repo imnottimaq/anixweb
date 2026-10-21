@@ -24,12 +24,15 @@ export function offlineShell(): Plugin {
                     'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png',
                     'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png',
                 ]) version.update(readFileSync(resolve(root, 'public', file)));
-                const assets = files.filter(file => file !== 'index.html');
+                const isExcludedFromPrecache = (file: string) => file.includes('anime4k');
+                const assets = files.filter(file => file !== 'index.html' && !isExcludedFromPrecache(file));
+                const optionalAssets = files.filter(file => isExcludedFromPrecache(file));
                 this.emitFile({
                     type: 'asset', fileName: 'sw.js',
                     source: template
                         .replace('__BUILD_VERSION__', version.digest('hex').slice(0, 20))
-                        .replace('const BUILD_ASSETS = [];', `const BUILD_ASSETS = ${JSON.stringify(assets)};`),
+                        .replace('const BUILD_ASSETS = [];', `const BUILD_ASSETS = ${JSON.stringify(assets)};`)
+                        .replace('const OPTIONAL_ASSETS = [];', `const OPTIONAL_ASSETS = ${JSON.stringify(optionalAssets)};`),
                 });
             },
         },

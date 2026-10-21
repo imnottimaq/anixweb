@@ -167,7 +167,7 @@ export default function SearchButton(){
 
     const isProfileSearch = searchScope.type === 'profiles';
     const isCollectionSearch = searchScope.type === 'collections';
-    const searchLabel = isFeed ? t('feed.search') : isProfileSearch ? t('search.users') : isCollectionSearch ? t('nav.collections') : t('search.anime');
+    const searchLabel = isFeed ? t('feed.search') : isProfileSearch ? t('search.users') : isCollectionSearch ? t('search.collections') : t('search.anime');
     const profileResults = searchResults && 'profiles' in searchResults ? searchResults.profiles : [];
     const collectionResults = searchResults && 'collections' in searchResults ? searchResults.collections : [];
     const releaseResults = searchResults && 'releases' in searchResults ? searchResults : undefined;

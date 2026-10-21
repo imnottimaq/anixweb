@@ -297,7 +297,15 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     const [bufferedTime, setBufferedTime] = useState(0);
     const [volume, setVolume] = useState(settings.player.volume / 100);
     const [isPlayerSettingsOpen, setIsPlayerSettingsOpen] = useState(false);
-    const [playbackRate, setPlaybackRate] = useState(1);
+    const [playbackRate, setPlaybackRate] = useState(() => {
+        try {
+            const saved = sessionStorage.getItem('anixweb_player_playback_rate');
+            const num = Number(saved);
+            return [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].includes(num) ? num : 1;
+        } catch {
+            return 1;
+        }
+    });
     const displayedPlaybackRate = roomId && watchRoom ? watchRoom.playback.rate : playbackRate;
     const [aspectRatio, setAspectRatio] = useState<AspectRatio>('original');
     const [nativeAspectRatio, setNativeAspectRatio] = useState<number | null>(null);
@@ -1062,6 +1070,11 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                                             <button key={rate} type="button" disabled={!canControlRoom} className={displayedPlaybackRate === rate ? styles.selected : ''} onClick={() => {
                                                 if (roomId) { if (videoRef.current) sendRoomPlayback('set_rate', videoRef.current.currentTime, rate); return; }
                                                 setPlaybackRate(rate);
+                                                try {
+                                                    sessionStorage.setItem('anixweb_player_playback_rate', String(rate));
+                                                } catch {
+                                                    // Ignore storage errors in private browsing
+                                                }
                                                 if (videoRef.current) {
                                                     videoRef.current.playbackRate = rate;
                                                     sendRoomPlayback('set_rate', videoRef.current.currentTime, rate);

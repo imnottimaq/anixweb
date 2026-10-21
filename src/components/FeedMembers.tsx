@@ -68,7 +68,7 @@ export default function FeedMembers({ channel }: { channel: FeedChannel }) {
     const [draft, setDraft] = useState(''), [query, setQuery] = useState('');
     return <section aria-label={t('feed.members')}><h2>{t('feed.members')}</h2>
         <div className={controls.tabs} role="group" aria-label={t('feed.members')}>{(['subscribers', 'administrators', 'blocked'] as const).map(tab => <button type="button" key={tab} aria-pressed={kind === tab} onClick={() => setKind(tab)}>{t(`feed.memberList.${tab}`)}</button>)}</div>
-        {kind === 'subscribers' && <form className={styles.search} onSubmit={event => { event.preventDefault(); setQuery(draft.trim()); }}><input type="search" aria-label={t('feed.searchMembers')} value={draft} onChange={event => setDraft(event.target.value)} /><button>{t('feed.find')}</button></form>}
+        {kind === 'subscribers' && <form className={styles.search} onSubmit={event => { event.preventDefault(); setQuery(draft.trim()); }}><input type="search" aria-label={t('feed.searchMembers')} placeholder={t('feed.searchMembers')} value={draft} onChange={event => setDraft(event.target.value)} /><button>{t('feed.find')}</button></form>}
         <MemberListView key={`${kind}:${query}`} channel={channel} kind={kind} query={query} />
     </section>;
 }

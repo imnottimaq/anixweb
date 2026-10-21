@@ -4,6 +4,7 @@
   --lighter-background-color: #2a2c33;
   --text-color: #f4f5f7;
   --text-secondary: #aeb3bd;
+  --text-placeholder: color-mix(in srgb, var(--text-color) 42%, transparent);
   --border-color: #383b44;
   --control-border: #737985;
   --error-color: #ff9a9a;
@@ -62,6 +63,7 @@
   --lighter-background-color: #e8e9ed;
   --text-color: #1d1f24;
   --text-secondary: #686e7b;
+  --text-placeholder: color-mix(in srgb, var(--text-color) 44%, transparent);
   --card-bg: #f7f8fa;
   --border-color: #d5d8df;
   --control-border: #858a94;
@@ -107,6 +109,7 @@
   --lighter-background-color: #141414;
   --text-color: #ffffff;
   --text-secondary: #e6e6e6;
+  --text-placeholder: color-mix(in srgb, var(--text-color) 70%, transparent);
   --border-color: #ffffff;
   --surface-border: #ffffff;
   --accent-color: #ff6b6b;
@@ -121,6 +124,7 @@
   --lighter-background-color: #f5f5f5;
   --text-color: #000000;
   --text-secondary: #1a1a1a;
+  --text-placeholder: color-mix(in srgb, var(--text-color) 70%, transparent);
   --border-color: #000000;
   --surface-border: #000000;
   --accent-color: #c90000;
@@ -203,6 +207,12 @@ h2 {
 
 p {
   margin: .25rem;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-placeholder);
+  opacity: 1;
 }
 
 button, input, select, textarea {
@@ -299,6 +309,7 @@ button, input, select, textarea {
     --accent-color: Highlight;
     --accent-foreground: HighlightText;
     --accent-text-color: HighlightText;
+    --text-placeholder: GrayText;
     --focus-ring: 2px solid Highlight;
   }
 }

@@ -7,7 +7,8 @@
 }
 
 .search.expanded {
-    width: clamp(190px, 21vw, 320px);
+    width: 280px;
+    max-width: 100%;
 }
 
 .search-trigger {
@@ -44,17 +45,24 @@
 }
 
 @media (min-width: 1181px) {
-    .search { width: auto; }
+    .search { width: 280px; }
     .search-trigger {
         display: flex;
         align-items: center;
         gap: 9px;
-        width: auto;
+        width: 100%;
+        text-align: left;
         padding-inline: 12px;
         font: inherit;
         font-size: 14px;
     }
-    .trigger-label { display: inline; }
+    .trigger-label {
+        display: inline;
+        color: var(--text-placeholder);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 }
 
 .search-field {
@@ -375,7 +383,7 @@
 }
 
 @media (max-width: 960px) {
-    .search.expanded { width: min(48vw, 260px); }
+    .search.expanded { width: min(280px, 48vw); }
 }
 
 @media (max-width: 600px) {

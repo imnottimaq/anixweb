@@ -4,6 +4,7 @@ const scopePath = scopeUrl.pathname.endsWith('/') ? scopeUrl.pathname : `${scope
 // Replaced by the production build with a content version and all emitted assets.
 const BUILD_VERSION = '__BUILD_VERSION__';
 const BUILD_ASSETS = [];
+const OPTIONAL_ASSETS = [];
 const CACHE_PREFIX = `anixweb-v3-${encodeURIComponent(self.registration.scope)}-`;
 const CACHE_NAME = `${CACHE_PREFIX}${BUILD_VERSION}`;
 const LEGACY_CACHE_NAME = `anixweb-v2-${encodeURIComponent(self.registration.scope)}`;
@@ -18,6 +19,7 @@ const STATIC_ASSETS = [
   ...BUILD_ASSETS.map(path => `${scopePath}${path}`),
 ];
 const staticPaths = new Set(STATIC_ASSETS);
+const optionalPaths = new Set(OPTIONAL_ASSETS.map(path => `${scopePath}${path}`));
 
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
@@ -58,6 +60,20 @@ self.addEventListener('fetch', event => {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
       return await cache.match(`${scopePath}index.html`) || fetch(request);
+    })());
+    return;
+  }
+
+  if (optionalPaths.has(url.pathname)) {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE_NAME);
+      const cached = await cache.match(request);
+      if (cached) return cached;
+      const response = await fetch(request);
+      if (response.ok) {
+        cache.put(request, response.clone()).catch(() => {});
+      }
+      return response;
     })());
     return;
   }

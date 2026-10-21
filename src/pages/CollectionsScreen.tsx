@@ -8,7 +8,7 @@ import { useSearchScope } from '../shared/contexts/searchContext';
 import { useUser } from '../shared/contexts/userContext';
 import { Modal } from '../modals/ModalTemplate';
 import SelectDropdown from '../components/SelectDropdown';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from '../shared/useTranslation';
 import styles from './CollectionsScreen.module.css';
 
@@ -34,6 +34,7 @@ export default function CollectionsScreen() {
     const { t } = useTranslation();
     const { userId, userToken } = useUser();
     const [searchParams] = useSearchParams();
+    const navigate = useNavigate();
     const { setSearchScope } = useSearchScope();
     const triggerRef = useRef<HTMLDivElement | null>(null);
     const [firstPagesCache, setFirstPagesCache] = useState(() => new Map<string, PagedResponse<Collection>>());
@@ -166,7 +167,7 @@ export default function CollectionsScreen() {
 
     const changeView = (nextView: CollectionsView) => {
         if (nextView === 'mine' && !canShowMine) {
-            alert(t('collections.loginMine'));
+            navigate('/account/login');
             return;
         }
         if (nextView === view) return;
