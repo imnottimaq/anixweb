@@ -388,9 +388,19 @@
     flex: 0 0 auto;
 }
 
-.action-btn img{
+.action-btn img {
     width: 20px;
     filter: invert(72%);
+}
+
+.action-btn svg {
+    color: rgb(255 255 255 / 72%);
+    transition: color 160ms ease;
+}
+
+.action-btn:hover svg,
+.action-btn-active svg {
+    color: #fff;
 }
 
 .time-code {
@@ -866,3 +876,65 @@
 .volume-div { flex-shrink: 0; }
 .volume-div .mute-button { flex-shrink: 0; }
 @media (max-width: 540px) { .volume-expanded { overflow: visible; width: 38px; } .volume-div input { position: absolute; bottom: 48px; left: 0; width: 140px; height: 32px; padding: 6px; background: #202126; border-radius: 6px; } }
+
+.volume-osd {
+    position: absolute;
+    top: 40px;
+    left: 50%;
+    transform: translate(-50%, -10px);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 18px;
+    border-radius: 999px;
+    background: rgb(20 20 24 / 88%);
+    border: 1px solid rgb(255 255 255 / 18%);
+    box-shadow: 0 10px 32px rgb(0 0 0 / 50%);
+    backdrop-filter: blur(14px);
+    color: #fff;
+    pointer-events: none;
+    font-size: 14px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    opacity: 0;
+    transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.volume-osd-visible {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+.volume-osd img {
+    width: 20px;
+    height: 20px;
+    filter: invert(85%);
+    flex-shrink: 0;
+}
+
+.volume-osd-bar {
+    width: 90px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 20%);
+    overflow: hidden;
+}
+
+.volume-osd-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--accent-color, #ff6060);
+    transition: width 60ms ease-out;
+}
+
+.volume-osd-text {
+    min-width: 40px;
+    text-align: right;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .volume-osd {
+        transition: none;
+    }
+}

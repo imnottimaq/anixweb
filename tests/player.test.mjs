@@ -490,3 +490,108 @@ test('active GPU devices are destroyed on disposal', () => {
     scope.useDevice({ destroy: () => destroyed++ });
     scope.dispose(); scope.dispose(); assert.equal(destroyed, 1);
 });
+
+test('autoplay countdown starts on video ended, shows prompt, and allows cancel or play now', async () => {
+    const h = harness();
+    h.settings.player.autoplay = true;
+    h.render();
+    assert.equal(h.state.nextEpisodeCountdown, null);
+    h.event('onEnded');
+    assert.equal(h.state.nextEpisodeCountdown, 5);
+    h.render();
+
+    // Verify countdown card is rendered
+    const card = h.find(node => node.tag === 'div' && node.props['role'] === 'dialog' && typeof node.props['aria-label'] === 'string');
+    assert.ok(card, 'Countdown dialog rendered');
+
+    // Clicking cancel clears the countdown
+    const cancelBtn = h.find(node => node.tag === 'button' && node.props.children === 'player.cancelAutoplay');
+    assert.ok(cancelBtn, 'Cancel button exists');
+    cancelBtn.props.onClick();
+    assert.equal(h.state.nextEpisodeCountdown, null);
+
+    // Trigger onEnded again and click "Play now"
+    h.event('onEnded');
+    assert.equal(h.state.nextEpisodeCountdown, 5);
+    h.render();
+    const playNowBtn = h.find(node => node.tag === 'button' && node.props.children === 'player.playNow');
+    assert.ok(playNowBtn, 'Play now button exists');
+    await playNowBtn.props.onClick();
+    assert.equal(h.state.nextEpisodeCountdown, null);
+    assert.equal(h.sessions.at(-1).episodeNumber, 2);
+});
+
+test('mouse wheel adjusts volume and triggers OSD display', () => {
+    const h = harness();
+    h.video.volume = 0.5;
+    h.video.muted = false;
+    h.state.volume = 0.5;
+    h.render();
+
+    const stage = h.find(node => node.tag === 'div' && typeof node.props?.onWheel === 'function');
+    assert.ok(stage, 'video stage with onWheel found');
+
+    // Scroll up (deltaY < 0) -> volume increases by 0.05
+    let prevented = false;
+    stage.props.onWheel({
+        deltaY: -100,
+        preventDefault() { prevented = true; },
+        stopPropagation() {},
+    });
+    assert.equal(prevented, true);
+    assert.equal(h.video.volume, 0.55);
+    assert.equal(h.state.volume, 0.55);
+    assert.equal(h.settings.player.volume, 55);
+    assert.deepEqual(h.state.volumeOsd, { level: 55, muted: false, visible: true });
+
+    // Scroll down (deltaY > 0) -> volume decreases by 0.05
+    stage.props.onWheel({
+        deltaY: 100,
+        preventDefault() {},
+        stopPropagation() {},
+    });
+    assert.equal(h.video.volume, 0.5);
+    assert.equal(h.state.volume, 0.5);
+    assert.equal(h.settings.player.volume, 50);
+    assert.deepEqual(h.state.volumeOsd, { level: 50, muted: false, visible: true });
+});
+
+test('picture-in-picture button renders, reflects active state, and hotkeys trigger toggle', async () => {
+    const h = harness();
+    h.document.pictureInPictureEnabled = true;
+    let pipRequested = 0, pipExited = 0;
+    h.video.requestPictureInPicture = async () => { pipRequested++; };
+    h.document.exitPictureInPicture = async () => { pipExited++; };
+
+    h.render();
+    const pipBtn = h.find(node => node.tag === 'button' && node.props['aria-label'] === 'player.pip');
+    assert.ok(pipBtn, 'PiP button rendered when PiP supported');
+    assert.equal(pipBtn.props['aria-pressed'], false);
+
+    // Enter PiP event
+    h.event('onEnterPictureInPicture');
+    assert.equal(h.state.isPipActive, true);
+    h.render();
+    const activePipBtn = h.find(node => node.tag === 'button' && node.props['aria-label'] === 'player.pipExit');
+    assert.ok(activePipBtn, 'PiP button shows exit label when active');
+    assert.equal(activePipBtn.props['aria-pressed'], true);
+
+    // Leave PiP event
+    h.event('onLeavePictureInPicture');
+    assert.equal(h.state.isPipActive, false);
+
+    // Clicking PiP button requests PiP
+    await pipBtn.props.onClick();
+    assert.equal(pipRequested, 1);
+
+    // Hotkey P triggers PiP
+    h.effect('const handleKeyDown');
+    h.window.dispatch('keydown', { code: 'KeyP', preventDefault() {} });
+    await Promise.resolve();
+    assert.equal(pipRequested, 2);
+
+    // Hotkey I also triggers PiP
+    h.window.dispatch('keydown', { code: 'KeyI', preventDefault() {} });
+    await Promise.resolve();
+    assert.equal(pipRequested, 3);
+});

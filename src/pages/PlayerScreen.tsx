@@ -313,6 +313,9 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     const [upscalerReadyKey, setUpscalerReadyKey] = useState<string | null>(null);
     const [isEpisodeChanging, setIsEpisodeChanging] = useState(false);
     const [resumePromptTime, setResumePromptTime] = useState<number | null>(null);
+    const [nextEpisodeCountdown, setNextEpisodeCountdown] = useState<number | null>(null);
+    const [isPipActive, setIsPipActive] = useState(false);
+    const [volumeOsd, setVolumeOsd] = useState<{ level: number; muted: boolean; visible: boolean } | null>(null);
     const [streamError, setStreamError] = useState<string | null>(null);
     const promptedEpisodeRef = useRef<string | null>(null);
     const autoplayAttemptedRef = useRef(false);
@@ -322,6 +325,9 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     const wasAutoPausedRef = useRef(false);
     const windowFocusedRef = useRef(typeof document.hasFocus === 'function' ? document.hasFocus() : true);
     const downloadDialogRef = useRef<HTMLDivElement>(null);
+    const countdownDialogRef = useRef<HTMLDivElement>(null);
+    const countdownIntervalRef = useRef<number | null>(null);
+    const volumeOsdTimeoutRef = useRef<number | null>(null);
     const resumePendingRef = useRef(false);
     const loadPlaybackRef = useRef<boolean | null>(null);
     const metadataLoadedRef = useRef(false);
@@ -365,6 +371,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     useEffect(() => {
         const fullscreenGeneration = fullscreenGenerationRef;
         playerClosedRef.current = false;
+        setNextEpisodeCountdown(null);
         autoFullscreenTriggeredRef.current = false;
         autoFullscreenPendingRef.current = false;
         fullscreenGenerationRef.current++;
@@ -458,6 +465,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
 
     const closePlayer = () => {
         playerClosedRef.current = true;
+        setNextEpisodeCountdown(null);
         episodeRequestRef.current += 1;
         saveEpisodeTime();
         clearPlayerSession();
@@ -467,10 +475,10 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     const showControls = useCallback(() => {
         setAreControlsVisible(true);
         if (controlsTimeoutRef.current !== null) window.clearTimeout(controlsTimeoutRef.current);
-        if (!isPlaying || isPlayerSettingsOpen || resumePromptTime !== null || isDownloadModalOpen || (keyboardControlsRef.current && playerDialogRef.current?.querySelector('[data-player-controls]')?.contains(document.activeElement))) return;
+        if (!isPlaying || isPlayerSettingsOpen || resumePromptTime !== null || nextEpisodeCountdown !== null || isDownloadModalOpen || (keyboardControlsRef.current && playerDialogRef.current?.querySelector('[data-player-controls]')?.contains(document.activeElement))) return;
 
         controlsTimeoutRef.current = window.setTimeout(() => { if (!keyboardControlsRef.current || !playerDialogRef.current?.querySelector('[data-player-controls]')?.contains(document.activeElement)) setAreControlsVisible(false); }, 2_500);
-    }, [isPlaying, isPlayerSettingsOpen, resumePromptTime, isDownloadModalOpen]);
+    }, [isPlaying, isPlayerSettingsOpen, resumePromptTime, nextEpisodeCountdown, isDownloadModalOpen]);
 
     useEffect(() => {
         const updateFullscreen = () => setIsMaximized(Boolean(document.fullscreenElement || (document as WebKitFullscreenDocument).webkitFullscreenElement));
@@ -578,6 +586,124 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     }, true);
     useDialogFocus(downloadDialogRef, isDownloadModalOpen, () => { resetDownload(); setIsDownloadModalOpen(false); }, true);
     useDialogFocus(resumeDialogRef, resumePromptTime !== null, () => { if (resumePromptTime !== null) startFrom(resumePromptTime); }, true);
+    useDialogFocus(countdownDialogRef, nextEpisodeCountdown !== null, () => setNextEpisodeCountdown(null), true);
+
+    const isPipSupported = typeof document !== 'undefined' && (
+        Boolean(document.pictureInPictureEnabled)
+        || (typeof HTMLVideoElement !== 'undefined' && 'webkitSupportsPresentationMode' in HTMLVideoElement.prototype)
+    );
+
+    const togglePictureInPicture = useCallback(async () => {
+        const video = videoRef.current;
+        if (!video) return;
+        try {
+            if (document.pictureInPictureElement) {
+                await document.exitPictureInPicture();
+            } else if (document.pictureInPictureEnabled && typeof video.requestPictureInPicture === 'function') {
+                await video.requestPictureInPicture();
+            } else if ('webkitSetPresentationMode' in video && typeof (video as unknown as { webkitSetPresentationMode: (m: string) => void }).webkitSetPresentationMode === 'function') {
+                const v = video as unknown as { webkitPresentationMode: string; webkitSetPresentationMode: (m: string) => void };
+                v.webkitSetPresentationMode(v.webkitPresentationMode === 'picture-in-picture' ? 'inline' : 'picture-in-picture');
+            }
+        } catch (error) {
+            console.error('Не удалось переключить режим «картинка в картинке»:', error);
+        }
+    }, []);
+
+    const triggerVolumeOsd = useCallback((level: number, muted: boolean) => {
+        setVolumeOsd({ level, muted, visible: true });
+        if (volumeOsdTimeoutRef.current !== null) window.clearTimeout(volumeOsdTimeoutRef.current);
+        volumeOsdTimeoutRef.current = window.setTimeout(() => {
+            setVolumeOsd(prev => (prev ? { ...prev, visible: false } : null));
+        }, 1500);
+    }, []);
+
+    const handleWheelVolume = useCallback((event: React.WheelEvent) => {
+        if (isDownloadModalOpen || resumePromptTime !== null || nextEpisodeCountdown !== null || isPlayerSettingsOpen) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const video = videoRef.current;
+        if (!video) return;
+
+        const step = 0.05;
+        const currentVol = video.muted ? 0 : video.volume;
+        const change = event.deltaY < 0 ? step : -step;
+        const nextVolume = Math.min(1, Math.max(0, Math.round((currentVol + change) * 100) / 100));
+
+        video.muted = false;
+        video.volume = nextVolume;
+        setVolume(nextVolume);
+        setIsMuted(false);
+        setSettings(previous => ({
+            ...previous,
+            player: { ...previous.player, volume: Math.round(nextVolume * 100) },
+        }));
+
+        triggerVolumeOsd(Math.round(nextVolume * 100), nextVolume === 0);
+    }, [isDownloadModalOpen, isPlayerSettingsOpen, nextEpisodeCountdown, resumePromptTime, setSettings, triggerVolumeOsd]);
+
+    useEffect(() => {
+        return () => {
+            if (volumeOsdTimeoutRef.current !== null) {
+                window.clearTimeout(volumeOsdTimeoutRef.current);
+            }
+            if (countdownIntervalRef.current !== null) {
+                window.clearInterval(countdownIntervalRef.current);
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        if (nextEpisodeCountdown === null) {
+            if (countdownIntervalRef.current !== null) {
+                window.clearInterval(countdownIntervalRef.current);
+                countdownIntervalRef.current = null;
+            }
+            return;
+        }
+
+        if (nextEpisodeCountdown <= 0) {
+            setNextEpisodeCountdown(null);
+            if (nextEpisode) {
+                void changeEpisode(nextEpisode);
+            }
+            return;
+        }
+
+        countdownIntervalRef.current = window.setInterval(() => {
+            setNextEpisodeCountdown(prev => (prev !== null && prev > 0 ? prev - 1 : null));
+        }, 1000);
+
+        return () => {
+            if (countdownIntervalRef.current !== null) {
+                window.clearInterval(countdownIntervalRef.current);
+                countdownIntervalRef.current = null;
+            }
+        };
+    }, [changeEpisode, nextEpisode, nextEpisodeCountdown]);
+
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        const onEnter = () => setIsPipActive(true);
+        const onLeave = () => setIsPipActive(false);
+        const onWebkit = () => {
+            if ('webkitPresentationMode' in video) {
+                setIsPipActive((video as unknown as { webkitPresentationMode: string }).webkitPresentationMode === 'picture-in-picture');
+            }
+        };
+
+        video.addEventListener('enterpictureinpicture', onEnter);
+        video.addEventListener('leavepictureinpicture', onLeave);
+        video.addEventListener('webkitpresentationmodechanged', onWebkit);
+
+        return () => {
+            video.removeEventListener('enterpictureinpicture', onEnter);
+            video.removeEventListener('leavepictureinpicture', onLeave);
+            video.removeEventListener('webkitpresentationmodechanged', onWebkit);
+        };
+    }, []);
 
     useEffect(() => {
         return () => { resetDownload(); };
@@ -852,12 +978,20 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
-            if (isDownloadModalOpen || resumePromptTime !== null || event.defaultPrevented || event.isComposing || !event.code || event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+            if (isDownloadModalOpen || resumePromptTime !== null || nextEpisodeCountdown !== null || event.defaultPrevented || event.isComposing || !event.code || event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
             const target = event.target;
             if (target instanceof HTMLElement && target.closest('button, a, input, textarea, select, [contenteditable], [role="button"], [role="textbox"], [role="listbox"], [role="slider"], [role="menu"], [role="tab"], #watch-room-panel, [data-social-panel]')) return;
 
             const action = Object.entries(keybindings).find(([, code]) => code === event.code)?.[0];
-            if (!action) return;
+            if (!action) {
+                if (event.code === 'KeyP' || event.code === 'KeyI') {
+                    event.preventDefault();
+                    showControls();
+                    void togglePictureInPicture();
+                    return;
+                }
+                return;
+            }
 
             const video = videoRef.current;
             if (!video) return;
@@ -881,9 +1015,13 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                     video.volume = nextVolume;
                     setVolume(nextVolume);
                     setSettings(previous => ({ ...previous, player: { ...previous.player, volume: Math.round(nextVolume * 100) } }));
+                    triggerVolumeOsd(Math.round(nextVolume * 100), nextVolume === 0);
                     break;
                 }
-                case 'toggleMute': video.muted = !video.muted; break;
+                case 'toggleMute':
+                    video.muted = !video.muted;
+                    triggerVolumeOsd(Math.round(video.volume * 100), video.muted);
+                    break;
                 case 'toggleFullscreen':
                     if (document.fullscreenElement || (document as WebKitFullscreenDocument).webkitFullscreenElement) void exitFullscreenElement();
                     else void requestFullscreenElement(playerRef.current, videoRef.current);
@@ -893,12 +1031,15 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                 case 'skipOpening':
                     if (settings.player.showSkipOpeningButton) seek(settings.player.skipOpeningValue);
                     break;
+                case 'togglePictureInPicture':
+                    void togglePictureInPicture();
+                    break;
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [changeEpisode, isDownloadModalOpen, resumePromptTime, keybindings, nextEpisode, previousEpisode, seekTo, togglePlayback, setSettings, settings.player.showSkipOpeningButton, settings.player.skipOpeningValue, showControls]);
+    }, [changeEpisode, isDownloadModalOpen, resumePromptTime, nextEpisodeCountdown, keybindings, nextEpisode, previousEpisode, seekTo, togglePlayback, setSettings, settings.player.showSkipOpeningButton, settings.player.skipOpeningValue, showControls, togglePictureInPicture, triggerVolumeOsd]);
 
     if (!stream) return <div ref={playerDialogRef} tabIndex={-1} className={styles.overlay} role="dialog" aria-modal="true" aria-label={t('player.ariaLabel')}>
         <div className={styles.player}>
@@ -1114,6 +1255,21 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                                 <line x1="12" y1="15" x2="12" y2="3" />
                             </svg>
                         </button>
+                        {isPipSupported && (
+                            <button
+                                type="button"
+                                className={`${styles['action-btn']} ${isPipActive ? styles['action-btn-active'] : ''}`}
+                                onClick={() => void togglePictureInPicture()}
+                                aria-label={t(isPipActive ? 'player.pipExit' : 'player.pip')}
+                                aria-pressed={isPipActive}
+                                title={t(isPipActive ? 'player.pipExit' : 'player.pip')}
+                            >
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                    <rect x="2" y="4" width="20" height="16" rx="2" />
+                                    <rect x="12" y="11" width="7" height="6" rx="1" fill={isPipActive ? 'currentColor' : 'none'} />
+                                </svg>
+                            </button>
+                        )}
                         <button
                             aria-label={t(isMaximized ? 'ux.exitFullscreen' : 'ux.enterFullscreen')}
                             className={styles['action-btn']}
@@ -1146,7 +1302,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                         />
                     </div>
                 </div>
-                <div className={styles['video-stage']}>
+                <div className={styles['video-stage']} onWheel={handleWheelVolume}>
                 <div className={styles['video-frame']} style={videoFrameStyle}>
                 <video
                     ref={videoRef}
@@ -1203,11 +1359,13 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                         setIsPlaying(false);
                         saveEpisodeTime();
                         if (settings.player.autoplay && nextEpisode && (!roomId || watchRoom?.hostId === roomProfileId)) {
-                            void changeEpisode(nextEpisode);
+                            setNextEpisodeCountdown(5);
                         } else if (roomId && watchRoom?.hostId === roomProfileId && videoRef.current) {
                             sendRoomPlayback('pause', videoRef.current.currentTime);
                         }
                     }}
+                    onEnterPictureInPicture={() => setIsPipActive(true)}
+                    onLeavePictureInPicture={() => setIsPipActive(false)}
                     onLoadedMetadata={event => {
                         const video = event.currentTarget;
                         metadataLoadedRef.current = true;
@@ -1268,6 +1426,54 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                 {roomId && isRoomPanelOpen && <div id="watch-room-panel" className={styles['room-panel']}><RoomPanel compact /></div>}
                 {roomId && streamError?.includes('Браузер') && <button className={styles['unlock-playback']} onClick={() => { void videoRef.current?.play().then(() => setStreamError(null)).catch(() => {}); }}>Включить видео</button>}
                 {streamError && <div className={styles['stream-error']} role="status">{streamError}</div>}
+                {volumeOsd && (
+                    <div
+                        className={`${styles['volume-osd']} ${volumeOsd.visible ? styles['volume-osd-visible'] : ''}`}
+                        role="status"
+                        aria-live="polite"
+                        aria-label={t('player.volumeLevel', { percent: volumeOsd.level })}
+                    >
+                        <img src={volumeOsd.muted || volumeOsd.level === 0 ? VolumeMuteIcon : VolumeMaxIcon} alt="" />
+                        <div className={styles['volume-osd-bar']}>
+                            <div className={styles['volume-osd-fill']} style={{ width: `${volumeOsd.muted ? 0 : volumeOsd.level}%` }} />
+                        </div>
+                        <span className={styles['volume-osd-text']}>{volumeOsd.muted ? '0%' : `${volumeOsd.level}%`}</span>
+                    </div>
+                )}
+                {nextEpisodeCountdown !== null && nextEpisode && (
+                    <div
+                        ref={countdownDialogRef}
+                        tabIndex={-1}
+                        className={styles['resume-prompt']}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={t('player.nextEpisodeCountdown', { seconds: nextEpisodeCountdown })}
+                    >
+                        <div className={styles['resume-prompt-card']}>
+                            <h2>{t('player.nextEpisodeCountdown', { seconds: nextEpisodeCountdown })}</h2>
+                            <p>{nextEpisode.name || t('player.episodeTitle', { number: nextEpisode.position })}</p>
+                            <div className={styles['resume-prompt-actions']}>
+                                <button
+                                    type="button"
+                                    className={styles['resume-secondary-button']}
+                                    onClick={() => setNextEpisodeCountdown(null)}
+                                >
+                                    {t('player.cancelAutoplay')}
+                                </button>
+                                <button
+                                    type="button"
+                                    className={styles['resume-primary-button']}
+                                    onClick={() => {
+                                        setNextEpisodeCountdown(null);
+                                        void changeEpisode(nextEpisode);
+                                    }}
+                                >
+                                    {t('player.playNow')}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 {resumePromptTime !== null && <div ref={resumeDialogRef} tabIndex={-1} className={styles['resume-prompt']} role="dialog" aria-modal="true" aria-label={t('misc.continue')}>
                     <div className={styles['resume-prompt-card']}>
                         <h2>{t('misc.continue')}?</h2>
