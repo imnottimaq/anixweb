@@ -55,7 +55,7 @@
 
 .tabButton.active {
     background: var(--accent-color, #e53935);
-    color: var(--accent-foreground, #121212);
+    color: var(--accent-foreground, #ffffff);
 }
 
 .tabButton:disabled {
@@ -79,7 +79,7 @@
 .loginLink {
     padding: 6px 14px;
     background: var(--accent-color, #e53935);
-    color: var(--accent-foreground, #121212);
+    color: var(--accent-foreground, #ffffff);
     border-radius: 6px;
     text-decoration: none;
     font-size: 13px;
@@ -176,7 +176,7 @@
 
 .primaryButton {
     background: var(--accent-color, #e53935);
-    color: var(--accent-foreground, #121212);
+    color: var(--accent-foreground, #ffffff);
     border: none;
     border-radius: 8px;
     padding: 10px 20px;

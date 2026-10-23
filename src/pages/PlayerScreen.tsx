@@ -371,7 +371,6 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     useEffect(() => {
         const fullscreenGeneration = fullscreenGenerationRef;
         playerClosedRef.current = false;
-        setNextEpisodeCountdown(null);
         autoFullscreenTriggeredRef.current = false;
         autoFullscreenPendingRef.current = false;
         fullscreenGenerationRef.current++;
@@ -653,34 +652,6 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
         };
     }, []);
 
-    useEffect(() => {
-        if (nextEpisodeCountdown === null) {
-            if (countdownIntervalRef.current !== null) {
-                window.clearInterval(countdownIntervalRef.current);
-                countdownIntervalRef.current = null;
-            }
-            return;
-        }
-
-        if (nextEpisodeCountdown <= 0) {
-            setNextEpisodeCountdown(null);
-            if (nextEpisode) {
-                void changeEpisode(nextEpisode);
-            }
-            return;
-        }
-
-        countdownIntervalRef.current = window.setInterval(() => {
-            setNextEpisodeCountdown(prev => (prev !== null && prev > 0 ? prev - 1 : null));
-        }, 1000);
-
-        return () => {
-            if (countdownIntervalRef.current !== null) {
-                window.clearInterval(countdownIntervalRef.current);
-                countdownIntervalRef.current = null;
-            }
-        };
-    }, [changeEpisode, nextEpisode, nextEpisodeCountdown]);
 
     useEffect(() => {
         const video = videoRef.current;
@@ -922,6 +893,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     }, [settings.player.qualityUpgrade, settings.player.qualityUpgradeMode, stream, upscalerKey]);
 
     const changeEpisode = useCallback(async (targetEpisode: NonNullable<typeof previousEpisode>) => {
+        setNextEpisodeCountdown(null);
         if (!canControlRoom || episodeChangePendingRef.current || playerClosedRef.current) return;
         if (roomId) {
             if (!playerSession.dubId || !playerSession.sourceId) return;
@@ -974,6 +946,38 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
             }
         }
     }, [animeId, animeName, api, canControlRoom, onSessionChange, playerSession, roomId, send, userToken, saveEpisodeTime, t]);
+
+    useEffect(() => {
+        if (nextEpisodeCountdown === null) {
+            if (countdownIntervalRef.current !== null) {
+                window.clearTimeout(countdownIntervalRef.current);
+                countdownIntervalRef.current = null;
+            }
+            return;
+        }
+
+        if (nextEpisodeCountdown <= 0) {
+            const timerId = window.setTimeout(() => {
+                setNextEpisodeCountdown(null);
+                if (nextEpisode) {
+                    void changeEpisode(nextEpisode);
+                }
+            }, 0);
+            return () => window.clearTimeout(timerId);
+        }
+
+        const timerId = window.setTimeout(() => {
+            setNextEpisodeCountdown(prev => (prev !== null && prev > 0 ? prev - 1 : null));
+        }, 1000);
+        countdownIntervalRef.current = timerId;
+
+        return () => {
+            window.clearTimeout(timerId);
+            if (countdownIntervalRef.current === timerId) {
+                countdownIntervalRef.current = null;
+            }
+        };
+    }, [changeEpisode, nextEpisode, nextEpisodeCountdown]);
 
 
     useEffect(() => {
@@ -1364,8 +1368,6 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                             sendRoomPlayback('pause', videoRef.current.currentTime);
                         }
                     }}
-                    onEnterPictureInPicture={() => setIsPipActive(true)}
-                    onLeavePictureInPicture={() => setIsPipActive(false)}
                     onLoadedMetadata={event => {
                         const video = event.currentTarget;
                         metadataLoadedRef.current = true;

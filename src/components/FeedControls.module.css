@@ -47,7 +47,7 @@
 
 .actionRail .primary,
 .formActions .primary {
-    color: var(--feed-accent-foreground, #1d1f24);
+    color: var(--feed-accent-foreground, #ffffff);
     background: var(--accent-color);
     border-color: var(--accent-color);
     font-weight: 700;

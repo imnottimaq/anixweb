@@ -53,6 +53,7 @@ function harness(options = {}) {
         startDownload: async args => { downloadCalls.push({type:'start',args}); },
         cancelDownload: () => downloadCalls.push({type:'cancel'}), reset: () => downloadCalls.push({type:'reset'}) };
     const video = {
+        ...eventTarget(),
         currentTime: 0, duration: 1500, videoWidth: 1920, videoHeight: 1080,
         paused: true, ended: false, seeking: false, buffered: {length:1,start:()=>0,end:()=>1500}, error: null, readyState: 0, playbackRate: 1, playCalls: 0,
         play() { this.paused = false; this.playCalls++; return Promise.resolve(); },
@@ -505,7 +506,8 @@ test('autoplay countdown starts on video ended, shows prompt, and allows cancel 
     assert.ok(card, 'Countdown dialog rendered');
 
     // Clicking cancel clears the countdown
-    const cancelBtn = h.find(node => node.tag === 'button' && node.props.children === 'player.cancelAutoplay');
+    const hasText = (children, text) => children === text || (Array.isArray(children) && children.includes(text));
+    const cancelBtn = h.find(node => node.tag === 'button' && hasText(node.props?.children, 'player.cancelAutoplay'));
     assert.ok(cancelBtn, 'Cancel button exists');
     cancelBtn.props.onClick();
     assert.equal(h.state.nextEpisodeCountdown, null);
@@ -514,7 +516,7 @@ test('autoplay countdown starts on video ended, shows prompt, and allows cancel 
     h.event('onEnded');
     assert.equal(h.state.nextEpisodeCountdown, 5);
     h.render();
-    const playNowBtn = h.find(node => node.tag === 'button' && node.props.children === 'player.playNow');
+    const playNowBtn = h.find(node => node.tag === 'button' && hasText(node.props?.children, 'player.playNow'));
     assert.ok(playNowBtn, 'Play now button exists');
     await playNowBtn.props.onClick();
     assert.equal(h.state.nextEpisodeCountdown, null);
@@ -569,15 +571,22 @@ test('picture-in-picture button renders, reflects active state, and hotkeys trig
     assert.equal(pipBtn.props['aria-pressed'], false);
 
     // Enter PiP event
-    h.event('onEnterPictureInPicture');
+    h.effect('enterpictureinpicture');
+    h.video.dispatch('enterpictureinpicture');
     assert.equal(h.state.isPipActive, true);
     h.render();
     const activePipBtn = h.find(node => node.tag === 'button' && node.props['aria-label'] === 'player.pipExit');
     assert.ok(activePipBtn, 'PiP button shows exit label when active');
     assert.equal(activePipBtn.props['aria-pressed'], true);
 
+    // Clicking active PiP button exits PiP
+    h.document.pictureInPictureElement = h.video;
+    await activePipBtn.props.onClick();
+    assert.equal(pipExited, 1);
+    h.document.pictureInPictureElement = null;
+
     // Leave PiP event
-    h.event('onLeavePictureInPicture');
+    h.video.dispatch('leavepictureinpicture');
     assert.equal(h.state.isPipActive, false);
 
     // Clicking PiP button requests PiP

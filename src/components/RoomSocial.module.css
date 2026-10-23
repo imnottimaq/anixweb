@@ -63,7 +63,7 @@
     border-radius: 50%;
     overflow: hidden;
     background: var(--accent-color, #e5e4df);
-    color: var(--accent-text-color, #121212);
+    color: var(--accent-text-color, #ffffff);
     font-size: 11px;
     font-weight: 700;
 }
@@ -252,7 +252,7 @@
     border: 1px solid transparent;
     border-radius: var(--radius-control, 9px);
     background: var(--accent-color, #e5e4df);
-    color: var(--accent-text-color, #121212);
+    color: var(--accent-text-color, #ffffff);
     font: inherit;
     font-size: 12px;
     font-weight: 600;

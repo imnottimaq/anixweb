@@ -196,7 +196,7 @@
 .composeForm .publishButton,
 .channelForm .channelSubmit,
 .studioActions .studioCreate {
-    --feed-accent-foreground: #1d1f24;
+    --feed-accent-foreground: var(--accent-text-color);
 }
 
 [data-high-contrast="true"] .composeForm .publishButton,

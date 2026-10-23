@@ -154,7 +154,9 @@ export function applyTheme(appearance: AppSettings['appearance']): () => void {
             }
 
             effectiveTheme = isBgDark ? 'dark' : 'light';
-            const accentText = getAccentTextColor(customColors.accentColor);
+            const accentText = !isBgDark && getContrastRatio(customColors.accentColor, '#ffffff') >= 2.0
+                ? '#ffffff'
+                : getAccentTextColor(customColors.accentColor);
 
             root.style.setProperty('--background-color', customColors.backgroundColor);
             root.style.setProperty('--surface-page', customColors.backgroundColor);
@@ -163,7 +165,10 @@ export function applyTheme(appearance: AppSettings['appearance']): () => void {
             root.style.setProperty('--accent-color', customColors.accentColor);
             const hoverAccent = mixHex(customColors.accentColor, '#ffffff', .15);
             root.style.setProperty('--lighter-accent-color', hoverAccent);
-            root.style.setProperty('--accent-hover-foreground', getAccentTextColor(hoverAccent));
+            const hoverAccentText = !isBgDark && getContrastRatio(hoverAccent, '#ffffff') >= 2.0
+                ? '#ffffff'
+                : getAccentTextColor(hoverAccent);
+            root.style.setProperty('--accent-hover-foreground', hoverAccentText);
             root.style.setProperty('--accent-link-color', getAccessibleAccent(customColors.accentColor, customColors.backgroundColor));
             root.style.setProperty('--feed-accent-foreground', accentText);
             root.style.setProperty('--control-border', getAccessibleAccent('#777777', customColors.backgroundColor, 3));

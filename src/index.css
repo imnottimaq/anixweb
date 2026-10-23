@@ -69,10 +69,11 @@
   --control-border: #858a94;
   --error-color: #b42334;
   --accent-color: #FF6060;
-  --accent-text-color: #1d1f24;
+  --accent-text-color: #ffffff;
   --accent-link-color: #b82436;
-  --accent-hover-foreground: #1d1f24;
+  --accent-hover-foreground: #ffffff;
   --accent-foreground: var(--accent-text-color);
+  --feed-accent-foreground: var(--accent-text-color);
   --lighter-accent-color: #ff8a8a;
 
   --surface-page: var(--background-color);

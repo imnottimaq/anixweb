@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ACCENT_COLOR_PRESETS, BACKGROUND_COLOR_PRESETS, getAccentTextColor, getAccessibleAccent, mixHex } from '../../src/shared/theme';
+import { ACCENT_COLOR_PRESETS, BACKGROUND_COLOR_PRESETS, applyTheme, getAccentTextColor, getAccessibleAccent, mixHex } from '../../src/shared/theme';
 
 // Calculate the WCAG ratio independently of the theme's implementation.
 function contrast(first: string, second: string): number {
@@ -53,5 +53,25 @@ describe('accessible accent color calculations', () => {
         expect(mixHex('#000', '#fff', 1)).toBe('#ffffff');
         expect(mixHex('#000', '#fff', .5)).toBe('#808080');
         expect(mixHex('#ff6060', '#ffffff', .15)).toBe('#ff7878');
+    });
+
+    it('sets white text on accent background in light theme with custom colors', () => {
+        applyTheme({
+            theme: 'light',
+            highContrast: false,
+            compactMode: false,
+            language: 'russian',
+            defaultCardType: 'vertical',
+            customColors: {
+                enabled: true,
+                backgroundColor: '#ffffff',
+                accentColor: '#FF6060',
+                textColor: '#1d1f24',
+                autoTextColor: true,
+            },
+        });
+        expect(document.documentElement.style.getPropertyValue('--accent-text-color')).toBe('#ffffff');
+        expect(document.documentElement.style.getPropertyValue('--accent-foreground')).toBe('#ffffff');
+        expect(document.documentElement.style.getPropertyValue('--feed-accent-foreground')).toBe('#ffffff');
     });
 });

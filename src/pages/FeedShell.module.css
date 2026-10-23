@@ -6,7 +6,7 @@
 
 .headerActions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .headerActions a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 10px 14px; border-radius: var(--radius-control); font-weight: 700; font-size: 15px; text-decoration: none; }
-.compose { background: var(--accent-color); color: var(--feed-accent-foreground, #1d1f24); border: 1px solid transparent; }
+.compose { background: var(--accent-color); color: var(--feed-accent-foreground, #ffffff); border: 1px solid transparent; }
 .compose:hover { background: var(--lighter-accent-color);  color: var(--accent-hover-foreground); }
 .manage { color: var(--text-secondary); border: 1px solid var(--surface-border); }
 .manage:hover { color: var(--text-color); background: var(--surface-muted); }
@@ -37,7 +37,7 @@
 .channelIdentity > div { flex: 1; min-width: 150px; }
 .channelDescription { max-width: 66ch; color: var(--text-secondary); }
 .commentForm { padding: 18px; background: var(--card-bg); border: 1px solid var(--surface-border-subtle); border-radius: var(--radius-card); }
-.commentForm button[type="submit"] { background: var(--accent-color); border-color: transparent; color: var(--feed-accent-foreground, #1d1f24); font-weight: 700; }
+.commentForm button[type="submit"] { background: var(--accent-color); border-color: transparent; color: var(--feed-accent-foreground, #ffffff); font-weight: 700; }
 .commentForm button[type="submit"]:hover { background: var(--lighter-accent-color);  color: var(--accent-hover-foreground); }
 
 @media (max-width: 620px) {
