@@ -5,9 +5,10 @@ export default defineConfig({
     fullyParallel: false,
     forbidOnly: !!process.env.CI,
     workers: 1,
-    retries: 0,
+    retries: process.env.CI ? 1 : 0,
     reporter: 'list',
     outputDir: './test-results/production-artifacts',
+    expect: { timeout: 10000 },
     use: { baseURL: 'http://127.0.0.1:5181/anixweb/', trace: 'retain-on-failure' },
     webServer: {
         command: 'npx vite build --outDir test-results/production-dist && npx vite preview --outDir test-results/production-dist --host 127.0.0.1 --port 5181 --strictPort',

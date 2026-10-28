@@ -7,6 +7,7 @@ export default defineConfig({
   base: process.env.BASE_PATH ?? '/',
   plugins: [react(), offlineShell()],
   build: {
+    chunkSizeWarningLimit: 4000,
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -15,6 +16,9 @@ export default defineConfig({
           }
           if (id.includes('node_modules/hls.js')) {
             return 'hls';
+          }
+          if (id.includes('src/shared/apiClient')) {
+            return 'apiClient';
           }
         },
       },

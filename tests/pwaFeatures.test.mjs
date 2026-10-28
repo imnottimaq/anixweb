@@ -168,6 +168,8 @@ test('Vite build succeeds for root base path and subpath /anixweb/', { timeout: 
             assert.ok(assets.some(file => file.endsWith('.js')), 'Application JavaScript is precached');
             assert.ok(assets.some(file => file.endsWith('.css')), 'Application CSS is precached');
             assert.ok(assets.some(file => file.includes('SettingsScreen') && file.endsWith('.js')), 'Lazy screens are precached');
+            assert.ok(assets.some(file => file.includes('anime4kSupport') && file.endsWith('.js')), 'anime4kSupport helper is precached');
+            assert.ok(!assets.some(file => /(?:^|\/)anime4k-[^/]+\.js$/.test(file)), 'Large anime4k chunk is excluded from precache');
             for (const asset of assets) assert.ok(existsSync(join(directory, asset)), `Precache asset exists: ${asset}`);
         }
 

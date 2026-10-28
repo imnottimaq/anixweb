@@ -24,7 +24,7 @@ export function offlineShell(): Plugin {
                     'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png',
                     'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png',
                 ]) version.update(readFileSync(resolve(root, 'public', file)));
-                const isExcludedFromPrecache = (file: string) => file.includes('anime4k');
+                const isExcludedFromPrecache = (file: string) => /(?:^|\/)anime4k-[^/]+\.js$/.test(file);
                 const assets = files.filter(file => file !== 'index.html' && !isExcludedFromPrecache(file));
                 const optionalAssets = files.filter(file => isExcludedFromPrecache(file));
                 this.emitFile({

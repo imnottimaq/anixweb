@@ -528,6 +528,54 @@ button.seen img {
     border-color: var(--accent-color);
 }
 
+.selection-error-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    margin-top: 12px;
+    border-radius: var(--radius-control);
+    background: color-mix(in srgb, #ff4d4f 12%, var(--surface-card, transparent));
+    border: 1px solid color-mix(in srgb, #ff4d4f 35%, transparent);
+    color: var(--text-color);
+    font-size: 0.88rem;
+    line-height: 1.4;
+    animation: fadeIn var(--motion-fast) ease-out;
+}
+
+.selection-error-banner svg {
+    flex: 0 0 auto;
+    color: #ff6b6b;
+}
+
+.selection-error-text {
+    flex: 1;
+    min-width: 0;
+    color: var(--text-color);
+}
+
+.selection-error-close {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: color var(--motion-fast), background-color var(--motion-fast);
+}
+
+.selection-error-close:hover {
+    color: var(--text-color);
+    background: color-mix(in srgb, var(--text-color) 10%, transparent);
+}
+
 [data-theme="dark"] .close-btn img,
 [data-theme="dark"] .episode img,
 [data-theme="dark"] .seen img {

@@ -5,7 +5,7 @@ type WorkerResponse =
     | { type: 'complete'; result: DownloadResult }
     | { type: 'error'; message: string };
 
-export function downloadHlsInWorker({ stream, filename, maxBytes, signal, onProgress }: DownloadOptions): Promise<DownloadResult> {
+export function downloadHlsInWorker({ stream, filename, maxBytes, concurrency, signal, onProgress }: DownloadOptions): Promise<DownloadResult> {
     signal?.throwIfAborted();
     return new Promise((resolve, reject) => {
         const worker = new Worker(new URL('./hlsDownload.worker.ts', import.meta.url), { type: 'module' });
@@ -28,6 +28,6 @@ export function downloadHlsInWorker({ stream, filename, maxBytes, signal, onProg
                 else reject(new Error(data.message));
             }
         };
-        worker.postMessage({ stream, filename, maxBytes });
+        worker.postMessage({ stream, filename, maxBytes, concurrency });
     });
 }

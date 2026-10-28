@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import AnimeCard from '../components/AnimeCard';
 import AnimeCardHorizontal from '../components/AnimeCardHorizontal';
+import RemoteMedia from '../components/RemoteMedia';
 import { type Anime, type Filter } from '../shared/types/api';
 import { emptyTab, type Page, type TabData } from '../shared/types/internal';
+import { getContinueWatchingList, removeContinueWatchingItem, type ContinueWatchingItem } from '../shared/watchProgress';
 import { useUser } from '../shared/contexts/userContext';
 import { useSettings } from '../shared/contexts/settingsContext';
 import styles from './HomepageScreen.module.css';
@@ -15,6 +18,7 @@ import { useReorderableTabs } from '../shared/useReorderableTabs';
 import { useLongPress } from '../shared/useLongPress';
 import TabDragHandle from '../components/TabDragHandle';
 import { moveTab } from '../shared/discover/tabs';
+import { getReadableErrorMessage } from '../shared/errorUtils';
 
 const PAGE_ITEMS: { page: Page; buttonText: 'home.my' | 'home.latest' | 'home.donghua' | 'home.ongoing' | 'home.announced' | 'home.completed' | 'home.films' }[] = [
     { page: 'donghua', buttonText: 'home.donghua' },
@@ -116,6 +120,20 @@ export default function HomepageScreen() {
     const [retryVersion, setRetryVersion] = useState(0);
     const [myFilterVersion, setMyFilterVersion] = useState(0);
     const [tabs, setTabs] = useState<Record<Page, TabData>>(createTabs);
+    const [continueWatching, setContinueWatching] = useState<ContinueWatchingItem[]>(() => getContinueWatchingList());
+
+    useEffect(() => {
+        const onFocus = () => setContinueWatching(getContinueWatchingList());
+        window.addEventListener('focus', onFocus);
+        return () => window.removeEventListener('focus', onFocus);
+    }, []);
+
+    const handleRemoveContinueWatching = useCallback((event: React.MouseEvent, animeId: number) => {
+        event.preventDefault();
+        event.stopPropagation();
+        removeContinueWatchingItem(animeId);
+        setContinueWatching(getContinueWatchingList());
+    }, []);
 
     const filterTabTarget = useCallback((target: EventTarget | null) => {
         if (!target || !(target instanceof Element)) return null;
@@ -200,7 +218,7 @@ export default function HomepageScreen() {
             .catch(error => {
                 if (latestRequestKeysRef.current.get(activePage) !== requestKey) return;
                 console.error('Не удалось загрузить релизы:', error);
-                setFilterError(t('home.loadError'));
+                setFilterError(getReadableErrorMessage(error, t) || t('home.loadError'));
                 setTabs(previousTabs => ({
                     ...previousTabs,
                     [activePage]: {
@@ -292,6 +310,63 @@ export default function HomepageScreen() {
             <span className={reorder.announcementClass} aria-live="polite" aria-atomic="true">{reorder.announcement}</span>
 
             <div className={styles.content} role="tabpanel" id={`${tabGroupId}-panel`} aria-labelledby={`${tabGroupId}-tab-${activePage}`} tabIndex={0}>
+                {continueWatching.length > 0 && (
+                    <section className={styles['continue-shelf']} aria-label={t('home.continueWatching')}>
+                        <div className={styles['continue-shelf-header']}>
+                            <h2 className={styles['continue-shelf-title']}>{t('home.continueWatching')}</h2>
+                        </div>
+                        <div className={styles['continue-shelf-scroll']}>
+                            {continueWatching.map(item => {
+                                const progressPercent = item.duration > 0
+                                    ? Math.min(100, Math.max(0, Math.round((item.seconds / item.duration) * 100)))
+                                    : 0;
+                                const episodeLabel = item.episodeName || (item.episodeNumber ? t('player.episodeTitle', { number: item.episodeNumber }) : '');
+                                return (
+                                    <div key={item.animeId} className={styles['continue-card-wrapper']}>
+                                        <Link
+                                            to={`/anime/${item.animeId}`}
+                                            state={{ openEpisodePicker: true }}
+                                            className={styles['continue-card']}
+                                            title={item.title}
+                                        >
+                                            <div className={styles['continue-card-poster']}>
+                                                <RemoteMedia
+                                                    src={item.image ?? undefined}
+                                                    alt={item.title}
+                                                    loading="lazy"
+                                                />
+                                                <div className={styles['continue-card-play-icon']}>
+                                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                                                        <polygon points="6 3 20 12 6 21 6 3" />
+                                                    </svg>
+                                                </div>
+                                                <div className={styles['continue-card-progress']}>
+                                                    <div className={styles['continue-card-progress-bar']} style={{ width: `${progressPercent}%` }} />
+                                                </div>
+                                            </div>
+                                            <div className={styles['continue-card-info']}>
+                                                <p className={styles['continue-card-title']}>{item.title}</p>
+                                                {episodeLabel && <p className={styles['continue-card-episode']}>{episodeLabel}</p>}
+                                            </div>
+                                        </Link>
+                                        <button
+                                            type="button"
+                                            className={styles['continue-card-remove']}
+                                            aria-label={t('misc.remove')}
+                                            title={t('misc.remove')}
+                                            onClick={(e) => handleRemoveContinueWatching(e, item.animeId)}
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <line x1="18" y1="6" x2="6" y2="18" />
+                                                <line x1="6" y1="6" x2="18" y2="18" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </section>
+                )}
                 {isMyTabUnconfigured ? (
                     <div className={styles['empty-my-tab']}>
                         <button type="button" className={styles['configure-button']} onClick={() => setIsFilterModalOpen(true)}>{t('misc.configure')}</button>

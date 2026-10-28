@@ -30,6 +30,7 @@ export default function BottomNav() {
     pathname.startsWith('/schedule') ||
     pathname.startsWith('/settings') ||
     pathname.startsWith('/notifications') ||
+    pathname.startsWith('/downloads') ||
     pathname.startsWith('/random');
 
   const profilePath = userToken ? '/account' : '/account/login';

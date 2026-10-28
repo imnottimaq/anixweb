@@ -5,6 +5,8 @@ import type { DownloadOptions, DownloadProgress, DownloadResult } from './downlo
 const MAX_BYTES = 256 * 1024 * 1024;
 const MAX_PLAYLIST_BYTES = 2 * 1024 * 1024;
 
+const DEFAULT_CONCURRENCY = 5;
+
 function checkAbort(signal?: AbortSignal) {
     signal?.throwIfAborted();
 }
@@ -16,12 +18,18 @@ function mediaUrl(uri: string, base: string) {
 }
 
 // Read incrementally so unknown-length responses cannot exhaust memory.
-async function readResponse(response: Response, limit: number, signal?: AbortSignal) {
+async function readResponse(
+    response: Response,
+    limit: number,
+    signal?: AbortSignal,
+    onChunk?: (length: number) => void
+) {
     if (!response.ok || !response.body) {
         await response.body?.cancel().catch(() => {});
         throw new Error(`HLS request failed: HTTP ${response.status}`);
     }
-    if (Number(response.headers.get('content-length')) > limit) {
+    const contentLength = Number(response.headers.get('content-length'));
+    if (contentLength > limit) {
         await response.body.cancel().catch(() => {});
         throw new Error('Download exceeds the 256 MB memory limit');
     }
@@ -38,6 +46,7 @@ async function readResponse(response: Response, limit: number, signal?: AbortSig
             if (done) break;
             length += value.byteLength;
             if (length > limit) throw new Error('Download exceeds the 256 MB memory limit');
+            onChunk?.(value.byteLength);
             chunks.push(value);
         }
     } catch (error) {
@@ -51,14 +60,29 @@ async function readResponse(response: Response, limit: number, signal?: AbortSig
     if (expected > 0 && !response.headers.get('content-encoding') && length !== expected) {
         throw new Error('HLS response was truncated');
     }
+    if (chunks.length === 0) return new Uint8Array(0);
+    if (chunks.length === 1) return chunks[0];
     const bytes = new Uint8Array(length);
     let offset = 0;
     for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
     return bytes;
 }
 
-export async function downloadEpisodeHls({ stream, filename, signal, onProgress, fetchFn = fetch, maxBytes = MAX_BYTES }: DownloadOptions): Promise<DownloadResult> {
+export async function downloadEpisodeHls({
+    stream,
+    filename,
+    signal,
+    onProgress,
+    fetchFn = fetch,
+    maxBytes = MAX_BYTES,
+    concurrency: customConcurrency,
+}: DownloadOptions): Promise<DownloadResult> {
     const limit = Number.isFinite(maxBytes) && maxBytes > 0 ? Math.min(MAX_BYTES, maxBytes) : MAX_BYTES;
+    const concurrency = Number.isInteger(customConcurrency) && customConcurrency! > 0
+        ? Math.max(1, Math.min(customConcurrency!, 8))
+        : DEFAULT_CONCURRENCY;
+    const maxLookahead = concurrency * 2;
+
     let playlistUrl = stream.src;
     const visited = new Set<string>();
     let segments: Segment[] = [];
@@ -96,10 +120,14 @@ export async function downloadEpisodeHls({ stream, filename, signal, onProgress,
     }
     if (!segments.length) throw new Error('HLS playlist contains no downloadable segments');
     if (segments.length > 20000) throw new Error('HLS playlist contains too many segments');
+    const hasMap = Boolean(segments[0].map);
+    const activeMap = hasMap ? JSON.stringify(segments[0].map) : '';
     for (const segment of segments) {
         if (segment.key && segment.key.method !== 'NONE') throw new Error('Encrypted HLS downloads are not supported');
         if (segment.discontinuity || (segment as Segment & { gap?: boolean }).gap) throw new Error('HLS timeline discontinuities or missing segments are not supported');
         if (!segment.uri) throw new Error('HLS segment URL is missing');
+        if (Boolean(segment.map) !== hasMap) throw new Error('HLS segment format changes are not supported');
+        if (segment.map && JSON.stringify(segment.map) !== activeMap) throw new Error('HLS initialization changes are not supported');
     }
 
     const output: Uint8Array<ArrayBuffer>[] = [];
@@ -109,8 +137,38 @@ export async function downloadEpisodeHls({ stream, filename, signal, onProgress,
         output.push(new Uint8Array(bytes));
         outputSize += bytes.byteLength;
     };
+
+    const internalController = new AbortController();
+    const internalSignal = internalController.signal;
+    let fatalError: unknown = null;
+
+    const waitingResolvers = new Map<number, (bytes: Uint8Array) => void>();
+    const waitingRejecters = new Map<number, (err: unknown) => void>();
+    const downloaded = new Map<number, Uint8Array>();
+
+    const failAll = (err: unknown) => {
+        if (fatalError) return;
+        fatalError = err;
+        internalController.abort(err);
+        for (const reject of waitingRejecters.values()) {
+            reject(err);
+        }
+        waitingResolvers.clear();
+        waitingRejecters.clear();
+        downloaded.clear();
+    };
+
+    const onUserAbort = () => {
+        const err = signal?.reason instanceof Error
+            ? signal.reason
+            : new DOMException('Download aborted', 'AbortError');
+        failAll(err);
+    };
+    signal?.addEventListener('abort', onUserAbort, { once: true });
+
     const getBytes = async (uri: string, range?: ByteRange) => {
         checkAbort(signal);
+        checkAbort(internalSignal);
         const url = mediaUrl(uri, playlistUrl);
         let headers: HeadersInit | undefined;
         if (range) {
@@ -119,21 +177,26 @@ export async function downloadEpisodeHls({ stream, filename, signal, onProgress,
             }
             headers = { Range: `bytes=${range.offset}-${range.offset + range.length - 1}` };
         }
-        const response = await fetchFn(url, { signal, headers });
+        const response = await fetchFn(url, { signal: internalSignal, headers });
         if (range && (response.status !== 206 || response.headers.get('content-range')?.split('/')[0] !== `bytes ${range.offset}-${range.offset + range.length - 1}`)) {
             await response.body?.cancel().catch(() => {});
             throw new Error('Server did not return the requested HLS byte range');
         }
-        const bytes = await readResponse(response, limit - loaded, signal);
+        const remainingLimit = limit - loaded;
+        if (remainingLimit <= 0) {
+            await response.body?.cancel().catch(() => {});
+            throw new Error('Download exceeds the 256 MB memory limit');
+        }
+        const bytes = await readResponse(response, remainingLimit, internalSignal, chunkBytes => {
+            loaded += chunkBytes;
+            if (loaded > limit) throw new Error('Download exceeds the 256 MB memory limit');
+        });
         if (!bytes.length || (range && bytes.length !== range.length)) throw new Error('Empty or incomplete HLS segment');
-        loaded += bytes.length;
         return bytes;
     };
 
     let wroteInit = false;
     let initSignature = '';
-    let activeMap = '';
-    const hasMap = Boolean(segments[0].map);
     const transmuxer = hasMap ? null : new mux.mp4.Transmuxer({ remux: true });
     transmuxer?.on('data', segment => {
         if (segment.type !== 'combined') throw new Error('HLS download requires a combined audio/video stream');
@@ -143,20 +206,69 @@ export async function downloadEpisodeHls({ stream, filename, signal, onProgress,
         if (!wroteInit) { append(segment.initSegment); wroteInit = true; initSignature = signature; }
         append(segment.data);
     });
+
     try {
-        for (let index = 0; index < segments.length; index++) {
-            const segment = segments[index];
-            if (Boolean(segment.map) !== hasMap) throw new Error('HLS segment format changes are not supported');
-            if (segment.map) {
-                const mapKey = JSON.stringify(segment.map);
-                if (activeMap && mapKey !== activeMap) throw new Error('HLS initialization changes are not supported');
-                if (!activeMap) {
-                    const init = await getBytes(segment.map.uri, segment.map.byterange);
-                    if (String.fromCharCode(...init.subarray(4, 8)) !== 'ftyp') throw new Error('Invalid HLS MP4 initialization');
-                    append(init); activeMap = mapKey;
-                }
+        if (hasMap) {
+            const init = await getBytes(segments[0].map!.uri, segments[0].map!.byterange);
+            if (String.fromCharCode(...init.subarray(4, 8)) !== 'ftyp') throw new Error('Invalid HLS MP4 initialization');
+            append(init);
+        }
+
+        let nextFetchIndex = 0;
+        let nextProcessIndex = 0;
+        let activeFetches = 0;
+
+        const scheduleFetches = () => {
+            if (fatalError || internalSignal.aborted) return;
+            while (
+                activeFetches < concurrency &&
+                nextFetchIndex < segments.length &&
+                nextFetchIndex < nextProcessIndex + maxLookahead
+            ) {
+                const indexToFetch = nextFetchIndex++;
+                activeFetches++;
+                const seg = segments[indexToFetch];
+                getBytes(seg.uri, seg.byterange)
+                    .then(bytes => {
+                        activeFetches--;
+                        if (fatalError || internalSignal.aborted) return;
+                        const resolver = waitingResolvers.get(indexToFetch);
+                        if (resolver) {
+                            waitingResolvers.delete(indexToFetch);
+                            waitingRejecters.delete(indexToFetch);
+                            resolver(bytes);
+                        } else {
+                            downloaded.set(indexToFetch, bytes);
+                        }
+                        scheduleFetches();
+                    })
+                    .catch(err => {
+                        activeFetches--;
+                        failAll(err);
+                    });
             }
-            const bytes = await getBytes(segment.uri, segment.byterange);
+        };
+
+        const getSegmentBytes = (indexToGet: number): Promise<Uint8Array> => {
+            if (fatalError) return Promise.reject(fatalError);
+            if (downloaded.has(indexToGet)) {
+                const bytes = downloaded.get(indexToGet)!;
+                downloaded.delete(indexToGet);
+                return Promise.resolve(bytes);
+            }
+            return new Promise<Uint8Array>((resolve, reject) => {
+                waitingResolvers.set(indexToGet, resolve);
+                waitingRejecters.set(indexToGet, reject);
+            });
+        };
+
+        scheduleFetches();
+
+        for (let index = 0; index < segments.length; index++) {
+            checkAbort(signal);
+            if (fatalError) throw fatalError;
+            const bytes = await getSegmentBytes(index);
+            checkAbort(signal);
             if (hasMap) {
                 const box = String.fromCharCode(...bytes.subarray(4, 8));
                 if (!['styp', 'sidx', 'moof', 'emsg', 'prft'].includes(box)) throw new Error('Invalid HLS MP4 fragment');
@@ -167,18 +279,26 @@ export async function downloadEpisodeHls({ stream, filename, signal, onProgress,
                 transmuxer!.push(bytes); transmuxer!.flush();
                 if (outputSize === previousSize) throw new Error('HLS segment contains no compatible audio/video');
             }
+            nextProcessIndex = index + 1;
+            scheduleFetches();
             const progress: DownloadProgress = {
                 loaded, total: 0, percent: Math.min(99, Math.round((index + 1) / segments.length * 100)),
                 completedSegments: index + 1, totalSegments: segments.length,
             };
             onProgress?.(progress);
         }
+
         checkAbort(signal);
         const blob = new Blob(output, { type: 'video/mp4' });
         onProgress?.({ loaded, total: loaded, percent: 100, completedSegments: segments.length, totalSegments: segments.length });
         return { blob, size: blob.size, filename };
     } finally {
+        signal?.removeEventListener('abort', onUserAbort);
+        failAll(new Error('Operation terminated'));
         output.length = 0;
+        downloaded.clear();
+        waitingResolvers.clear();
+        waitingRejecters.clear();
         transmuxer?.dispose();
     }
 }

@@ -18,6 +18,7 @@ import { plural } from '../shared/plural';
 import { Modal } from '../modals/ModalTemplate';
 import CommentsModal from '../modals/CommentsModal';
 import { useAsyncLoad } from '../shared/useAsyncLoad';
+import { getReadableErrorMessage } from '../shared/errorUtils';
 
 //Icons
 import peopleIcon from "../assets/icons/users.svg"
@@ -134,7 +135,7 @@ export default function ReleaseScreen(){
         } catch (error) {
             setMyCollections([]);
             console.error('Failed to load collections:', error);
-            setCollectionActionError(t('release.collectionsLoadError'));
+            setCollectionActionError(getReadableErrorMessage(error, t) || t('release.collectionsLoadError'));
         } finally {
             setIsCollectionsLoading(false);
         }
@@ -153,7 +154,7 @@ export default function ReleaseScreen(){
             console.error('Failed to add release to collection:', error);
             setCollectionActionError(error instanceof Error && error.message === 'API error: 5'
                 ? t('release.alreadyInCollection')
-                : t('release.collectionAddError'));
+                : (getReadableErrorMessage(error, t) || t('release.collectionAddError')));
         } finally {
             setCollectionActionId(null);
         }
@@ -371,7 +372,7 @@ export default function ReleaseScreen(){
             .catch(error => {
                 if (!isCurrent || controller.signal.aborted) return;
                 console.error('Не удалось загрузить релиз:', error);
-                setReleaseLoadError({ key: releaseAttemptKey, message: t('release.loadError') });
+                setReleaseLoadError({ key: releaseAttemptKey, message: getReadableErrorMessage(error, t) || t('release.loadError') });
             })
             .finally(() => {
                 if (isCurrent) setLoadedRequestKey(releaseAttemptKey);
@@ -620,7 +621,7 @@ export default function ReleaseScreen(){
                             {t('comments.writePlaceholder')}
                         </button>
                         {isCommentsLoading && <p className={styles['empty-comments']}>{t('misc.loading')}</p>}
-                        {Boolean(commentsLoadError) && <p className={styles['comment-error']}>{t('release.loadError')}</p>}
+                        {Boolean(commentsLoadError) && <p className={styles['comment-error']}>{getReadableErrorMessage(commentsLoadError, t) || t('release.loadError')}</p>}
                         {!isCommentsLoading && !commentsLoadError && firstPageComments.length === 0 && <p className={styles['empty-comments']}>{t('release.noComments')}</p>}
                         {!isCommentsLoading && <div className={styles['comments-page-list']}>
                             {firstPageComments.map((comment: CommentType) => (
@@ -984,7 +985,7 @@ export default function ReleaseScreen(){
 
                     {/* Comments preview */}
                     {isCommentsLoading && <p className={styles['empty-comments']}>{t('misc.loading')}</p>}
-                    {Boolean(commentsLoadError) && <p className={styles['comment-error']}>{t('release.loadError')}</p>}
+                    {Boolean(commentsLoadError) && <p className={styles['comment-error']}>{getReadableErrorMessage(commentsLoadError, t) || t('release.loadError')}</p>}
                     {!isCommentsLoading && !commentsLoadError && firstPageComments.length === 0 && (
                         <p className={styles['empty-comments']}>{t('release.noComments')}</p>
                     )}
@@ -1152,6 +1153,7 @@ export default function ReleaseScreen(){
                         sources,
                         animeId: animeData.id,
                         animeName: getReleaseTitle(animeData, settings.appearance.language),
+                        image: animeData.image,
                         episodeNumber: episode.position,
                         episodeName: episode.name,
                         episodes,

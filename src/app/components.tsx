@@ -29,3 +29,4 @@ export const FriendsPage = lazy(() => import('../pages/FriendsPage'));
 
 export const PopularScreen = lazy(() => import('../pages/PopularScreen'));
 export const ScheduleScreen = lazy(() => import('../pages/ScheduleScreen'));
+export const DownloadsScreen = lazy(() => import('../pages/DownloadsScreen'));

@@ -94,6 +94,7 @@ function harness(options = {}) {
         canUseAnime4KVideo: () => false, isSafariBrowser: () => false, WatchRoomSocket: Socket, getRoomParticipant: () => ({}),
         getWatchProgress: () => ({ '1': { '1': 120, '2': 90 } }),
         saveWatchProgress: (...args) => saved.push(args),
+        saveContinueWatchingItem: () => {},
         clearPlayerSession: () => { sessionCleared = true; },
         extractVideoLinks: options.extract ?? (async () => sources),
         Hls: { isSupported: () => false }, HLS_MIME_TYPE: 'application/x-mpegURL',
@@ -604,3 +605,37 @@ test('picture-in-picture button renders, reflects active state, and hotkeys trig
     await Promise.resolve();
     assert.equal(pipRequested, 3);
 });
+
+test('sleep timer can be set, displayed on badge, and pauses playback on episode end or timer expiry', async () => {
+    const h = harness();
+    h.state.isPlayerSettingsOpen = true;
+    h.render();
+
+    const btn15 = h.find(node => node.tag === 'button' && node.props.children?.[0] === 'player.sleepTimer.min');
+    assert.ok(btn15, '15 minute sleep timer button found');
+
+    btn15.props.onClick();
+    assert.equal(h.state.sleepTimer, 15);
+    assert.ok(h.state.sleepTimerOsd, 'sleep timer OSD shown');
+    assert.equal(h.state.sleepTimerOsd.visible, true);
+
+    // Badge reflects active timer
+    h.render();
+    const badge = h.find(node => node.tag === 'span' && node.props?.title === 'player.sleepTimer');
+    assert.ok(badge, 'sleep timer badge is visible in settings button');
+
+    // Setting to episode
+    const btnEpisode = h.find(node => node.tag === 'button' && node.props.children?.[0] === 'player.sleepTimer.endOfEpisode');
+    assert.ok(btnEpisode, 'episode sleep timer button found');
+    btnEpisode.props.onClick();
+    assert.equal(h.state.sleepTimer, 'episode');
+    assert.equal(h.refs.sleepTimerRef.current, 'episode');
+
+    // Video ending with episode sleep timer stops playback without triggering next episode countdown
+    h.event('onEnded');
+    assert.equal(h.state.isPlaying, false);
+    assert.equal(h.state.sleepTimer, 'off');
+    assert.equal(h.state.nextEpisodeCountdown, null);
+    assert.ok(h.state.sleepTimerOsd, 'triggered OSD shown');
+});
+

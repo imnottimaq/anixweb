@@ -6,6 +6,7 @@ export interface PlayerSession {
     sources: VideoSources;
     animeId: number;
     animeName: string;
+    image?: string | null;
     episodeNumber?: number;
     episodeName?: string;
     episodes?: PlayerSessionEpisode[];

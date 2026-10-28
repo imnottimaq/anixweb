@@ -9,6 +9,7 @@ import { Modal } from './ModalTemplate';
 import { useSettings } from '../shared/contexts/settingsContext';
 import { useTranslation } from '../shared/useTranslation';
 import { useApi } from '../shared/apiClient';
+import { getReadableErrorMessage } from '../shared/errorUtils';
 
 interface DubSelectModalProps {
     isOpen: boolean;
@@ -178,6 +179,7 @@ export default function DubSelectModal({
     const [isSourcesLoading, setIsSourcesLoading] = useState(false);
     const [isEpisodesLoading, setIsEpisodesLoading] = useState(false);
     const [loadError, setLoadError] = useState<string | null>(null);
+    const [selectionError, setSelectionError] = useState<string | null>(null);
     const [focusedEpisodeIndex, setFocusedEpisodeIndex] = useState(-1);
 
     const activeFocusedIndex = focusedEpisodeIndex !== -1 ? focusedEpisodeIndex : primaryMatchIndex;
@@ -194,6 +196,7 @@ export default function DubSelectModal({
         selectionRef.current?.controller.abort();
         selectionRef.current = null;
         setIsSelecting(false);
+        setSelectionError(null);
         setFocusedEpisodeIndex(-1);
     }, []);
 
@@ -275,7 +278,7 @@ export default function DubSelectModal({
             .catch(err => {
                 if (requestId === episodesRequestRef.current) {
                     console.error(err);
-                    setLoadError(t('roadmap.player.pickerError') || 'Не удалось загрузить список серий');
+                    setLoadError(getReadableErrorMessage(err, t) || t('roadmap.player.pickerError') || 'Не удалось загрузить список серий');
                 }
             })
             .finally(() => {
@@ -315,7 +318,7 @@ export default function DubSelectModal({
             .catch(err => {
                 if (requestId === sourcesRequestRef.current) {
                     console.error(err);
-                    setLoadError(t('roadmap.player.pickerError') || 'Не удалось загрузить источники');
+                    setLoadError(getReadableErrorMessage(err, t) || t('roadmap.player.pickerError') || 'Не удалось загрузить источники');
                 }
             })
             .finally(() => {
@@ -353,7 +356,7 @@ export default function DubSelectModal({
             .catch(err => {
                 if (requestId === dubsRequestRef.current) {
                     console.error(err);
-                    setLoadError(t('roadmap.player.pickerError') || 'Не удалось загрузить список озвучек');
+                    setLoadError(getReadableErrorMessage(err, t) || t('roadmap.player.pickerError') || 'Не удалось загрузить список озвучек');
                 }
             })
             .finally(() => {
@@ -393,24 +396,32 @@ export default function DubSelectModal({
         const controller = new AbortController();
         selectionRef.current = { id, controller };
         setIsSelecting(true);
+        setSelectionError(null);
         const sourceId = selectedSource;
         const dubId = selectedDub;
         const episodes = episodesData.map(({ name, position, url }) => ({ name, position, url }));
         try {
-        const sources = resolveSources ? await extractVideoLinks(episode.url, controller.signal) : {};
-        if (controller.signal.aborted || id !== selectionGenerationRef.current) return;
-        if (!sources) throw new Error('Не удалось получить ссылки на видео');
-        if (resolveSources && shouldMarkWatched && token) await SetWatched(api, releaseId, sourceId, episode.position);
-        if (controller.signal.aborted || id !== selectionGenerationRef.current) return;
-        onEpisodeSelect(sources, {
-            name: episode.name,
-            position: episode.position,
-            url: episode.url,
-        }, episodes, sourceId, dubId);
+            const sources = resolveSources ? await extractVideoLinks(episode.url, controller.signal) : {};
+            if (controller.signal.aborted || id !== selectionGenerationRef.current) return;
+            if (!sources || (resolveSources && Object.keys(sources).length === 0)) {
+                throw new Error(t('dubSelect.extractError'));
+            }
+            if (resolveSources && shouldMarkWatched && token) await SetWatched(api, releaseId, sourceId, episode.position);
+            if (controller.signal.aborted || id !== selectionGenerationRef.current) return;
+            onEpisodeSelect(sources, {
+                name: episode.name,
+                position: episode.position,
+                url: episode.url,
+            }, episodes, sourceId, dubId);
+        } catch (error) {
+            if (!controller.signal.aborted && id === selectionGenerationRef.current) {
+                console.error('Ошибка при выборе серии:', error);
+                setSelectionError(getReadableErrorMessage(error, t) || t('dubSelect.extractError'));
+            }
         } finally {
             if (selectionRef.current?.id === id) { selectionRef.current = null; setIsSelecting(false); }
         }
-    }, [api, episodesData, isDubsLoading, isEpisodesLoading, isOpen, isSourcesLoading, loadError, onEpisodeSelect, releaseId, resolveSources, selectedDub, selectedSource, token]);
+    }, [api, episodesData, isDubsLoading, isEpisodesLoading, isOpen, isSourcesLoading, loadError, onEpisodeSelect, releaseId, resolveSources, selectedDub, selectedSource, token, t]);
 
     useEffect(() => {
         if (!isOpen || isDubsLoading || isSourcesLoading || isEpisodesLoading || loadError || autoDubId === undefined || autoSrcId === undefined || autoEpNumber === undefined) return;
@@ -703,6 +714,24 @@ export default function DubSelectModal({
                                     </label>
                                 )}
                         </div>
+
+                        {selectionError && (
+                            <div className={styles['selection-error-banner']} role="alert">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="12" y1="8" x2="12" y2="12" />
+                                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                                </svg>
+                                <span className={styles['selection-error-text']}>{selectionError}</span>
+                                <button
+                                    type="button"
+                                    className={styles['selection-error-close']}
+                                    onClick={() => setSelectionError(null)}
+                                    aria-label={t('dubSelect.dismiss')}
+                                    title={t('dubSelect.dismiss')}
+                                >×</button>
+                            </div>
+                        )}
 
                         {resumeTarget && !isLoading && !loadError && (
                             <div className={styles['resume-header-banner']}>

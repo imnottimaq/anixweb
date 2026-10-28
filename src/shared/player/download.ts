@@ -67,6 +67,7 @@ export interface DownloadOptions {
     signal?: AbortSignal;
     fetchFn?: typeof fetch;
     maxBytes?: number;
+    concurrency?: number;
 }
 
 export interface DownloadResult {
@@ -143,7 +144,10 @@ export async function downloadEpisodeDirect({
                     await reader.cancel('Exceeded maximum size').catch(() => {});
                     throw new Error(`Download exceeded maximum supported limit of ${formatBytes(limit)}`);
                 }
-                const ownedChunk: Uint8Array<ArrayBuffer> = value.slice();
+                const ownedChunk: Uint8Array<ArrayBuffer> =
+                    (value.byteOffset === 0 && value.byteLength === value.buffer.byteLength)
+                        ? (value as Uint8Array<ArrayBuffer>)
+                        : value.slice();
                 chunks.push(ownedChunk);
                 const percent = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
                 onProgress?.({ loaded, total, percent });
@@ -239,10 +243,20 @@ export function useEpisodeDownload() {
         stream,
         filename,
         fetchFn,
+        metadata,
     }: {
         stream: { src: string; type?: string };
         filename: string;
         fetchFn?: typeof fetch;
+        metadata?: {
+            releaseId: number;
+            releaseTitle: string;
+            releaseTitleRu?: string;
+            episodeNumber: number;
+            episodeName?: string;
+            quality?: string;
+            posterUrl?: string;
+        };
     }) => {
         reset();
         const currentJobId = ++jobIdRef.current;
@@ -274,6 +288,27 @@ export function useEpisodeDownload() {
             });
 
             if (currentJobId !== jobIdRef.current || controller.signal.aborted) return;
+
+            if (metadata) {
+                try {
+                    const { saveDownloadedEpisode } = await import('../storage/opfsStorage.ts');
+                    await saveDownloadedEpisode({
+                        releaseId: metadata.releaseId,
+                        releaseTitle: metadata.releaseTitle,
+                        releaseTitleRu: metadata.releaseTitleRu,
+                        episodeNumber: metadata.episodeNumber,
+                        episodeName: metadata.episodeName,
+                        quality: metadata.quality,
+                        filename: result.filename,
+                        blob: result.blob,
+                        size: result.size,
+                        posterUrl: metadata.posterUrl,
+                    });
+                } catch (saveErr) {
+                    console.warn('Failed to save to OPFS offline storage:', saveErr);
+                }
+            }
+
             triggerBrowserFileDownload(result.blob, result.filename);
             setStatus('completed');
         } catch (err: unknown) {

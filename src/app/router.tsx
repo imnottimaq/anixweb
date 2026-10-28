@@ -7,7 +7,7 @@ import RouteErrorPage from '../components/RouteErrorPage';
 import { HomepageScreen, OverviewScreen, FavoritesScreen, ReleaseScreen, PlayerScreen, FranchiseScreen,
     PopularScreen, ScheduleScreen, AccountScreen, EditAccountScreen, LoginScreen, RecoverScreen, NewAccountScreen, RandomAnime, SettingsScreen, FeedScreen, FeedChannelScreen, FeedPostScreen, FeedStudioScreen, FeedComposeScreen,
     NotificationsScreen, NotificationSettingsScreen, ReleaseNotificationSettingsScreen, WatchRoomScreen, FilterSearchScreen,
-    CollectionScreen, CollectionsScreen, FriendsPage
+    CollectionScreen, CollectionsScreen, FriendsPage, DownloadsScreen
  } from './components';
 
 function lazyPage(page: ReactNode) {
@@ -57,6 +57,7 @@ export const router = createBrowserRouter([
     { path: 'together/:roomId', element: lazyPage(<WatchRoomScreen />) },
     { path: 'collections', element: lazyPage(<CollectionsScreen />) },
     { path: 'collection/:id', element: lazyPage(<CollectionScreen />)},
+    { path: 'downloads', element: lazyPage(<DownloadsScreen />) },
     { path: '*', element: <RouteErrorPage notFound /> },
     ] },
     ],

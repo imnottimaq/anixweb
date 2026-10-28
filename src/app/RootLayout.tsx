@@ -112,6 +112,7 @@ function RootLayoutContent() {
           <NavLink to="/favorites" className={navClassName}>{t('nav.favorites')}</NavLink>
           <NavLink to={userToken ? '/account' : '/account/login'} className={navClassName}>{t('nav.account')}</NavLink>
           <NavLink to="/collections" className={navClassName}>{t('nav.collections')}</NavLink>
+          <NavLink to="/downloads" className={navClassName}>{t('nav.downloads')}</NavLink>
           <NavLink to="/together" className={navClassName}>{t('nav.watchTogether')}</NavLink>
         </nav>
         {isMenuOpen && <div className={styles.backdrop} onClick={() => { setIsMenuOpen(false); menuButtonRef.current?.focus(); }} aria-hidden="true" />}

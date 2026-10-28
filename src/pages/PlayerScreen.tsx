@@ -15,7 +15,7 @@ import { useSettings } from '../shared/contexts/settingsContext';
 import { defaultPlayerKeybindings } from '../shared/types/settings';
 import { useUser } from '../shared/contexts/userContext';
 import { clearPlayerSession, getPlayerSession, setPlayerSession, type PlayerSession } from '../shared/playerSession';
-import { getWatchProgress, saveWatchProgress } from '../shared/watchProgress';
+import { getWatchProgress, saveWatchProgress, saveContinueWatchingItem } from '../shared/watchProgress';
 import { extractVideoLinks } from '../utils/LinkParser';
 import { canUseAnime4KVideo, checkAnime4KVideoSupport, isSafariBrowser } from '../shared/anime4kSupport';
 import { useTranslation } from '../shared/useTranslation';
@@ -26,6 +26,7 @@ import RoomPanel from '../components/RoomPanel';
 import ReactionOverlay from '../components/ReactionOverlay';
 import { useRoomPresence } from '../shared/contexts/roomContext';
 import { useApi } from '../shared/apiClient';
+import { getReadableErrorMessage } from '../shared/errorUtils';
 import { createUpscalerScope } from '../shared/upscalerScope';
 import { getCorsProxyUrl } from '../shared/proxy';
 import {
@@ -247,6 +248,8 @@ function PlayerLoadingDialog({ children, onClose }: { children: React.ReactNode;
     return <div ref={ref} tabIndex={-1} className={styles.overlay} role="dialog" aria-modal="true" aria-label={t('player.ariaLabel')}>{children}</div>;
 }
 
+type SleepTimerOption = 'off' | 'episode' | 15 | 30 | 45 | 60;
+
 function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSession: PlayerSession; onSessionChange: (session: PlayerSession) => void; roomId: string | null }) {
     const navigate = useNavigate();
     const { settings, setSettings } = useSettings();
@@ -317,6 +320,9 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     const [isPipActive, setIsPipActive] = useState(false);
     const [volumeOsd, setVolumeOsd] = useState<{ level: number; muted: boolean; visible: boolean } | null>(null);
     const [streamError, setStreamError] = useState<string | null>(null);
+    const [sleepTimer, setSleepTimer] = useState<SleepTimerOption>('off');
+    const [sleepTimerRemainingSeconds, setSleepTimerRemainingSeconds] = useState<number | null>(null);
+    const [sleepTimerOsd, setSleepTimerOsd] = useState<{ text: string; visible: boolean } | null>(null);
     const promptedEpisodeRef = useRef<string | null>(null);
     const autoplayAttemptedRef = useRef(false);
     const autoFullscreenTriggeredRef = useRef(false);
@@ -328,6 +334,9 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     const countdownDialogRef = useRef<HTMLDivElement>(null);
     const countdownIntervalRef = useRef<number | null>(null);
     const volumeOsdTimeoutRef = useRef<number | null>(null);
+    const sleepTimerRef = useRef<SleepTimerOption>('off');
+    const sleepTimerEndsAtRef = useRef<number | null>(null);
+    const sleepTimerOsdTimeoutRef = useRef<number | null>(null);
     const resumePendingRef = useRef(false);
     const loadPlaybackRef = useRef<boolean | null>(null);
     const metadataLoadedRef = useRef(false);
@@ -425,13 +434,24 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
         if (!settings.content.rememberEpisodeTime || !video || !metadataLoadedRef.current || resumePendingRef.current
             || !Number.isFinite(video.currentTime)) return;
 
-        saveWatchProgress(animeId, episodeKey, video.ended ? -1 : Math.floor(video.currentTime));
-    }, [animeId, episodeKey, settings.content.rememberEpisodeTime]);
+        const isEnded = video.ended;
+        const time = isEnded ? -1 : Math.floor(video.currentTime);
+        saveWatchProgress(animeId, episodeKey, time);
+        saveContinueWatchingItem({
+            animeId,
+            title: animeName,
+            image: playerSession.image ?? null,
+            episodeNumber,
+            episodeName,
+            seconds: time,
+            duration: Math.floor(video.duration || 0),
+        });
+    }, [animeId, animeName, episodeKey, episodeName, episodeNumber, playerSession.image, settings.content.rememberEpisodeTime]);
 
     const sendRoomPlayback = useCallback((type: 'play' | 'pause' | 'seek' | 'set_rate', position: number, rate?: number) => {
         if (!roomId || !(type === 'pause' ? canPauseRoom : canControlRoom)) return;
-        void send(type === 'set_rate' ? { type, position, rate: rate ?? 1 } : { type, position }).catch(error => setStreamError(String(error)));
-    }, [canControlRoom, canPauseRoom, roomId, send]);
+        void send(type === 'set_rate' ? { type, position, rate: rate ?? 1 } : { type, position }).catch(error => setStreamError(getReadableErrorMessage(error, t)));
+    }, [canControlRoom, canPauseRoom, roomId, send, t]);
 
     useEffect(() => {
         const video = videoRef.current;
@@ -865,6 +885,59 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
         triggerVolumeOsd(Math.round(nextVolume * 100), nextVolume === 0);
     }, [isDownloadModalOpen, isPlayerSettingsOpen, nextEpisodeCountdown, resumePromptTime, setSettings, triggerVolumeOsd]);
 
+    const triggerSleepTimerOsd = useCallback((text: string) => {
+        setSleepTimerOsd({ text, visible: true });
+        if (sleepTimerOsdTimeoutRef.current !== null) window.clearTimeout(sleepTimerOsdTimeoutRef.current);
+        sleepTimerOsdTimeoutRef.current = window.setTimeout(() => {
+            setSleepTimerOsd(prev => (prev ? { ...prev, visible: false } : null));
+        }, 2200);
+    }, []);
+
+    const handleSetSleepTimer = useCallback((option: SleepTimerOption) => {
+        setSleepTimer(option);
+        sleepTimerRef.current = option;
+        if (option === 'off') {
+            sleepTimerEndsAtRef.current = null;
+            setSleepTimerRemainingSeconds(null);
+            triggerSleepTimerOsd(t('player.sleepTimer.turnedOff'));
+        } else if (option === 'episode') {
+            sleepTimerEndsAtRef.current = null;
+            setSleepTimerRemainingSeconds(null);
+            triggerSleepTimerOsd(t('player.sleepTimer.setEndOfEpisode'));
+        } else {
+            const endsAt = Date.now() + option * 60 * 1000;
+            sleepTimerEndsAtRef.current = endsAt;
+            setSleepTimerRemainingSeconds(option * 60);
+            triggerSleepTimerOsd(t('player.sleepTimer.setMinutes', { minutes: option }));
+        }
+    }, [t, triggerSleepTimerOsd]);
+
+    useEffect(() => {
+        if (typeof sleepTimer !== 'number') return;
+        const interval = window.setInterval(() => {
+            const endsAt = sleepTimerEndsAtRef.current;
+            if (!endsAt) return;
+            const remaining = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
+            setSleepTimerRemainingSeconds(remaining);
+            if (remaining <= 0) {
+                setSleepTimer('off');
+                sleepTimerRef.current = 'off';
+                sleepTimerEndsAtRef.current = null;
+                setSleepTimerRemainingSeconds(null);
+                const video = videoRef.current;
+                if (video) {
+                    if (roomId) {
+                        sendRoomPlayback('pause', video.currentTime);
+                    } else {
+                        video.pause();
+                    }
+                }
+                triggerSleepTimerOsd(t('player.sleepTimer.triggered'));
+            }
+        }, 1000);
+        return () => window.clearInterval(interval);
+    }, [roomId, sendRoomPlayback, sleepTimer, t, triggerSleepTimerOsd]);
+
     useEffect(() => {
         return () => {
             if (volumeOsdTimeoutRef.current !== null) {
@@ -872,6 +945,9 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
             }
             if (countdownIntervalRef.current !== null) {
                 window.clearInterval(countdownIntervalRef.current);
+            }
+            if (sleepTimerOsdTimeoutRef.current !== null) {
+                window.clearTimeout(sleepTimerOsdTimeoutRef.current);
             }
         };
     }, []);
@@ -1133,7 +1209,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
             } catch (error) {
                 episodeChangePendingRef.current = false;
                 setIsEpisodeChanging(false);
-                setStreamError(String(error));
+                setStreamError(getReadableErrorMessage(error, t) || t('player.nextEpisodeError'));
             }
             return;
         }
@@ -1163,7 +1239,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
         } catch (error) {
             if (!playerClosedRef.current && requestId === episodeRequestRef.current) {
                 console.error('Не удалось сменить серию:', error);
-                setStreamError(t('player.streamUnavailable'));
+                setStreamError(getReadableErrorMessage(error, t) || t('player.streamUnavailable'));
             }
         } finally {
             if (!playerClosedRef.current && requestId === episodeRequestRef.current) {
@@ -1516,7 +1592,14 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                                 onClick={() => setIsPlayerSettingsOpen(isOpen => !isOpen)}
                                 aria-label={t('player.settings')}
                                 aria-expanded={isPlayerSettingsOpen}
-                            ><img src={SettingsIcon} alt="" /></button>
+                            >
+                                <img src={SettingsIcon} alt="" />
+                                {sleepTimer !== 'off' && (
+                                    <span className={styles['sleep-timer-badge']} title={t('player.sleepTimer')}>
+                                        {sleepTimer === 'episode' ? '1ep' : `${typeof sleepTimer === 'number' && sleepTimerRemainingSeconds !== null ? Math.ceil(sleepTimerRemainingSeconds / 60) : sleepTimer}m`}
+                                    </span>
+                                )}
+                            </button>
                             {isPlayerSettingsOpen && <div className={styles['player-settings-menu']}>
                                 <section>
                                     <span className={styles['settings-label']}>{t('player.quality')}</span>
@@ -1595,6 +1678,33 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                                         {(Object.keys(ASPECT_RATIOS) as AspectRatio[]).map(ratio => (
                                             <button key={ratio} type="button" className={aspectRatio === ratio ? styles.selected : ''} onClick={() => setAspectRatio(ratio)}>{ratio === 'original' ? t('player.originalAspectRatio') : ratio}</button>
                                         ))}
+                                    </div>
+                                </section>
+                                <section>
+                                    <span className={styles['settings-label']}>{t('player.sleepTimer')}</span>
+                                    <div className={styles['settings-options']}>
+                                        {(['off', 'episode', 15, 30, 45, 60] as const).map(option => {
+                                            const isCurrent = sleepTimer === option;
+                                            let label = option === 'off'
+                                                ? t('player.sleepTimer.off')
+                                                : option === 'episode'
+                                                    ? t('player.sleepTimer.endOfEpisode')
+                                                    : t('player.sleepTimer.min', { minutes: option });
+                                            if (isCurrent && typeof option === 'number' && sleepTimerRemainingSeconds !== null) {
+                                                const mins = Math.ceil(sleepTimerRemainingSeconds / 60);
+                                                label = `${mins}m (${formatTime(sleepTimerRemainingSeconds)})`;
+                                            }
+                                            return (
+                                                <button
+                                                    key={String(option)}
+                                                    type="button"
+                                                    className={isCurrent ? styles.selected : ''}
+                                                    onClick={() => handleSetSleepTimer(option)}
+                                                >
+                                                    {label}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 </section>
                             </div>}
@@ -1768,6 +1878,15 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                     onEnded={() => {
                         setIsPlaying(false);
                         saveEpisodeTime();
+                        if (sleepTimerRef.current === 'episode') {
+                            setSleepTimer('off');
+                            sleepTimerRef.current = 'off';
+                            triggerSleepTimerOsd(t('player.sleepTimer.triggered'));
+                            if (roomId && watchRoom?.hostId === roomProfileId && videoRef.current) {
+                                sendRoomPlayback('pause', videoRef.current.currentTime);
+                            }
+                            return;
+                        }
                         if (settings.player.autoplay && nextEpisode && (!roomId || watchRoom?.hostId === roomProfileId)) {
                             setNextEpisodeCountdown(5);
                         } else if (roomId && watchRoom?.hostId === roomProfileId && videoRef.current) {
@@ -1833,7 +1952,39 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                 </div>
                 {roomId && isRoomPanelOpen && <div id="watch-room-panel" className={styles['room-panel']}><RoomPanel compact /></div>}
                 {roomId && streamError?.includes('Браузер') && <button className={styles['unlock-playback']} onClick={() => { void videoRef.current?.play().then(() => setStreamError(null)).catch(() => {}); }}>Включить видео</button>}
-                {streamError && <div className={styles['stream-error']} role="status">{streamError}</div>}
+                {streamError && (
+                    <div className={styles['stream-error']} role="status">
+                        <div className={styles['stream-error-message']}>{streamError}</div>
+                        <div className={styles['stream-error-actions']}>
+                            <button
+                                type="button"
+                                className={styles['stream-error-retry']}
+                                onClick={() => {
+                                    setStreamError(null);
+                                    setIsBuffering(true);
+                                    if (videoRef.current) {
+                                        videoRef.current.load();
+                                        void videoRef.current.play().catch(() => {});
+                                    }
+                                }}
+                            >
+                                {t('player.retryStream')}
+                            </button>
+                            {playerSession.episodes && playerSession.episodes.length > 1 && (
+                                <button
+                                    type="button"
+                                    className={styles['stream-error-action']}
+                                    onClick={() => {
+                                        setStreamError(null);
+                                        setIsEpisodeDrawerOpen(true);
+                                    }}
+                                >
+                                    {t('player.selectDub')}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
                 {volumeOsd && (
                     <div
                         className={`${styles['volume-osd']} ${volumeOsd.visible ? styles['volume-osd-visible'] : ''}`}
@@ -1846,6 +1997,19 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                             <div className={styles['volume-osd-fill']} style={{ width: `${volumeOsd.muted ? 0 : volumeOsd.level}%` }} />
                         </div>
                         <span className={styles['volume-osd-text']}>{volumeOsd.muted ? '0%' : `${volumeOsd.level}%`}</span>
+                    </div>
+                )}
+                {sleepTimerOsd && (
+                    <div
+                        className={`${styles['sleep-timer-osd']} ${sleepTimerOsd.visible ? styles['sleep-timer-osd-visible'] : ''}`}
+                        role="status"
+                        aria-live="polite"
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                        </svg>
+                        <span>{sleepTimerOsd.text}</span>
                     </div>
                 )}
                 {nextEpisodeCountdown !== null && nextEpisode && (
@@ -1960,7 +2124,12 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                                 }
 
                                 if (downloadStatus === 'completed') {
-                                    return <div className={styles['download-status-complete']}>{t('roadmap.player.downloadStatusComplete')}</div>;
+                                    return (
+                                        <div className={styles['download-status-complete']}>
+                                            <p>{t('roadmap.player.downloadStatusComplete')}</p>
+                                            <p className={styles['download-opfs-note']}>{t('downloads.savedNotice')}</p>
+                                        </div>
+                                    );
                                 }
 
                                 if (downloadStatus === 'error') {
@@ -1995,6 +2164,19 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                                         >
                                             {t('roadmap.player.downloadClose')}
                                         </button>
+                                        {downloadStatus === 'completed' && (
+                                            <button
+                                                type="button"
+                                                className={styles['download-btn-primary']}
+                                                onClick={() => {
+                                                    resetDownload();
+                                                    setIsDownloadModalOpen(false);
+                                                    navigate('/downloads');
+                                                }}
+                                            >
+                                                {t('downloads.openPage')}
+                                            </button>
+                                        )}
                                         {(() => {
                                             const activeQ = downloadSelectedQuality || selectedQuality;
                                             const activeStream = downloadOptions.find(option => option.quality === activeQ);
@@ -2010,7 +2192,18 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                                                             const epNum = episodeNumber !== undefined ? episodeNumber : 1;
                                                             const rawName = `${animeName} - Ep ${epNum} (${activeQ}p).mp4`;
                                                             const filename = sanitizeFilename(rawName);
-                                                            void startDownload({ stream: activeStream, filename });
+                                                            void startDownload({
+                                                                stream: activeStream,
+                                                                filename,
+                                                                metadata: {
+                                                                    releaseId: animeId,
+                                                                    releaseTitle: animeName,
+                                                                    episodeNumber: epNum,
+                                                                    episodeName,
+                                                                    quality: activeQ,
+                                                                    posterUrl: playerSession.image || undefined,
+                                                                },
+                                                            });
                                                         }}
                                                     >
                                                         {t('roadmap.player.downloadStart')}

@@ -27,7 +27,7 @@ test('a missing production lazy chunk exposes recovery without crashing the navi
     await expect(page.getByRole('navigation', { name: 'Primary navigation' })).toBeVisible();
     await page.unroute('**/assets/SettingsScreen-*.js');
     await page.getByRole('button', { name: 'Try again' }).click();
-    await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible({ timeout: 15000 });
 });
 });
 

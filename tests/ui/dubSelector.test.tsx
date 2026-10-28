@@ -8,11 +8,15 @@ import { defaultAppSettings } from '../../src/shared/types/settings';
 const mockGet = vi.fn();
 const mockExtract = vi.fn();
 vi.mock('../../src/utils/LinkParser', () => ({ extractVideoLinks: (...args: unknown[]) => mockExtract(...args) }));
-vi.mock('../../src/shared/apiClient', () => ({
-    useApi: () => ({
-        get: (...args: unknown[]) => mockGet(...args),
-    }),
-}));
+vi.mock('../../src/shared/apiClient', async importOriginal => {
+    const actual = await importOriginal<typeof import('../../src/shared/apiClient')>();
+    return {
+        ...actual,
+        useApi: () => ({
+            get: (...args: unknown[]) => mockGet(...args),
+        }),
+    };
+});
 
 const mockDubs = [
     { id: 1, name: 'AniLibria', episodes_count: 12, view_count: 1500 },
@@ -534,6 +538,31 @@ describe('DubSelectModal Redesign (src/modals/DubSelectModal.tsx)', () => {
 
         localStorage.removeItem('watch_progress');
     });
+
+    it('displays error banner when video extraction fails, and allows dismissing it', async () => {
+        mockExtract.mockResolvedValue(null);
+        renderModal({ resolveSources: true });
+
+        await waitFor(() => {
+            expect(screen.getByText('Серия 2: Встреча')).toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByText('Серия 2: Встреча'));
+
+        await waitFor(() => {
+            expect(screen.getByRole('alert')).toBeInTheDocument();
+        });
+
+        const alertBanner = screen.getByRole('alert');
+        expect(alertBanner).toHaveTextContent(/Не удалось получить видео для этой серии/i);
+
+        // Click dismiss button
+        const closeBtn = screen.getByRole('button', { name: /Закрыть предупреждение/i });
+        fireEvent.click(closeBtn);
+
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
 });
+
 
 

@@ -99,3 +99,102 @@ test('circular playlists and HTTP failures stop without returning a file', async
     await assert.rejects(downloadEpisodeHls({ ...options, fetchFn: async () => new Response('#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1\nindex.m3u8') }), /Circular/);
     await assert.rejects(downloadEpisodeHls({ ...options, fetchFn: async () => new Response('No', { status: 503 }) }), /HTTP 503/);
 });
+
+test('concurrent segment fetches download out-of-order but assemble in correct sequential order', async () => {
+    const multiSegmentPlaylist = `#EXTM3U\n#EXT-X-TARGETDURATION:10\n#EXTINF:10,\nseg0.bin\n#EXTINF:10,\nseg1.bin\n#EXTINF:10,\nseg2.bin\n#EXT-X-ENDLIST\n`;
+    const requestedUrls = [];
+    let resolveSeg0;
+    const seg0Promise = new Promise(r => { resolveSeg0 = r; });
+
+    const fetchFn = async (url) => {
+        if (url.endsWith('.m3u8')) return new Response(multiSegmentPlaylist);
+        requestedUrls.push(url);
+        if (url.endsWith('seg0.bin')) {
+            await seg0Promise;
+            return new Response(tsSegment);
+        }
+        return new Response(tsSegment);
+    };
+
+    const progressList = [];
+    const downloadPromise = downloadEpisodeHls({
+        ...options,
+        fetchFn,
+        concurrency: 3,
+        onProgress: p => progressList.push({ ...p }),
+    });
+
+    for (let i = 0; i < 50; i++) {
+        if (requestedUrls.includes('https://media.example/episode/seg1.bin')) break;
+        await new Promise(r => setImmediate(r));
+    }
+    assert.ok(requestedUrls.includes('https://media.example/episode/seg0.bin'));
+    assert.ok(requestedUrls.includes('https://media.example/episode/seg1.bin'));
+    assert.equal(progressList.length, 0);
+
+    resolveSeg0();
+
+    const result = await downloadPromise;
+    assert.equal(result.blob.type, 'video/mp4');
+    assert.ok(result.size > 0);
+    assert.equal(progressList.at(-1).completedSegments, 3);
+    assert.equal(progressList.at(-1).percent, 100);
+});
+
+test('concurrency adheres to sliding lookahead window and avoids unbound buffer growth', async () => {
+    const manySegmentsPlaylist = `#EXTM3U\n#EXT-X-TARGETDURATION:10\n` +
+        Array.from({ length: 15 }, (_, i) => `#EXTINF:10,\nseg${i}.bin\n`).join('') +
+        `#EXT-X-ENDLIST\n`;
+
+    const allRequested = [];
+    let resolveSeg0;
+    const seg0Promise = new Promise(r => { resolveSeg0 = r; });
+
+    const fetchFn = async (url) => {
+        if (url.endsWith('.m3u8')) return new Response(manySegmentsPlaylist);
+        allRequested.push(url);
+        if (url.endsWith('seg0.bin')) {
+            await seg0Promise;
+            return new Response(tsSegment);
+        }
+        return new Response(tsSegment);
+    };
+
+    const downloadPromise = downloadEpisodeHls({
+        ...options,
+        fetchFn,
+        concurrency: 3,
+    });
+
+    for (let i = 0; i < 50; i++) {
+        if (allRequested.length >= 6) break;
+        await new Promise(r => setImmediate(r));
+    }
+
+    assert.ok(allRequested.length <= 6, `Issued ${allRequested.length} requests, expected at most 6 due to lookahead`);
+    assert.ok(!allRequested.some(u => u.includes('seg7.bin')), 'seg7 should not be fetched before seg0 resolves');
+
+    resolveSeg0();
+    const result = await downloadPromise;
+    assert.ok(result.size > 0);
+});
+
+test('failure in one concurrent segment aborts all active fetches', async () => {
+    const playlist3 = `#EXTM3U\n#EXT-X-TARGETDURATION:10\n#EXTINF:10,\nseg0.bin\n#EXTINF:10,\nseg1.bin\n#EXT-X-ENDLIST\n`;
+    let seg1Cancelled = false;
+    const seg1Body = new ReadableStream({
+        cancel() { seg1Cancelled = true; },
+    });
+
+    const fetchFn = async (url) => {
+        if (url.endsWith('.m3u8')) return new Response(playlist3);
+        if (url.endsWith('seg0.bin')) {
+            return new Response('Server Error', { status: 500 });
+        }
+        return new Response(seg1Body);
+    };
+
+    await assert.rejects(downloadEpisodeHls({ ...options, fetchFn, concurrency: 2 }), /HTTP 500/);
+    assert.equal(seg1Cancelled, true);
+});
+
