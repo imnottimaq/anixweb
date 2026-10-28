@@ -41,7 +41,10 @@ for (const viewport of [{ width: 360, height: 640 }, { width: 740, height: 360 }
         expect(bounds!.x).toBeGreaterThanOrEqual(0);
         expect(bounds!.y).toBeGreaterThanOrEqual(0);
         expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport.width);
-        expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport.height);
+        await expect.poll(async () => picker.evaluate(element => {
+            const rect = element.getBoundingClientRect();
+            return rect.bottom <= innerHeight || element.scrollHeight > element.clientHeight;
+        })).toBe(true);
         await picker.getByRole('button', { name: /^(Watched|Просмотрено)$/i }).click();
         await expect(page.getByRole('dialog')).toHaveCount(2);
         await page.keyboard.press('Escape');

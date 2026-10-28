@@ -302,10 +302,14 @@ test.describe('Design Inspection Screenshots', () => {
 
     // 2. Navigation Mobile Dark (Drawer Open)
     const toggle = page.getByRole('button', { name: /Меню|Menu/i });
-    await toggle.click();
-    await expect(page.getByRole('navigation', { name: /Основная навигация|Primary navigation/i })).toBeVisible();
+    if (await toggle.count() > 0 && await toggle.first().isVisible()) {
+      await toggle.first().click();
+      await expect(page.getByRole('navigation', { name: /Основная навигация|Primary navigation/i })).toBeVisible();
+      await page.keyboard.press('Escape');
+    } else {
+      await expect(page.getByRole('navigation', { name: /Нижняя навигация|Bottom navigation/i })).toBeVisible();
+    }
     await page.screenshot({ path: 'test-results/design-navigation-mobile-dark.png', animations: 'disabled' });
-    await page.keyboard.press('Escape');
 
     // 3. Favorites Mobile Dark
     await page.goto('/favorites');

@@ -216,23 +216,22 @@ test('mobile navigation fits the viewport, restores focus and opens the schedule
     ...defaultAppSettings, appearance: { ...defaultAppSettings.appearance, language: 'english', theme: 'light' },
   } });
   await page.goto('/popular');
-  const toggle = page.getByRole('button', { name: 'Menu', exact: true });
-  const navigation = page.getByRole('navigation', { name: 'Primary navigation' });
-  await toggle.click();
-  await expect(navigation.getByRole('link', { name: 'Popular', exact: true })).toHaveCount(0);
-  await expect(navigation.getByRole('link', { name: 'Schedule', exact: true })).toHaveCount(0);
-  expect(await navigation.evaluate(element => {
+  const bottomNavigation = page.getByRole('navigation', { name: 'Bottom navigation', exact: true });
+  const toggle = page.getByRole('button', { name: 'More', exact: true });
+  await expect(bottomNavigation).toBeVisible();
+  expect(await bottomNavigation.evaluate(element => {
     const rect = element.getBoundingClientRect();
     return rect.left >= 0 && rect.right <= innerWidth && rect.bottom <= innerHeight;
   })).toBe(true);
   await page.screenshot({ path: 'test-results/roadmap-navigation-mobile.png' });
+  await toggle.click();
+  const moreDialog = page.getByRole('dialog', { name: 'More', exact: true });
+  await expect(moreDialog).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(moreDialog).toHaveCount(0);
   await expect(toggle).toBeFocused();
   await toggle.click();
-  await navigation.getByRole('link', { name: 'Discover', exact: true }).click();
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-  await page.getByRole('link', { name: 'Schedule', exact: true }).click();
+  await page.getByRole('button', { name: 'Schedule', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Release Schedule', exact: true })).toBeVisible();
   const monday = page.getByRole('tab', { name: /^Monday/ });
   await monday.click();
