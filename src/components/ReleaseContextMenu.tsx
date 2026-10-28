@@ -5,6 +5,7 @@ import { useUser } from '../shared/contexts/userContext';
 import { ReleaseActionsContext, type ReleasePatch } from '../shared/contexts/releaseActionsContext';
 import { useApi } from '../shared/apiClient';
 import { useTranslation } from '../shared/useTranslation';
+import { useLongPress } from '../shared/useLongPress';
 import type { Anime } from '../shared/types/api';
 import styles from './ReleaseContextMenu.module.css';
 import ActionIcon from './ActionIcon';
@@ -58,15 +59,40 @@ function ReleaseActionsSession({children}: {children: ReactNode}) {
         const initial = patches[id] ?? (Number.isInteger(parsedStatus) && parsedStatus >= 0 && parsedStatus <= 5 && (favorite === 'true' || favorite === 'false')
             ? {profile_list_status: parsedStatus, is_favorite: favorite === 'true'} : null);
         const rect = link.getBoundingClientRect();
-        setMenu({id, name: link.querySelector<HTMLImageElement>('img[alt]')?.alt || link.textContent?.trim() || String(id), x: x || rect.left + 20, y: y || rect.top + 20, trigger: link, serial: ++serial.current, initial});
+        setMenu({id, name: link.querySelector<HTMLImageElement>('img[alt]')?.alt || link.textContent?.trim() || String(id), x: typeof x === 'number' ? x : rect.left + 20, y: typeof y === 'number' ? y : rect.top + 20, trigger: link, serial: ++serial.current, initial});
         return true;
     };
+    const filterReleaseTarget = useCallback((target: EventTarget | null) => {
+        const link = target instanceof Element ? target.closest<HTMLAnchorElement>('a[href]') : null;
+        if (!link || link.origin !== window.location.origin) return null;
+        const match = link.pathname.match(/\/anime\/([1-9]\d*)\/?$/);
+        if (!match) return null;
+        const id = Number(match[1]);
+        if (!Number.isSafeInteger(id)) return null;
+        return link;
+    }, []);
+    const longPress = useLongPress<HTMLDivElement, HTMLAnchorElement>({
+        filterTarget: filterReleaseTarget,
+        onLongPress: (link, coords) => {
+            return open(link, coords.x, coords.y);
+        },
+    });
     return <ReleaseActionsContext.Provider value={value}>
-        <div style={{display:'contents'}} onContextMenu={event => {
-            if (!event.defaultPrevented && open(event.target, event.clientX, event.clientY)) {event.preventDefault(); event.stopPropagation();}
-        }} onKeyDown={event => {
-            if ((event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) && open(event.target)) {event.preventDefault(); event.stopPropagation();}
-        }}>
+        <div style={{display:'contents'}}
+            {...longPress.handlers}
+            onContextMenu={event => {
+                if (!event.defaultPrevented && open(event.target, event.clientX, event.clientY)) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    longPress.cancel();
+                }
+            }}
+            onKeyDown={event => {
+                if ((event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) && open(event.target)) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+            }}>
             {children}
             {menu && createPortal(<ReleaseContextMenu key={menu.serial} target={menu} onClose={closeMenu}/>, document.body)}
         </div>

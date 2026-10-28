@@ -1,0 +1,67 @@
+.scroll-to-top {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 80;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--surface-border-subtle, color-mix(in srgb, var(--text-color) 16%, transparent));
+    border-radius: 50%;
+    color: var(--text-color);
+    background: color-mix(in srgb, var(--surface-card, #1a1a1a) 85%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+    touch-action: manipulation;
+    animation: fadeIn var(--motion-fast, 0.2s) ease-out;
+    transition: transform var(--motion-fast, 0.15s), background-color var(--motion-fast, 0.15s), border-color var(--motion-fast, 0.15s), color var(--motion-fast, 0.15s);
+}
+
+.scroll-to-top:hover {
+    color: #fff;
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--accent-color) 40%, transparent);
+}
+
+.scroll-to-top:active {
+    transform: translateY(0) scale(0.95);
+}
+
+.scroll-to-top:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-ring-offset);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@media (max-width: 768px) {
+    .scroll-to-top {
+        right: 16px;
+        bottom: calc(var(--mobile-bottom-nav-height, 58px) + var(--safe-area-bottom, 0px) + 16px);
+        width: 42px;
+        height: 42px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .scroll-to-top {
+        animation: none;
+        transition: none;
+    }
+}

@@ -347,6 +347,32 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
     const [downloadSelectedQuality, setDownloadSelectedQuality] = useState<string>('');
     const isAutoPausingRef = useRef(false);
+    const [swipeScrub, setSwipeScrub] = useState<{
+        deltaSeconds: number;
+        targetTime: number;
+        direction: 'forward' | 'backward';
+    } | null>(null);
+    const [doubleTapFeedback, setDoubleTapFeedback] = useState<{
+        direction: 'left' | 'right';
+        nonce: number;
+    } | null>(null);
+    const [isScreenLocked, setIsScreenLocked] = useState(false);
+    const [lockToast, setLockToast] = useState<string | null>(null);
+    const [isEpisodeDrawerOpen, setIsEpisodeDrawerOpen] = useState(false);
+
+    const gestureStartRef = useRef<{
+        pointerId: number;
+        startX: number;
+        startY: number;
+        startTime: number;
+        targetTime?: number;
+        hasMoved: boolean;
+        isSwipeScrub: boolean;
+    } | null>(null);
+    const lastTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
+    const singleTapTimeoutRef = useRef<number | null>(null);
+    const doubleTapTimeoutRef = useRef<number | null>(null);
+    const lockToastTimeoutRef = useRef<number | null>(null);
     const {
         status: downloadStatus,
         progress: downloadProgress,
@@ -472,12 +498,209 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     };
 
     const showControls = useCallback(() => {
+        if (isScreenLocked) return;
         setAreControlsVisible(true);
         if (controlsTimeoutRef.current !== null) window.clearTimeout(controlsTimeoutRef.current);
-        if (!isPlaying || isPlayerSettingsOpen || resumePromptTime !== null || nextEpisodeCountdown !== null || isDownloadModalOpen || (keyboardControlsRef.current && playerDialogRef.current?.querySelector('[data-player-controls]')?.contains(document.activeElement))) return;
+        if (!isPlaying || isPlayerSettingsOpen || isEpisodeDrawerOpen || resumePromptTime !== null || nextEpisodeCountdown !== null || isDownloadModalOpen || (keyboardControlsRef.current && playerDialogRef.current?.querySelector('[data-player-controls]')?.contains(document.activeElement))) return;
 
         controlsTimeoutRef.current = window.setTimeout(() => { if (!keyboardControlsRef.current || !playerDialogRef.current?.querySelector('[data-player-controls]')?.contains(document.activeElement)) setAreControlsVisible(false); }, 2_500);
-    }, [isPlaying, isPlayerSettingsOpen, resumePromptTime, nextEpisodeCountdown, isDownloadModalOpen]);
+    }, [isScreenLocked, isPlaying, isPlayerSettingsOpen, isEpisodeDrawerOpen, resumePromptTime, nextEpisodeCountdown, isDownloadModalOpen]);
+
+    useEffect(() => {
+        return () => {
+            if (singleTapTimeoutRef.current !== null) window.clearTimeout(singleTapTimeoutRef.current);
+            if (doubleTapTimeoutRef.current !== null) window.clearTimeout(doubleTapTimeoutRef.current);
+            if (lockToastTimeoutRef.current !== null) window.clearTimeout(lockToastTimeoutRef.current);
+        };
+    }, []);
+
+    const triggerDoubleTapFeedback = useCallback((direction: 'left' | 'right') => {
+        setDoubleTapFeedback({ direction, nonce: Date.now() });
+        if (doubleTapTimeoutRef.current !== null) window.clearTimeout(doubleTapTimeoutRef.current);
+        doubleTapTimeoutRef.current = window.setTimeout(() => setDoubleTapFeedback(null), 600);
+    }, []);
+
+    const showLockHint = useCallback(() => {
+        setLockToast(t('player.lockedHint') || 'Экран заблокирован. Нажмите «Разблокировать»');
+        if (lockToastTimeoutRef.current !== null) window.clearTimeout(lockToastTimeoutRef.current);
+        lockToastTimeoutRef.current = window.setTimeout(() => setLockToast(null), 2000);
+        try { navigator.vibrate?.(10); } catch { /* ignore unsupported */ }
+    }, [t]);
+
+    const handleLockScreen = useCallback(() => {
+        setIsScreenLocked(true);
+        setAreControlsVisible(false);
+        setIsPlayerSettingsOpen(false);
+        setIsEpisodeDrawerOpen(false);
+        setLockToast(t('player.locked') || 'Экран заблокирован');
+        if (lockToastTimeoutRef.current !== null) window.clearTimeout(lockToastTimeoutRef.current);
+        lockToastTimeoutRef.current = window.setTimeout(() => setLockToast(null), 2000);
+        try { navigator.vibrate?.(15); } catch { /* ignore unsupported */ }
+    }, [t]);
+
+    const handleUnlockScreen = useCallback(() => {
+        setIsScreenLocked(false);
+        setAreControlsVisible(true);
+        showControls();
+        setLockToast(t('player.unlocked') || 'Экран разблокирован');
+        if (lockToastTimeoutRef.current !== null) window.clearTimeout(lockToastTimeoutRef.current);
+        lockToastTimeoutRef.current = window.setTimeout(() => setLockToast(null), 1500);
+        try { navigator.vibrate?.(15); } catch { /* ignore unsupported */ }
+    }, [showControls, t]);
+
+    const handleGesturePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+        if (isScreenLocked) {
+            showLockHint();
+            return;
+        }
+
+        if (!e.isPrimary) return;
+        if (roomId && !canControlRoom) return;
+
+        try {
+            e.currentTarget.setPointerCapture(e.pointerId);
+        } catch { /* ignore unsupported */ }
+
+        const now = Date.now();
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX;
+        const y = e.clientY;
+        const initialVideoTime = videoRef.current?.currentTime ?? currentTime;
+
+        const lastTap = lastTapRef.current;
+        const isDoubleTap =
+            lastTap !== null &&
+            now - lastTap.time < 300 &&
+            Math.hypot(x - lastTap.x, y - lastTap.y) < 40;
+
+        if (isDoubleTap) {
+            if (singleTapTimeoutRef.current !== null) {
+                window.clearTimeout(singleTapTimeoutRef.current);
+                singleTapTimeoutRef.current = null;
+            }
+            lastTapRef.current = null;
+
+            const relativeX = (x - rect.left) / rect.width;
+            if (relativeX < 0.45) {
+                const nextTime = Math.max(0, initialVideoTime - 10);
+                seekTo(nextTime);
+                triggerDoubleTapFeedback('left');
+                try { navigator.vibrate?.(10); } catch { /* ignore unsupported */ }
+            } else if (relativeX > 0.55) {
+                const nextTime = Number.isFinite(duration) ? Math.min(duration, initialVideoTime + 10) : initialVideoTime + 10;
+                seekTo(nextTime);
+                triggerDoubleTapFeedback('right');
+                try { navigator.vibrate?.(10); } catch { /* ignore unsupported */ }
+            } else {
+                togglePlayback();
+            }
+
+            gestureStartRef.current = null;
+            return;
+        }
+
+        gestureStartRef.current = {
+            pointerId: e.pointerId,
+            startX: x,
+            startY: y,
+            startTime: initialVideoTime,
+            hasMoved: false,
+            isSwipeScrub: false,
+        };
+    }, [canControlRoom, currentTime, duration, isScreenLocked, roomId, seekTo, showLockHint, togglePlayback, triggerDoubleTapFeedback]);
+
+    const handleGesturePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+        const gesture = gestureStartRef.current;
+        if (!gesture || gesture.pointerId !== e.pointerId || isScreenLocked) {
+            showControls();
+            return;
+        }
+
+        const dx = e.clientX - gesture.startX;
+        const dy = e.clientY - gesture.startY;
+        const absX = Math.abs(dx);
+        const absY = Math.abs(dy);
+
+        if (!gesture.isSwipeScrub) {
+            if (absX > 12 && absX > absY * 1.2) {
+                gesture.isSwipeScrub = true;
+                gesture.hasMoved = true;
+                if (singleTapTimeoutRef.current !== null) {
+                    window.clearTimeout(singleTapTimeoutRef.current);
+                    singleTapTimeoutRef.current = null;
+                }
+                lastTapRef.current = null;
+            } else if (absY > 15 && absY > absX * 1.2) {
+                gestureStartRef.current = null;
+                return;
+            }
+        }
+
+        if (gesture.isSwipeScrub) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const width = rect.width || window.innerWidth || 400;
+            const maxSpan = Math.min(Math.max((duration || 1440) * 0.12, 60), 240);
+            const ratio = dx / width;
+            const deltaSeconds = Math.round(ratio * maxSpan);
+            const targetTime = Math.max(0, Math.min(duration || 0, gesture.startTime + deltaSeconds));
+            const effectiveDelta = targetTime - gesture.startTime;
+
+            gesture.targetTime = targetTime;
+            setSwipeScrub({
+                deltaSeconds: effectiveDelta,
+                targetTime,
+                direction: effectiveDelta >= 0 ? 'forward' : 'backward',
+            });
+        }
+    }, [duration, isScreenLocked, showControls]);
+
+    const handleGesturePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+        try {
+            e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch { /* ignore unsupported */ }
+
+        const gesture = gestureStartRef.current;
+        gestureStartRef.current = null;
+
+        if (isScreenLocked) return;
+        if (!gesture || gesture.pointerId !== e.pointerId) return;
+
+        if (gesture.isSwipeScrub) {
+            if (typeof gesture.targetTime === 'number' && Number.isFinite(gesture.targetTime)) {
+                seekTo(gesture.targetTime);
+                try { navigator.vibrate?.(12); } catch { /* ignore unsupported */ }
+            }
+            setSwipeScrub(null);
+            showControls();
+            return;
+        }
+
+        const x = e.clientX;
+        const y = e.clientY;
+        const now = Date.now();
+        lastTapRef.current = { time: now, x, y };
+
+        if (singleTapTimeoutRef.current !== null) {
+            window.clearTimeout(singleTapTimeoutRef.current);
+        }
+
+        singleTapTimeoutRef.current = window.setTimeout(() => {
+            singleTapTimeoutRef.current = null;
+            lastTapRef.current = null;
+            setAreControlsVisible(prev => {
+                if (!prev) showControls();
+                return !prev;
+            });
+        }, 260);
+    }, [isScreenLocked, seekTo, showControls]);
+
+    const handleGesturePointerCancel = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+        try {
+            e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch { /* ignore unsupported */ }
+        gestureStartRef.current = null;
+        setSwipeScrub(null);
+    }, []);
 
     useEffect(() => {
         const updateFullscreen = () => setIsMaximized(Boolean(document.fullscreenElement || (document as WebKitFullscreenDocument).webkitFullscreenElement));
@@ -579,6 +802,7 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
     };
 
     useDialogFocus(playerDialogRef, true, () => {
+        if (isEpisodeDrawerOpen) { setIsEpisodeDrawerOpen(false); return; }
         if (isPlayerSettingsOpen) { setIsPlayerSettingsOpen(false); return; }
         if (document.fullscreenElement || (document as WebKitFullscreenDocument).webkitFullscreenElement) { void exitFullscreenElement(); return; }
         closePlayer();
@@ -825,7 +1049,9 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
         }
 
         return () => {
+            hls?.detachMedia();
             hls?.destroy();
+            video.pause();
             video.removeAttribute('src');
             video.load();
         };
@@ -1061,19 +1287,123 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
 
     return (
         <div ref={playerDialogRef} tabIndex={-1} className={styles.overlay} role="dialog" aria-modal="true" aria-label={t('player.ariaLabel')}>
-            <div className={styles.player} ref={playerRef} onKeyDownCapture={event => { if (event.key === 'Tab') { keyboardControlsRef.current = true; showControls(); } }} onPointerMove={() => { keyboardControlsRef.current = false; showControls(); }} onPointerDown={() => { keyboardControlsRef.current = false; showControls(); }}>
+            <div className={styles.player} ref={playerRef} onKeyDownCapture={event => { if (event.key === 'Tab') { keyboardControlsRef.current = true; showControls(); } }}>
                 {Boolean(roomId && watchRoom?.roomId === roomId) && <ReactionOverlay />}
-                <div data-player-controls onFocusCapture={showControls} onBlurCapture={() => window.requestAnimationFrame(showControls)} className={`${styles['player-controls']} ${!areControlsVisible ? styles['player-controls-hidden'] : ''}`}>
-                    <div className={styles['playback-buttons']}>
-                        <div className={styles['top-bar']}>
-                            <button className={styles['back-button']} aria-label={roomId ? t('room.return') : t('player.backToRelease')} onClick={closePlayer}><img src={BackIcon} alt="" /></button>
-                            <div className={styles['title-block']}>
-                                <h3>{animeName}</h3>
-                                {episodeNumber !== undefined && <p>{episodeName}</p>}
-                            </div>
+
+                {/* Gesture Surface (drag scrub, double-tap, single tap) */}
+                <div
+                    className={styles['gesture-surface']}
+                    onPointerDown={handleGesturePointerDown}
+                    onPointerMove={handleGesturePointerMove}
+                    onPointerUp={handleGesturePointerUp}
+                    onPointerCancel={handleGesturePointerCancel}
+                    onWheel={handleWheelVolume}
+                />
+
+                {/* Double-tap feedback ripples */}
+                {doubleTapFeedback && (
+                    <div className={`${styles['double-tap-feedback']} ${styles[`double-tap-${doubleTapFeedback.direction}`]}`}>
+                        <div className={styles['double-tap-content']}>
+                            <span className={styles['double-tap-arrows']}>
+                                {doubleTapFeedback.direction === 'left' ? '««' : '»»'}
+                            </span>
+                            <span className={styles['double-tap-text']}>
+                                {doubleTapFeedback.direction === 'left' ? t('player.seek10Backward') : t('player.seek10Forward')}
+                            </span>
                         </div>
+                    </div>
+                )}
+
+                {/* Horizontal swipe scrub HUD */}
+                {swipeScrub && (
+                    <div className={styles['swipe-scrub-hud']} role="status" aria-live="polite">
+                        <div className={styles['swipe-scrub-icon']}>
+                            {swipeScrub.deltaSeconds < 0 ? (
+                                <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor" aria-hidden="true">
+                                    <polygon points="11 19 2 12 11 5 11 19" />
+                                    <polygon points="22 19 13 12 22 5 22 19" />
+                                </svg>
+                            ) : (
+                                <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor" aria-hidden="true">
+                                    <polygon points="13 19 22 12 13 5 13 19" />
+                                    <polygon points="2 19 11 12 2 5 2 19" />
+                                </svg>
+                            )}
+                        </div>
+                        <div className={`${styles['swipe-scrub-delta']} ${swipeScrub.deltaSeconds >= 0 ? styles['delta-positive'] : styles['delta-negative']}`}>
+                            {swipeScrub.deltaSeconds >= 0 ? `+${formatSeekDelta(swipeScrub.deltaSeconds)}` : `-${formatSeekDelta(Math.abs(swipeScrub.deltaSeconds))}`}
+                        </div>
+                        <div className={styles['swipe-scrub-time']}>
+                            {formatTime(swipeScrub.targetTime)} <span className={styles['time-separator']}>/</span> {formatTime(duration)}
+                        </div>
+                        <div className={styles['swipe-scrub-bar']}>
+                            <div
+                                className={styles['swipe-scrub-fill']}
+                                style={{
+                                    width: `${Number.isFinite(duration) && duration > 0 ? Math.min(100, Math.max(0, (swipeScrub.targetTime / duration) * 100)) : 0}%`,
+                                }}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* Screen lock toast */}
+                {lockToast && <div className={styles['screen-lock-toast']} role="status">{lockToast}</div>}
+
+                {/* Screen lock floating unlock button */}
+                {isScreenLocked && (
+                    <button
+                        type="button"
+                        className={styles['screen-lock-unlock-btn']}
+                        onClick={handleUnlockScreen}
+                        aria-label={t('player.unlock')}
+                        title={t('player.unlock')}
+                    >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                            <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                        </svg>
+                        <span>{t('player.unlock')}</span>
+                    </button>
+                )}
+
+                {!isScreenLocked && (
+                    <div data-player-controls onFocusCapture={showControls} onBlurCapture={() => window.requestAnimationFrame(showControls)} className={`${styles['player-controls']} ${!areControlsVisible ? styles['player-controls-hidden'] : ''}`}>
+                        <div className={styles['playback-buttons']}>
+                            <div className={styles['top-bar']}>
+                                <button className={styles['back-button']} aria-label={roomId ? t('room.return') : t('player.backToRelease')} onClick={closePlayer}><img src={BackIcon} alt="" /></button>
+                                <div className={styles['title-block']}>
+                                    <h3>{animeName}</h3>
+                                    {episodeNumber !== undefined && <p>{episodeName}</p>}
+                                </div>
+                                <button
+                                    type="button"
+                                    className={styles['lock-button']}
+                                    onClick={handleLockScreen}
+                                    aria-label={t('player.lock')}
+                                    title={t('player.lock')}
+                                >
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                    </svg>
+                                </button>
+                            </div>
                         <div className={styles['flow-buttons']}>
-                            <button type="button" aria-label={t('ux.previousEpisode')} className={styles['next-prev-buttons']} disabled={!canControlRoom || !previousEpisode || isEpisodeChanging} onClick={() => previousEpisode && void changeEpisode(previousEpisode)}><img src={PrevIcon} alt="" /></button>
+                            <button type="button" aria-label={t('ux.previousEpisode')} className={`${styles['next-prev-buttons']} ${styles['episode-nav-btn']}`} disabled={!canControlRoom || !previousEpisode || isEpisodeChanging} onClick={() => previousEpisode && void changeEpisode(previousEpisode)}><img src={PrevIcon} alt="" /></button>
+                            <button
+                                type="button"
+                                aria-label={t('player.seekBackward')}
+                                className={`${styles['next-prev-buttons']} ${styles['seek-btn-mobile']}`}
+                                disabled={!canControlRoom}
+                                onClick={() => seekTo(Math.max(0, currentTime - 10))}
+                                title="-10s"
+                            >
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20" aria-hidden="true">
+                                    <path d="M1 4v6h6" />
+                                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                                </svg>
+                            </button>
                             <button
                                 type="button"
                                 className={styles['play-button']}
@@ -1083,7 +1413,20 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                             >
                                 {isBuffering ? <span className={styles.spinner} aria-hidden="true" /> : <img src={isPlaying ? PauseIcon : PlayIcon} alt="" />}
                             </button>
-                            <button type="button" aria-label={t('ux.nextEpisode')} className={styles['next-prev-buttons']} disabled={!canControlRoom || !nextEpisode || isEpisodeChanging} onClick={() => nextEpisode && void changeEpisode(nextEpisode)}><img src={NextIcon} alt="" /></button>
+                            <button
+                                type="button"
+                                aria-label={t('player.seekForward')}
+                                className={`${styles['next-prev-buttons']} ${styles['seek-btn-mobile']}`}
+                                disabled={!canControlRoom}
+                                onClick={() => seekTo(Number.isFinite(duration) ? Math.min(duration, currentTime + 10) : currentTime + 10)}
+                                title="+10s"
+                            >
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20" aria-hidden="true">
+                                    <path d="M23 4v6h-6" />
+                                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                                </svg>
+                            </button>
+                            <button type="button" aria-label={t('ux.nextEpisode')} className={`${styles['next-prev-buttons']} ${styles['episode-nav-btn']}`} disabled={!canControlRoom || !nextEpisode || isEpisodeChanging} onClick={() => nextEpisode && void changeEpisode(nextEpisode)}><img src={NextIcon} alt="" /></button>
                         </div>
                     </div>
 
@@ -1146,6 +1489,24 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                                 }}
                             >
                                 <img src={SkipIcon} alt="" />
+                            </button>
+                        )}
+                        {playerSession.episodes && playerSession.episodes.length > 1 && (
+                            <button
+                                type="button"
+                                className={`${styles['action-btn']} ${isEpisodeDrawerOpen ? styles['action-btn-active'] : ''}`}
+                                onClick={() => setIsEpisodeDrawerOpen(open => !open)}
+                                aria-label={t('player.episodes')}
+                                title={t('player.episodes')}
+                            >
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                    <line x1="8" y1="6" x2="21" y2="6" />
+                                    <line x1="8" y1="12" x2="21" y2="12" />
+                                    <line x1="8" y1="18" x2="21" y2="18" />
+                                    <line x1="3" y1="6" x2="3.01" y2="6" />
+                                    <line x1="3" y1="12" x2="3.01" y2="12" />
+                                    <line x1="3" y1="18" x2="3.01" y2="18" />
+                                </svg>
                             </button>
                         )}
                         <div className={styles['player-settings-wrap']}>
@@ -1306,6 +1667,51 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
                         />
                     </div>
                 </div>
+                )}
+
+                {isEpisodeDrawerOpen && playerSession.episodes && (
+                    <>
+                        <div className={styles['episode-drawer-backdrop']} onClick={() => setIsEpisodeDrawerOpen(false)} />
+                        <div className={styles['episode-drawer']} role="dialog" aria-modal="true" aria-label={t('player.episodes')}>
+                            <div className={styles['episode-drawer-header']}>
+                                <h3>{t('player.episodes')} ({playerSession.episodes.length})</h3>
+                                <button
+                                    type="button"
+                                    className={styles['episode-drawer-close']}
+                                    onClick={() => setIsEpisodeDrawerOpen(false)}
+                                    aria-label={t('misc.close')}
+                                >×</button>
+                            </div>
+                            <div className={styles['episode-drawer-list']}>
+                                {playerSession.episodes.map(ep => {
+                                    const isCurrent = ep.position === episodeNumber;
+                                    return (
+                                        <button
+                                            key={ep.position}
+                                            type="button"
+                                            className={`${styles['episode-drawer-item']} ${isCurrent ? styles['episode-drawer-item-active'] : ''}`}
+                                            disabled={!canControlRoom || isEpisodeChanging}
+                                            onClick={() => {
+                                                setIsEpisodeDrawerOpen(false);
+                                                if (!isCurrent) void changeEpisode(ep);
+                                            }}
+                                        >
+                                            <span className={styles['episode-drawer-item-title']}>
+                                                {ep.name || t('player.episodeTitle', { number: ep.position })}
+                                            </span>
+                                            {isCurrent && (
+                                                <span className={styles['episode-badge-current']}>
+                                                    {t('roadmap.player.pickerCurrentPlaying')}
+                                                </span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </>
+                )}
+
                 <div className={styles['video-stage']} onWheel={handleWheelVolume}>
                 <div className={styles['video-frame']} style={videoFrameStyle}>
                 <video
@@ -1622,6 +2028,13 @@ function PlayerContent({ playerSession, onSessionChange, roomId }: { playerSessi
             </div>
         </div>
     );
+}
+
+function formatSeekDelta(totalSeconds: number) {
+    const absSeconds = Math.abs(Math.round(totalSeconds));
+    const mins = Math.floor(absSeconds / 60);
+    const secs = absSeconds % 60;
+    return `${mins}:${String(secs).padStart(2, '0')}`;
 }
 
 function formatTime(seconds: number) {

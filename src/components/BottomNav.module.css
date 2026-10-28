@@ -1,0 +1,91 @@
+.bottomNav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  height: calc(var(--mobile-bottom-nav-height, 58px) + var(--safe-area-bottom, 0px));
+  padding-bottom: var(--safe-area-bottom, 0px);
+  background: color-mix(in srgb, var(--surface-page, var(--background-color)) 94%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid var(--surface-border-subtle);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.navItem {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 6px 2px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: color var(--motion-fast), transform var(--motion-fast);
+}
+
+.navItem:active {
+  transform: scale(0.94);
+}
+
+.navItem.active {
+  color: var(--accent-color);
+}
+
+.iconWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 24px;
+}
+
+.iconWrapper svg {
+  width: 22px;
+  height: 22px;
+  stroke: currentColor;
+  stroke-width: 2;
+  transition: transform var(--motion-fast);
+}
+
+.navItem.active .iconWrapper svg {
+  transform: translateY(-1px);
+}
+
+.label {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  padding-inline: 2px;
+}
+
+.activeDot {
+  position: absolute;
+  bottom: -3px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: var(--accent-color);
+}
+
+@media (min-width: 769px) {
+  .bottomNav {
+    display: none !important;
+  }
+}

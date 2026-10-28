@@ -202,11 +202,13 @@
   min-width: 0;
 }
 
-@media (max-width: 1280px) {
+@media (min-width: 769px) and (max-width: 1280px) {
   .nav-logo-block p {
     display: none;
   }
+}
 
+@media (max-width: 1280px) {
   .header {
     padding-inline: clamp(8px, 1.2vw, 16px);
   }
@@ -268,6 +270,48 @@
   }
 }
 
+@media (max-width: 768px) {
+  .menu-toggle,
+  .navigation,
+  .settings-link,
+  .notifications-link {
+    display: none !important;
+  }
+
+  .header:has(input) .nav-logo-block {
+    display: none !important;
+  }
+
+  .main {
+    padding-bottom: calc(var(--mobile-bottom-nav-height, 58px) + var(--safe-area-bottom, 0px));
+  }
+
+  .header {
+    padding-top: max(8px, var(--safe-area-top, 0px));
+    height: calc(var(--app-header-height) + var(--safe-area-top, 0px));
+  }
+
+  .nav-logo-block {
+    width: auto;
+    overflow: visible;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .nav-logo-block p {
+    display: block;
+    margin: 0;
+    font-family: 'Varela Round', sans-serif;
+    font-size: clamp(18px, 4.8vw, 22px);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text-color);
+    white-space: nowrap;
+  }
+}
+
 @media (max-width: 600px) {
   .layout {
     --app-header-height: 60px;
@@ -278,14 +322,9 @@
     padding-inline: 8px;
   }
 
-  .nav-logo-block {
-    width: 36px;
-    overflow: hidden;
-  }
-
   .nav-logo-block img {
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
   }
 
   .room-indicator {
@@ -310,10 +349,6 @@
     gap: 3px;
     padding-inline: 5px;
   }
-
-  .nav-logo-block {
-    width: 32px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -325,10 +360,6 @@
   }
 }
 
-@media (max-width: 1240px) {
-  .nav-logo-block p { display: none; }
-}
-
 /* Keep the expanded search and room controls within the header at laptop sizes. */
 @media (min-width: 1181px) and (max-width: 1480px) {
   .room-label { display: none; }
@@ -336,7 +367,4 @@
   .room-status { display: none; }
 }
 @media (min-width: 1181px) { .backdrop { display: none; } }
-@media (max-width: 600px) {
-  .header > div:has(input) { flex: 1 1 120px; min-width: 90px; width: auto; }
-  .header:has(input) .nav-logo-block { display: none; }
-}
+

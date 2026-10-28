@@ -15,7 +15,11 @@ export function downloadHlsInWorker({ stream, filename, maxBytes, signal, onProg
         };
         const abort = () => { cleanup(); reject(new DOMException('Download aborted', 'AbortError')); };
         signal?.addEventListener('abort', abort, { once: true });
-        worker.onerror = () => { cleanup(); reject(new Error('HLS download worker failed')); };
+        worker.onerror = event => {
+            event.preventDefault?.();
+            cleanup();
+            reject(new Error('HLS download worker failed'));
+        };
         worker.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
             if (data.type === 'progress') onProgress?.(data.progress);
             else {

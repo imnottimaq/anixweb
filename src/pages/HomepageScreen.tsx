@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import AnimeCard from '../components/AnimeCard';
 import AnimeCardHorizontal from '../components/AnimeCardHorizontal';
 import { type Anime, type Filter } from '../shared/types/api';
@@ -12,6 +12,7 @@ import TabContextMenu, { type TabContextMenuItem } from '../components/TabContex
 import { HOME_TAB_ORDER, type HomeTabKey } from '../shared/types/settings';
 import { normalizeTabOrder } from '../shared/tabOrder';
 import { useReorderableTabs } from '../shared/useReorderableTabs';
+import { useLongPress } from '../shared/useLongPress';
 import TabDragHandle from '../components/TabDragHandle';
 import { moveTab } from '../shared/discover/tabs';
 
@@ -116,6 +117,29 @@ export default function HomepageScreen() {
     const [myFilterVersion, setMyFilterVersion] = useState(0);
     const [tabs, setTabs] = useState<Record<Page, TabData>>(createTabs);
 
+    const filterTabTarget = useCallback((target: EventTarget | null) => {
+        if (!target || !(target instanceof Element)) return null;
+        if (target.closest('[data-tab-grip]')) return null;
+        return target.closest<HTMLButtonElement>('button[role="tab"]');
+    }, []);
+
+    const tabLongPress = useLongPress<HTMLDivElement, HTMLButtonElement>({
+        filterTarget: filterTabTarget,
+        onLongPress: (button, coords) => {
+            const page = button.dataset.tabPage as Page | undefined;
+            if (page) {
+                setTabContextMenu({
+                    page,
+                    x: coords.x,
+                    y: coords.y,
+                    trigger: button,
+                });
+                return true;
+            }
+            return false;
+        },
+    });
+
     const activeTab = tabs[activePage];
     const activeFilter = activePage === 'my' ? myFilters : DEFAULT_FILTERS[activePage];
     const currentPageIsLoaded = activeTab.loadedPages.includes(activeTab.page);
@@ -218,11 +242,12 @@ export default function HomepageScreen() {
 
     return (
         <div className={styles.body}>
-            <div className={styles['side-panel']} role="tablist" aria-label={t('home.catalogAria')} aria-orientation={tabOrientation}>
+            <div className={styles['side-panel']} role="tablist" aria-label={t('home.catalogAria')} aria-orientation={tabOrientation} {...tabLongPress.handlers}>
                 {orderedItems.map(({ page, buttonText }) => (
                     <button
                         {...reorder.props(page)}
                         key={page}
+                        data-tab-page={page}
                         type="button"
                         role="tab"
                         id={`${tabGroupId}-tab-${page}`}
@@ -234,6 +259,7 @@ export default function HomepageScreen() {
                         onClick={() => setActivePage(page)}
                         onContextMenu={(e) => {
                             e.preventDefault();
+                            tabLongPress.cancel();
                             setTabContextMenu({
                                 page,
                                 x: e.clientX,

@@ -55,6 +55,14 @@ export default function SearchButton(){
     const api = useApi();
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
+    const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+        try {
+            const stored: unknown = JSON.parse(localStorage.getItem('search_history') ?? '[]');
+            return Array.isArray(stored) ? stored.filter((item): item is string => typeof item === 'string') : [];
+        } catch {
+            return [];
+        }
+    });
     const searchRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const triggerRef = useRef<HTMLButtonElement>(null);
@@ -73,7 +81,7 @@ export default function SearchButton(){
     const clearSearch = useCallback(() => {
         setQuery('');
         setResult(undefined);
-        setIsSearchOpen(false);
+        setIsSearchOpen(true);
         window.requestAnimationFrame(() => inputRef.current?.focus());
     }, []);
 
@@ -89,6 +97,41 @@ export default function SearchButton(){
         collapseSearch();
         restoreTriggerFocus.current = true;
     }, [collapseSearch]);
+
+    useEffect(() => {
+        const handleGlobalKeyDown = (event: KeyboardEvent) => {
+            const isCmdK = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k';
+            const activeEl = document.activeElement;
+            const isEditable = activeEl instanceof HTMLInputElement ||
+                activeEl instanceof HTMLTextAreaElement ||
+                activeEl instanceof HTMLSelectElement ||
+                (activeEl instanceof HTMLElement && activeEl.isContentEditable);
+            const isSlash = event.key === '/' && !isEditable && !event.ctrlKey && !event.metaKey && !event.altKey;
+
+            if (isCmdK || isSlash) {
+                event.preventDefault();
+                if (isFeed) {
+                    const field = document.getElementById('feed-search-input');
+                    if (field instanceof HTMLInputElement) {
+                        field.scrollIntoView({ block: 'center' });
+                        field.focus();
+                    } else {
+                        navigate('/feed?search=1', { state: feedChildState(location) });
+                    }
+                    return;
+                }
+                setIsExpanded(true);
+                setIsSearchOpen(true);
+                window.requestAnimationFrame(() => {
+                    inputRef.current?.focus();
+                    inputRef.current?.select();
+                });
+            }
+        };
+
+        window.addEventListener('keydown', handleGlobalKeyDown);
+        return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    }, [isFeed, location, navigate]);
 
     useEffect(() => {
         if (!isExpanded && !restoreTriggerFocus.current) return;
@@ -126,8 +169,8 @@ export default function SearchButton(){
         previousPathname.current = pathname;
     }, [collapseSearch, pathname]);
 
-    const setHistory = (query: string) => {
-        const value = query.trim();
+    const setHistory = useCallback((newQuery: string) => {
+        const value = newQuery.trim();
         if (!value) return;
 
         try {
@@ -135,8 +178,26 @@ export default function SearchButton(){
             const oldHistory = Array.isArray(stored) ? stored.filter((item): item is string => typeof item === 'string') : [];
             const nextHistory = [value, ...oldHistory.filter(i => i.toLowerCase() !== value.toLowerCase())].slice(0, 10);
             localStorage.setItem('search_history', JSON.stringify(nextHistory));
+            setRecentSearches(nextHistory);
         } catch { /* Unavailable or malformed history must not turn a successful search into an error. */ }
-    }
+    }, []);
+
+    const clearAllHistory = useCallback(() => {
+        try {
+            localStorage.removeItem('search_history');
+        } catch { /* ignore */ }
+        setRecentSearches([]);
+    }, []);
+
+    const removeHistoryItem = useCallback((itemToRemove: string) => {
+        try {
+            const stored: unknown = JSON.parse(localStorage.getItem('search_history') ?? '[]');
+            const oldHistory = Array.isArray(stored) ? stored.filter((item): item is string => typeof item === 'string') : [];
+            const nextHistory = oldHistory.filter(i => i !== itemToRemove);
+            localStorage.setItem('search_history', JSON.stringify(nextHistory));
+            setRecentSearches(nextHistory);
+        } catch { /* ignore */ }
+    }, []);
 
     useEffect(() => {
         const value = query.trim();
@@ -163,7 +224,7 @@ export default function SearchButton(){
             controller.abort();
             window.clearTimeout(timer);
         };
-    }, [api, isExpanded, isFeed, query, searchKey, searchScope, settings.content.proxySearchThroughShikimori, retryIndex])
+    }, [api, isExpanded, isFeed, query, searchKey, searchScope, settings.content.proxySearchThroughShikimori, retryIndex, setHistory]);
 
     const isProfileSearch = searchScope.type === 'profiles';
     const isCollectionSearch = searchScope.type === 'collections';
@@ -184,7 +245,11 @@ export default function SearchButton(){
                 type="button"
                 className={styles['search-trigger']}
                 onClick={() => {
-                    if (!isFeed) { setIsExpanded(true); return; }
+                    if (!isFeed) {
+                        setIsExpanded(true);
+                        setIsSearchOpen(true);
+                        return;
+                    }
                     const field = document.getElementById('feed-search-input');
                     if (field instanceof HTMLInputElement) { field.scrollIntoView({ block: 'center' }); field.focus(); }
                     else navigate('/feed?search=1', { state: feedChildState(location) });
@@ -195,15 +260,17 @@ export default function SearchButton(){
             >
                 <img className={styles['search-icon']} src={SearchIcon} alt="" />
                 <span className={styles['trigger-label']}>{searchLabel}</span>
+                <kbd className={styles['hotkey-badge']}>⌘K</kbd>
             </button> : <label className={styles['search-field']}>
                 <img className={styles['search-icon']} src={SearchIcon} alt="" />
                 <input
                     ref={inputRef}
                     value={query}
+                    onFocus={() => setIsSearchOpen(true)}
                     onChange={e => {
                         const value = e.target.value;
                         setQuery(value);
-                        setIsSearchOpen(Boolean(value.trim()));
+                        setIsSearchOpen(true);
                         if (!value.trim()) {
                             setResult(undefined);
                         }
@@ -211,18 +278,79 @@ export default function SearchButton(){
                     placeholder={searchLabel}
                     aria-label={searchLabel}
                 />
-                {query && <button
-                    type="button"
-                    className={styles['clear-button']}
-                    onClick={clearSearch}
-                    aria-label={t('search.clear')}
-                >×</button>}
+                {query ? (
+                    <button
+                        type="button"
+                        className={styles['clear-button']}
+                        onClick={clearSearch}
+                        aria-label={t('search.clear')}
+                    >×</button>
+                ) : (
+                    <button
+                        type="button"
+                        className={styles['clear-button']}
+                        onClick={dismissSearch}
+                        aria-label={t('misc.close')}
+                    >×</button>
+                )}
             </label>}
             <span className={styles['search-status']} role={isExpanded && query.trim() ? 'status' : undefined} aria-live="polite" aria-atomic="true">{searchStatus}</span>
             {!isFeed && isSearchOpen && <div className={styles['search-overlay']} onMouseDown={event => {
                 if (event.target === event.currentTarget) dismissSearch();
             }}>
                 <div className={styles['search-content']}>
+                    {!isLoading && !query.trim() && (
+                        <div className={styles['recent-searches']}>
+                            <div className={styles['recent-header']}>
+                                <span className={styles['recent-title']}>
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <polyline points="12 6 12 12 16 14" />
+                                    </svg>
+                                    {t('search.recentSearches')}
+                                </span>
+                                {recentSearches.length > 0 && (
+                                    <button
+                                        type="button"
+                                        className={styles['clear-history-btn']}
+                                        onClick={clearAllHistory}
+                                    >
+                                        {t('search.clearHistory')}
+                                    </button>
+                                )}
+                            </div>
+                            {recentSearches.length > 0 ? (
+                                <div className={styles['recent-tags']} role="list">
+                                    {recentSearches.map(item => (
+                                        <div key={item} className={styles['recent-tag']} role="listitem">
+                                            <button
+                                                type="button"
+                                                className={styles['recent-tag-btn']}
+                                                onClick={() => {
+                                                    setQuery(item);
+                                                    setIsSearchOpen(true);
+                                                    inputRef.current?.focus();
+                                                }}
+                                            >
+                                                {item}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className={styles['recent-tag-remove']}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    removeHistoryItem(item);
+                                                }}
+                                                aria-label={`Удалить ${item}`}
+                                            >×</button>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className={styles.message}>{t('search.waiting')}</p>
+                            )}
+                        </div>
+                    )}
                     {isLoading && <p className={styles.message}>{t('search.waiting')}</p>}
                     {currentResult?.error && <div className={styles.message} role="alert">
                         <p>{t('search.error')}</p>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import styles from './DubSelectModal.module.css';
 import { extractVideoLinks } from '../utils/LinkParser';
 import type { VideoSources } from '../shared/types/video';
@@ -47,6 +47,74 @@ function formatProgressTime(seconds: number) {
     return `${String(minutes).padStart(2, '0')}:${remainingSeconds}`;
 }
 
+interface ParsedEpisodeQuery {
+    trimmed: string;
+    isNumeric: boolean;
+    numValue?: number;
+}
+
+function parseEpisodeQuery(query: string): ParsedEpisodeQuery {
+    const trimmed = query.trim().toLowerCase();
+    if (!trimmed) {
+        return { trimmed: '', isNumeric: false };
+    }
+
+    const directNum = Number(trimmed);
+    if (!Number.isNaN(directNum) && Number.isInteger(directNum) && directNum > 0) {
+        return { trimmed, isNumeric: true, numValue: directNum };
+    }
+
+    const epMatch = trimmed.match(/^(?:серия|эпизод|эп\.?|ep\.?|s\d+\s*e|e)\s*(\d+)$/i);
+    if (epMatch) {
+        const parsed = Number(epMatch[1]);
+        if (!Number.isNaN(parsed) && Number.isInteger(parsed) && parsed > 0) {
+            return { trimmed, isNumeric: true, numValue: parsed };
+        }
+    }
+
+    return { trimmed, isNumeric: false };
+}
+
+function matchesEpisode(episode: Episode, parsed: ParsedEpisodeQuery): boolean {
+    if (!parsed.trimmed) return true;
+
+    if (parsed.isNumeric && parsed.numValue !== undefined) {
+        if (episode.position === parsed.numValue) return true;
+        if (String(episode.position).startsWith(String(parsed.numValue))) return true;
+    }
+
+    if (String(episode.position) === parsed.trimmed) return true;
+    if (episode.name.toLowerCase().includes(parsed.trimmed)) return true;
+
+    return false;
+}
+
+function highlightMatch(text: string, query: string): ReactNode {
+    const q = query.trim();
+    if (!q) return text;
+    let index = text.toLowerCase().indexOf(q.toLowerCase());
+    let matchLen = q.length;
+
+    if (index === -1) {
+        const parsed = parseEpisodeQuery(q);
+        if (parsed.isNumeric && parsed.numValue !== undefined) {
+            const numStr = String(parsed.numValue);
+            index = text.toLowerCase().indexOf(numStr);
+            matchLen = numStr.length;
+        }
+    }
+
+    if (index === -1) return text;
+    const before = text.slice(0, index);
+    const match = text.slice(index, index + matchLen);
+    const after = text.slice(index + matchLen);
+    return <>
+        {before}
+        <mark className={styles.highlight}>{match}</mark>
+        {after}
+    </>;
+}
+
 export default function DubSelectModal({
     isOpen,
     onClose,
@@ -65,11 +133,59 @@ export default function DubSelectModal({
     const [episodesData, setEpisodesData] = useState<Episode[]>([]);
     const [selectedDub, setSelectedDub] = useState(0);
     const [selectedSource, setSelectedSource] = useState(0);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [isReversed, setIsReversed] = useState(false);
+    const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+    const displayedEpisodes = useMemo(() => {
+        return isReversed ? [...episodesData].reverse() : episodesData;
+    }, [episodesData, isReversed]);
+
+    const matchingIndices = useMemo(() => {
+        const parsed = parseEpisodeQuery(searchQuery);
+        if (!parsed.trimmed) return new Set<number>();
+        const set = new Set<number>();
+        displayedEpisodes.forEach((ep, index) => {
+            if (matchesEpisode(ep, parsed)) {
+                set.add(index);
+            }
+        });
+        return set;
+    }, [displayedEpisodes, searchQuery]);
+
+    const primaryMatchIndex = useMemo(() => {
+        const parsed = parseEpisodeQuery(searchQuery);
+        if (!parsed.trimmed || displayedEpisodes.length === 0) return -1;
+
+        if (parsed.isNumeric && parsed.numValue !== undefined) {
+            const exactIdx = displayedEpisodes.findIndex(ep => ep.position === parsed.numValue);
+            if (exactIdx !== -1) return exactIdx;
+
+            const prefixIdx = displayedEpisodes.findIndex(ep => String(ep.position).startsWith(String(parsed.numValue)));
+            if (prefixIdx !== -1) return prefixIdx;
+        }
+
+        const nameStartsIdx = displayedEpisodes.findIndex(ep => ep.name.toLowerCase().startsWith(parsed.trimmed));
+        if (nameStartsIdx !== -1) return nameStartsIdx;
+
+        return displayedEpisodes.findIndex(ep => matchesEpisode(ep, parsed));
+    }, [displayedEpisodes, searchQuery]);
+
+    const lastTypeTimeRef = useRef(0);
+
     const [isDubsLoading, setIsDubsLoading] = useState(false);
     const [isSourcesLoading, setIsSourcesLoading] = useState(false);
     const [isEpisodesLoading, setIsEpisodesLoading] = useState(false);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [focusedEpisodeIndex, setFocusedEpisodeIndex] = useState(-1);
+
+    const activeFocusedIndex = focusedEpisodeIndex !== -1 ? focusedEpisodeIndex : primaryMatchIndex;
+
+    const updateSearchQuery = useCallback((updater: string | ((prev: string) => string)) => {
+        setFocusedEpisodeIndex(-1);
+        setSearchQuery(updater);
+    }, []);
     const [isSelecting, setIsSelecting] = useState(false);
     const selectionRef = useRef<{ id: number; controller: AbortController } | null>(null);
     const selectionGenerationRef = useRef(0);
@@ -88,7 +204,55 @@ export default function DubSelectModal({
     const episodesRequestRef = useRef(0);
     const activeEpisodeRef = useRef<HTMLButtonElement | null>(null);
     const episodeListRef = useRef<HTMLDivElement | null>(null);
-    const episodeProgress = getWatchProgress()[String(releaseId)] ?? {};
+    const episodeProgress = useMemo(() => getWatchProgress()[String(releaseId)] ?? {}, [releaseId]);
+
+    const resumeTarget = useMemo(() => {
+        if (!episodesData.length || Object.keys(episodeProgress).length === 0) return null;
+
+        // 1. Partially watched episode (savedTime > 0)
+        const partialWatched = episodesData
+            .filter(ep => {
+                const time = episodeProgress[String(ep.position)];
+                return typeof time === 'number' && time > 0;
+            })
+            .sort((a, b) => b.position - a.position);
+
+        if (partialWatched.length > 0) {
+            const ep = partialWatched[0];
+            return {
+                episode: ep,
+                isPartial: true,
+                isCompleted: false,
+                time: episodeProgress[String(ep.position)] as number,
+            };
+        }
+
+        // 2. Fully watched episodes from local progress (time === -1)
+        const watchedEpisodes = episodesData
+            .filter(ep => episodeProgress[String(ep.position)] === -1)
+            .sort((a, b) => b.position - a.position);
+
+        if (watchedEpisodes.length > 0) {
+            const lastWatched = watchedEpisodes[0];
+            const nextEp = episodesData.find(ep => ep.position === lastWatched.position + 1);
+            if (nextEp) {
+                return {
+                    episode: nextEp,
+                    isPartial: false,
+                    isCompleted: false,
+                    time: 0,
+                };
+            }
+            return {
+                episode: lastWatched,
+                isPartial: false,
+                isCompleted: true,
+                time: -1,
+            };
+        }
+
+        return null;
+    }, [episodesData, episodeProgress]);
 
     const autoDubId = autoSelect?.dubId;
     const autoSrcId = autoSelect?.sourceId;
@@ -100,6 +264,7 @@ export default function DubSelectModal({
         setIsEpisodesLoading(true);
         setLoadError(null);
         setEpisodesData([]);
+        setSearchQuery('');
 
         GetEpisodes(api, relId, dubId, srcId)
             .then(data => {
@@ -127,6 +292,7 @@ export default function DubSelectModal({
         setLoadError(null);
         setSourcesData([]);
         setEpisodesData([]);
+        setSearchQuery('');
 
         GetSources(api, relId, dubId)
             .then(data => {
@@ -205,6 +371,8 @@ export default function DubSelectModal({
             episodesRequestRef.current += 1;
             autoSelectedRef.current = null;
             setFocusedEpisodeIndex(-1);
+            setIsSearchOpen(false);
+            setSearchQuery('');
             return;
         }
 
@@ -267,21 +435,203 @@ export default function DubSelectModal({
 
     useEffect(() => {
         episodeListRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest' });
-    }, [focusedEpisodeIndex]);
+    }, [activeFocusedIndex]);
+
+    useEffect(() => {
+        if (!searchQuery.trim() || activeFocusedIndex === -1) return;
+        const targetEl = document.getElementById(
+            `episode-row-${releaseId}-${displayedEpisodes[activeFocusedIndex]?.position}`
+        );
+        if (typeof targetEl?.scrollIntoView === 'function') {
+            targetEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    }, [searchQuery, activeFocusedIndex, releaseId, displayedEpisodes]);
+
+    const navigateMatches = useCallback((direction: 1 | -1) => {
+        if (matchingIndices.size > 0) {
+            const matchList = Array.from(matchingIndices);
+            const currentPos = matchList.indexOf(activeFocusedIndex);
+            const nextPos = currentPos !== -1
+                ? (currentPos + direction + matchList.length) % matchList.length
+                : (direction === 1 ? 0 : matchList.length - 1);
+            const nextIndex = matchList[nextPos];
+            setFocusedEpisodeIndex(nextIndex);
+            const targetEl = document.getElementById(
+                `episode-row-${releaseId}-${displayedEpisodes[nextIndex].position}`
+            );
+            if (typeof targetEl?.scrollIntoView === 'function') {
+                try {
+                    targetEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                } catch {
+                    // Ignore jsdom errors
+                }
+            }
+        } else if (displayedEpisodes.length > 0) {
+            const currentIndex = activeFocusedIndex !== -1 ? activeFocusedIndex : (direction === 1 ? -1 : 0);
+            const nextIndex = (currentIndex + direction + displayedEpisodes.length) % displayedEpisodes.length;
+            setFocusedEpisodeIndex(nextIndex);
+            const targetEl = document.getElementById(
+                `episode-row-${releaseId}-${displayedEpisodes[nextIndex].position}`
+            );
+            if (typeof targetEl?.scrollIntoView === 'function') {
+                try {
+                    targetEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                } catch {
+                    // Ignore jsdom errors
+                }
+            }
+        }
+    }, [activeFocusedIndex, displayedEpisodes, matchingIndices, releaseId]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const handleGlobalKeyDown = (event: globalThis.KeyboardEvent) => {
+            if (episodeToUnwatch !== null) return;
+            if (event.defaultPrevented || event.isComposing) return;
+
+            const el = event.target instanceof Element ? event.target : null;
+            const tagName = el?.tagName?.toLowerCase();
+            const isInsideInput = tagName === 'input' || tagName === 'textarea';
+            const isSeenButton = Boolean(el?.closest(`.${styles.seen}`) || el?.getAttribute('aria-label') === t('dubSelect.watched'));
+            const isSelect = tagName === 'select';
+
+            // 1. ESCAPE: if search query or search bar is active, clear it and prevent modal from closing
+            if (event.key === 'Escape') {
+                if (searchQuery.trim().length > 0 || isSearchOpen) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+                    updateSearchQuery('');
+                    setIsSearchOpen(false);
+                    lastTypeTimeRef.current = 0;
+                }
+                return;
+            }
+
+            // 2. BACKSPACE: if not inside an input and search query exists, delete last character
+            if (event.key === 'Backspace' && !isInsideInput && searchQuery.length > 0) {
+                event.preventDefault();
+                event.stopPropagation();
+                updateSearchQuery(q => {
+                    const next = q.slice(0, -1);
+                    if (!next) setIsSearchOpen(false);
+                    return next;
+                });
+                lastTypeTimeRef.current = Date.now();
+                return;
+            }
+
+            // If loading or selecting or error or no episodes, skip navigation/selection
+            if (isSelecting || isDubsLoading || isSourcesLoading || isEpisodesLoading || loadError || displayedEpisodes.length === 0) {
+                return;
+            }
+
+            // 3. ENTER: select episode
+            if (event.key === 'Enter') {
+                if (isSeenButton) return;
+                if (el?.closest(`.${styles['resume-btn']}`) || el?.closest(`.${styles['retry-button']}`) || el?.closest(`.${styles['search-clear-btn']}`) || el?.closest(`.${styles['sort-toggle-btn']}`)) {
+                    return;
+                }
+
+                const activeOption = (el?.closest('button[role="option"]') as HTMLButtonElement | null) ?? (document.activeElement?.closest('button[role="option"]') as HTMLButtonElement | null);
+                if (activeOption && !searchQuery.trim()) {
+                    const optId = activeOption.id;
+                    const ep = displayedEpisodes.find(item => optId.endsWith(`-${item.position}`));
+                    if (ep) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        void selectEpisode(ep, true).catch(console.error);
+                        return;
+                    }
+                }
+
+                if (activeFocusedIndex >= 0 && activeFocusedIndex < displayedEpisodes.length) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const ep = displayedEpisodes[activeFocusedIndex];
+                    if (ep) void selectEpisode(ep, true).catch(console.error);
+                }
+                return;
+            }
+
+            // 4. ARROW KEYS: navigate matching episodes
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                if (isSelect) return;
+                event.preventDefault();
+                event.stopPropagation();
+                navigateMatches(event.key === 'ArrowDown' ? 1 : -1);
+                return;
+            }
+
+            // 5. PRINTABLE CHARACTERS: Dota 2 style type-to-find
+            if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+                const now = Date.now();
+                const isTimeout = now - lastTypeTimeRef.current > 1800;
+
+                if (isInsideInput) {
+                    lastTypeTimeRef.current = now;
+                    if (isTimeout && searchQuery.length > 0) {
+                        event.preventDefault();
+                        updateSearchQuery(event.key);
+                    }
+                    return;
+                }
+
+                if (event.key === ' ' && el?.closest('button')) {
+                    return;
+                }
+
+                if (isSelect && event.key === ' ') return;
+
+                event.preventDefault();
+                event.stopPropagation();
+
+                lastTypeTimeRef.current = now;
+                setIsSearchOpen(true);
+                if (isTimeout) {
+                    updateSearchQuery(event.key);
+                } else {
+                    updateSearchQuery(prev => prev + event.key);
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleGlobalKeyDown, true);
+        return () => {
+            window.removeEventListener('keydown', handleGlobalKeyDown, true);
+        };
+    }, [
+        isOpen,
+        isSearchOpen,
+        episodeToUnwatch,
+        searchQuery,
+        isSelecting,
+        isDubsLoading,
+        isSourcesLoading,
+        isEpisodesLoading,
+        loadError,
+        displayedEpisodes,
+        activeFocusedIndex,
+        updateSearchQuery,
+        selectEpisode,
+        navigateMatches,
+        t,
+    ]);
 
     const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-        if (event.target !== event.currentTarget || event.defaultPrevented || event.nativeEvent.isComposing || isSelecting || isDubsLoading || isSourcesLoading || isEpisodesLoading || loadError || episodesData.length === 0) return;
+        if (event.defaultPrevented || event.nativeEvent.isComposing) return;
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            navigateMatches(event.key === 'ArrowDown' ? 1 : -1);
+        }
+    };
 
-        if (event.key === 'ArrowDown') {
+    const handleSearchInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+        if (event.defaultPrevented || event.nativeEvent.isComposing) return;
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault();
-            setFocusedEpisodeIndex(prev => (prev < episodesData.length - 1 ? prev + 1 : 0));
-        } else if (event.key === 'ArrowUp') {
-            event.preventDefault();
-            setFocusedEpisodeIndex(prev => (prev > 0 ? prev - 1 : episodesData.length - 1));
-        } else if (event.key === 'Enter' && focusedEpisodeIndex >= 0 && focusedEpisodeIndex < episodesData.length) {
-            event.preventDefault();
-            const target = episodesData[focusedEpisodeIndex];
-            if (target) void selectEpisode(target, true).catch(err => console.error(err));
+            navigateMatches(event.key === 'ArrowDown' ? 1 : -1);
         }
     };
 
@@ -354,12 +704,130 @@ export default function DubSelectModal({
                                 )}
                         </div>
 
+                        {resumeTarget && !isLoading && !loadError && (
+                            <div className={styles['resume-header-banner']}>
+                                <div className={styles['resume-content']}>
+                                    <span className={styles['resume-badge']}>
+                                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                                            <circle cx="12" cy="12" r="10" />
+                                            <polyline points="12 6 12 12 16 14" />
+                                        </svg>
+                                        {resumeTarget.isPartial
+                                            ? t('dubSelect.continueWatching')
+                                            : resumeTarget.isCompleted
+                                                ? t('dubSelect.lastWatched')
+                                                : t('dubSelect.nextEpisode')}
+                                    </span>
+                                    <span className={styles['resume-ep-name']}>
+                                        {resumeTarget.episode.name}
+                                        {resumeTarget.isPartial && (
+                                            <span className={styles['resume-time']}>
+                                                ({formatProgressTime(resumeTarget.time)})
+                                            </span>
+                                        )}
+                                    </span>
+                                </div>
+                                <button
+                                    type="button"
+                                    className={styles['resume-btn']}
+                                    disabled={isSelecting}
+                                    onClick={() => void selectEpisode(resumeTarget.episode, true).catch(error => console.error(error))}
+                                    aria-label={`${resumeTarget.isPartial ? t('dubSelect.continue') : t('dubSelect.play')} ${resumeTarget.episode.name}`}
+                                >
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true">
+                                        <polygon points="5 3 19 12 5 21 5 3" />
+                                    </svg>
+                                    <span>
+                                        {resumeTarget.isPartial
+                                            ? t('dubSelect.continue')
+                                            : t('dubSelect.play')}
+                                    </span>
+                                </button>
+                            </div>
+                        )}
+
+                        {!isLoading && !loadError && episodesData.length > 0 && (
+                            <div className={styles['episodes-header']}>
+                                <div className={styles['episodes-header-left']}>
+                                    <span className={styles['episodes-count']}>
+                                        {t('dubSelect.title')} ({displayedEpisodes.length})
+                                    </span>
+                                </div>
+                                <div className={styles['episodes-header-actions']}>
+                                    {!isSearchOpen && !searchQuery.trim() && (
+                                        <button
+                                            type="button"
+                                            className={styles['header-action-btn']}
+                                            onClick={() => {
+                                                setIsSearchOpen(true);
+                                                setTimeout(() => searchInputRef.current?.focus(), 50);
+                                            }}
+                                            title={t('dubSelect.quickSearch')}
+                                            aria-label={t('dubSelect.quickSearch')}
+                                        >
+                                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                                                <circle cx="11" cy="11" r="8" />
+                                                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                            </svg>
+                                        </button>
+                                    )}
+                                    {episodesData.length > 1 && (
+                                        <button
+                                            type="button"
+                                            className={`${styles['header-action-btn']} ${styles['sort-toggle-btn']} ${isReversed ? styles['sort-active'] : ''}`}
+                                            onClick={() => setIsReversed(v => !v)}
+                                            title={isReversed ? t('dubSelect.sortOrder') : t('dubSelect.sortReverse')}
+                                            aria-label={isReversed ? 'Сначала старые' : 'Сначала новые'}
+                                        >
+                                            <span aria-hidden="true">{isReversed ? 'N → 1' : '1 → N'}</span>
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {!isLoading && !loadError && (isSearchOpen || searchQuery.trim().length > 0) && (
+                            <div className={styles['search-bar']}>
+                                <div className={styles['search-input-wrapper']}>
+                                    <svg className={styles['search-icon']} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                        <circle cx="11" cy="11" r="8" />
+                                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                    </svg>
+                                    <input
+                                        ref={searchInputRef}
+                                        type="text"
+                                        className={styles['search-input']}
+                                        placeholder={t('dubSelect.quickSearch')}
+                                        value={searchQuery}
+                                        onChange={e => updateSearchQuery(e.target.value)}
+                                        onKeyDown={handleSearchInputKeyDown}
+                                        aria-label={t('dubSelect.quickSearch')}
+                                        autoFocus
+                                    />
+                                    <button
+                                        type="button"
+                                        className={styles['search-clear-btn']}
+                                        onClick={() => {
+                                            updateSearchQuery('');
+                                            setIsSearchOpen(false);
+                                        }}
+                                        aria-label={t('search.clear') || 'Очистить'}
+                                    >×</button>
+                                </div>
+                                {searchQuery.trim() && (
+                                    <span className={styles['match-count']}>
+                                        {t('dubSelect.matchCount', { count: matchingIndices.size, total: displayedEpisodes.length })}
+                                    </span>
+                                )}
+                            </div>
+                        )}
+
                         <div
                             ref={episodeListRef}
                             className={styles.episodes}
                             tabIndex={0}
                             role="listbox"
-                            aria-activedescendant={episodesData[focusedEpisodeIndex] ? `episode-option-${releaseId}-${selectedDub}-${selectedSource}-${episodesData[focusedEpisodeIndex].position}` : undefined}
+                            aria-activedescendant={displayedEpisodes[activeFocusedIndex] ? `episode-option-${releaseId}-${selectedDub}-${selectedSource}-${displayedEpisodes[activeFocusedIndex].position}` : undefined}
                             aria-label={t('dubSelect.title')}
                             onKeyDown={handleKeyDown}
                         >
@@ -385,22 +853,32 @@ export default function DubSelectModal({
                                 </div>
                             )}
 
-                            {!isLoading && !loadError && episodesData.length === 0 && (
+                            {!isLoading && !loadError && displayedEpisodes.length === 0 && (
                                 <div className={styles['state-container']}>
                                     <p>{t('page.empty')}</p>
                                 </div>
                             )}
 
-                            {!isLoading && !loadError && episodesData.map((episode, index) => {
+                            {!isLoading && !loadError && searchQuery.trim() && matchingIndices.size === 0 && (
+                                <div className={styles['state-container']}>
+                                    <p>{t('dubSelect.noMatches')}</p>
+                                </div>
+                            )}
+
+                            {!isLoading && !loadError && displayedEpisodes.map((episode, index) => {
                                 const savedTime = episodeProgress[String(episode.position)];
                                 const hasProgress = typeof savedTime === 'number' && savedTime > 0;
                                 const isFullWatched = savedTime === -1 || episode.is_watched;
-                                const isFocused = index === focusedEpisodeIndex;
+                                const isFocused = index === activeFocusedIndex;
+                                const hasQuery = searchQuery.trim().length > 0;
+                                const isMatching = !hasQuery || matchingIndices.has(index);
+                                const isPrimaryMatch = hasQuery && isFocused && isMatching;
 
                                 return (
                                     <div
+                                        id={`episode-row-${releaseId}-${episode.position}`}
                                         key={`episode-${episode.position}`}
-                                        className={`${styles['episode-row']} ${isFocused ? styles['episode-focused'] : ''}`}
+                                        className={`${styles['episode-row']} ${isFocused ? styles['episode-focused'] : ''} ${hasQuery && isMatching ? styles['dota-matched'] : ''} ${hasQuery && !isMatching ? styles['dota-dimmed'] : ''} ${isPrimaryMatch ? styles['dota-primary-match'] : ''}`}
                                     >
                                         <button
                                             ref={hasProgress ? activeEpisodeRef : null}
@@ -412,7 +890,7 @@ export default function DubSelectModal({
                                             disabled={isSelecting}
                                             onClick={() => void selectEpisode(episode, true).catch(error => console.error(error))}
                                         >
-                                            <h3>{episode.name}</h3>
+                                            <h3>{highlightMatch(episode.name, searchQuery)}</h3>
                                             <div className={styles['episode-meta']}>
                                                 {isFullWatched && !hasProgress ? (
                                                     <span className={styles['episode-progress']}>

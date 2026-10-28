@@ -12,17 +12,38 @@ import NotificationsIcon from '../assets/icons/notifications.svg';
 import LogoIcon from '../assets/icons/logo.svg';
 import { useRoomPresence } from '../shared/contexts/roomContext';
 import { applyTheme } from '../shared/theme';
+import BottomNav from '../components/BottomNav';
+import ScrollToTop from '../components/ScrollToTop';
 import styles from './RootLayout.module.css';
 
 export default function RootLayout() {
   return <ReleaseActionsProvider><RootLayoutContent /></ReleaseActionsProvider>;
 }
 
+function RoomIndicator() {
+  const { activeRoomId } = useRoomPresence();
+  const { t } = useTranslation();
+
+  if (!activeRoomId) return null;
+
+  return (
+    <Link
+      to={`/together/${activeRoomId}`}
+      className={styles['room-indicator']}
+      title={t('room.return')}
+      aria-label={t('room.return')}
+    >
+      <span className={styles['room-status']} />
+      <img src={UsersIcon} alt="" />
+      <span className={styles['room-label']}>{t('room.inRoom')}</span>
+    </Link>
+  );
+}
+
 function RootLayoutContent() {
   const { settings, setSettings } = useSettings();
   const { userToken } = useUser();
   const { t } = useTranslation();
-  const { activeRoomId } = useRoomPresence();
   const [isFirstTimeOpening, setIsFirstTimeOpeningState] = useState<boolean>(() => localStorage.getItem('onboarded') !== 'true');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -95,12 +116,7 @@ function RootLayoutContent() {
         </nav>
         {isMenuOpen && <div className={styles.backdrop} onClick={() => { setIsMenuOpen(false); menuButtonRef.current?.focus(); }} aria-hidden="true" />}
         <SearchBar />
-        {activeRoomId && <Link
-          to={`/together/${activeRoomId}`}
-          className={styles['room-indicator']}
-          title={t('room.return')}
-          aria-label={t('room.return')}
-        ><span className={styles['room-status']} /><img src={UsersIcon} alt="" /><span className={styles['room-label']}>{t('room.inRoom')}</span></Link>}
+        <RoomIndicator />
         <NavLink
           to="/settings"
           className={({ isActive }) => `${styles['theme-toggle']} ${styles['settings-link']} ${isActive ? styles.active : ''}`}
@@ -121,6 +137,8 @@ function RootLayoutContent() {
       <main className={styles.main}>
         <Outlet />
       </main>
+      <ScrollToTop />
+      <BottomNav />
       <Modal
         isOpen={isFirstTimeOpening}
         onClose={closeOnboarding}

@@ -82,6 +82,7 @@ export function Modal({ isOpen, onClose, onCloseStart, title, text, actions, chi
             aria-labelledby={title ? titleId : undefined}
             onMouseDown={(event) => event.stopPropagation()}
         >
+            <div className={styles['sheet-handle']} aria-hidden="true" />
             {(title || showCloseButton !== false) && <header className={styles['modal-header']}>
                 {title && <h2 id={titleId} className={styles.title}>{title}</h2>}
                 {showCloseButton !== false && <button type="button" className={styles['close-button']} onClick={handleClose} aria-label={t('misc.close')}>

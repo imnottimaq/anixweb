@@ -41,5 +41,7 @@ export function useTranslation() {
     const selectPlural = useCallback((value: number, options?: Intl.PluralRulesOptions) =>
         options ? new Intl.PluralRules(locale, options).select(value) : pluralRules.select(value), [locale, pluralRules]);
 
-    return { t, language, locale, formatDate, formatNumber, formatRelativeTime, selectPlural };
+    return useMemo(() => ({
+        t, language, locale, formatDate, formatNumber, formatRelativeTime, selectPlural
+    }), [t, language, locale, formatDate, formatNumber, formatRelativeTime, selectPlural]);
 }

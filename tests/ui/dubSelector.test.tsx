@@ -309,5 +309,231 @@ describe('DubSelectModal Redesign (src/modals/DubSelectModal.tsx)', () => {
             expect(rect.bottom).toBeLessThanOrEqual(dialogRect.bottom);
         }
     });
+
+    it('highlights matching episodes and dims non-matches (Dota 2 hero pick style)', async () => {
+        renderModal();
+
+        await waitFor(() => {
+            expect(screen.getByText('Серия 1: Начало')).toBeInTheDocument();
+        });
+
+        const searchBtn = screen.getByRole('button', { name: /Поиск серии/i });
+        fireEvent.click(searchBtn);
+
+        const searchInput = screen.getByPlaceholderText(/Поиск серии/i);
+        expect(searchInput).toBeInTheDocument();
+
+        // Type "2" into search input
+        await userEvent.type(searchInput, '2');
+
+        const ep1Row = document.getElementById('episode-row-100-1');
+        const ep2Row = document.getElementById('episode-row-100-2');
+        const ep3Row = document.getElementById('episode-row-100-3');
+
+        expect(ep1Row?.className).toMatch(/dota-dimmed/);
+        expect(ep2Row?.className).toMatch(/dota-matched/);
+        expect(ep2Row?.className).toMatch(/dota-primary-match/);
+        expect(ep3Row?.className).toMatch(/dota-dimmed/);
+
+        // Match count shown
+        expect(screen.getByText(/1 из 3/i)).toBeInTheDocument();
+
+        // Clear query
+        await userEvent.clear(searchInput);
+        expect(ep1Row?.className).not.toMatch(/dota-dimmed/);
+        expect(ep2Row?.className).not.toMatch(/dota-dimmed/);
+    });
+
+    it('selects the primary matched episode when Enter is pressed in search input', async () => {
+        const onEpisodeSelect = vi.fn();
+        renderModal({ onEpisodeSelect });
+
+        await waitFor(() => {
+            expect(screen.getByText('Серия 2: Встреча')).toBeInTheDocument();
+        });
+
+        const searchBtn = screen.getByRole('button', { name: /Поиск серии/i });
+        fireEvent.click(searchBtn);
+
+        const searchInput = screen.getByPlaceholderText(/Поиск серии/i);
+        await userEvent.type(searchInput, 'Финал{Enter}');
+
+        await waitFor(() => {
+            expect(onEpisodeSelect).toHaveBeenCalledTimes(1);
+        });
+
+        expect(onEpisodeSelect).toHaveBeenCalledWith(
+            {},
+            expect.objectContaining({ name: 'Серия 3: Финал', position: 3 }),
+            expect.any(Array),
+            10,
+            1
+        );
+    });
+
+    it('allows typing digits anywhere (Dota 2 type-to-find) even when close button is focused, and Enter immediately selects the episode', async () => {
+        const onEpisodeSelect = vi.fn();
+        renderModal({ onEpisodeSelect });
+
+        await waitFor(() => {
+            expect(screen.getByText('Серия 1: Начало')).toBeInTheDocument();
+        });
+
+        // Close button has default modal focus
+        const closeBtn = screen.getByRole('button', { name: 'Закрыть' });
+        closeBtn.focus();
+        expect(document.activeElement).toBe(closeBtn);
+
+        // User types "2" without clicking search input
+        await userEvent.keyboard('2');
+
+        const ep1Row = document.getElementById('episode-row-100-1');
+        const ep2Row = document.getElementById('episode-row-100-2');
+        const ep3Row = document.getElementById('episode-row-100-3');
+
+        expect(ep1Row?.className).toMatch(/dota-dimmed/);
+        expect(ep2Row?.className).toMatch(/dota-matched/);
+        expect(ep2Row?.className).toMatch(/dota-primary-match/);
+        expect(ep3Row?.className).toMatch(/dota-dimmed/);
+
+        // Press Enter -> selects Episode 2 immediately
+        await userEvent.keyboard('{Enter}');
+
+        await waitFor(() => {
+            expect(onEpisodeSelect).toHaveBeenCalledTimes(1);
+        });
+
+        expect(onEpisodeSelect).toHaveBeenCalledWith(
+            {},
+            expect.objectContaining({ name: 'Серия 2: Встреча', position: 2 }),
+            expect.any(Array),
+            10,
+            1
+        );
+    });
+
+    it('handles Escape to clear query without closing modal, and Backspace to delete characters', async () => {
+        const onClose = vi.fn();
+        renderModal({ onClose });
+
+        await waitFor(() => {
+            expect(screen.getByText('Серия 1: Начало')).toBeInTheDocument();
+        });
+
+        // Type "2" to filter
+        await userEvent.keyboard('2');
+        const ep1Row = document.getElementById('episode-row-100-1');
+        const ep2Row = document.getElementById('episode-row-100-2');
+        expect(ep2Row?.className).toMatch(/dota-primary-match/);
+        expect(ep1Row?.className).toMatch(/dota-dimmed/);
+
+        // Backspace outside input clears character
+        await userEvent.keyboard('{Backspace}');
+        expect(ep1Row?.className).not.toMatch(/dota-dimmed/);
+        expect(ep2Row?.className).not.toMatch(/dota-dimmed/);
+
+        // Type "2" again
+        await userEvent.keyboard('2');
+        expect(ep2Row?.className).toMatch(/dota-primary-match/);
+
+        // Escape clears search query and does NOT call onClose
+        await userEvent.keyboard('{Escape}');
+        expect(onClose).not.toHaveBeenCalled();
+        expect(ep1Row?.className).not.toMatch(/dota-dimmed/);
+        expect(ep2Row?.className).not.toMatch(/dota-dimmed/);
+
+        // Second Escape when query is empty closes the modal
+        await userEvent.keyboard('{Escape}');
+        await waitFor(() => {
+            expect(onClose).toHaveBeenCalled();
+        });
+    });
+
+    it('navigates matching episodes using ArrowUp and ArrowDown', async () => {
+        const onEpisodeSelect = vi.fn();
+        renderModal({ onEpisodeSelect });
+
+        await waitFor(() => {
+            expect(screen.getByText('Серия 1: Начало')).toBeInTheDocument();
+        });
+
+        // Type "серия" which matches all 3
+        await userEvent.keyboard('серия');
+
+        const ep1Row = document.getElementById('episode-row-100-1');
+        const ep2Row = document.getElementById('episode-row-100-2');
+
+        // Ep 1 is primary match
+        expect(ep1Row?.className).toMatch(/dota-primary-match/);
+
+        // ArrowDown moves primary match to Ep 2
+        await userEvent.keyboard('{ArrowDown}');
+        expect(ep2Row?.className).toMatch(/dota-primary-match/);
+
+        // Enter selects Ep 2
+        await userEvent.keyboard('{Enter}');
+        await waitFor(() => {
+            expect(onEpisodeSelect).toHaveBeenCalledTimes(1);
+        });
+        expect(onEpisodeSelect.mock.calls[0][1].position).toBe(2);
+    });
+
+    it('toggles sort order between 1 → N and N → 1', async () => {
+        renderModal();
+
+        await waitFor(() => {
+            expect(screen.getByText('Серия 1: Начало')).toBeInTheDocument();
+        });
+
+        const sortBtn = screen.getByRole('button', { name: /Сначала новые/i });
+        expect(sortBtn).toBeInTheDocument();
+
+        // Initially ordered: 1, 2, 3
+        const listbox = screen.getByRole('listbox');
+        const getEpisodeButtons = () => Array.from(listbox.querySelectorAll<HTMLButtonElement>('button[role="option"]'));
+        expect(getEpisodeButtons()[0]).toHaveTextContent('Серия 1: Начало');
+        expect(getEpisodeButtons()[2]).toHaveTextContent('Серия 3: Финал');
+
+        // Click sort toggle
+        fireEvent.click(sortBtn);
+
+        // Now reversed: 3, 2, 1
+        expect(getEpisodeButtons()[0]).toHaveTextContent('Серия 3: Финал');
+        expect(getEpisodeButtons()[2]).toHaveTextContent('Серия 1: Начало');
+    });
+
+    it('renders continue watching header banner and selects episode on click', async () => {
+        localStorage.setItem('watch_progress', JSON.stringify({
+            '100': { '2': 450 }, // 7m 30s
+        }));
+
+        const onEpisodeSelect = vi.fn();
+        renderModal({ onEpisodeSelect });
+
+        await waitFor(() => {
+            expect(screen.getByText('Продолжить просмотр')).toBeInTheDocument();
+        });
+
+        expect(screen.getAllByText(/07:30/).length).toBeGreaterThan(0);
+        const resumeBtn = screen.getByRole('button', { name: /Продолжить Серия 2: Встреча/i });
+        expect(resumeBtn).toBeInTheDocument();
+
+        fireEvent.click(resumeBtn);
+
+        await waitFor(() => {
+            expect(onEpisodeSelect).toHaveBeenCalledTimes(1);
+        });
+
+        expect(onEpisodeSelect).toHaveBeenCalledWith(
+            {},
+            expect.objectContaining({ name: 'Серия 2: Встреча', position: 2 }),
+            expect.any(Array),
+            10,
+            1
+        );
+
+        localStorage.removeItem('watch_progress');
+    });
 });
+
 

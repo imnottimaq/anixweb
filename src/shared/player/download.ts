@@ -206,7 +206,7 @@ export function triggerBrowserFileDownload(blob: Blob, filename: string): void {
     document.body.removeChild(anchor);
     window.setTimeout(() => {
         URL.revokeObjectURL(url);
-    }, 60_000);
+    }, 5_000);
 }
 
 export function useEpisodeDownload() {

@@ -56,7 +56,30 @@
   --status-dropped: #eb5757;
   --status-favorite: #ffbf40;
   --player-controls-background: rgb(0 0 0 / 55%);
+
+  /* Safe areas & Mobile Navigation tokens */
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --mobile-bottom-nav-height: 58px;
 }
+
+html {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Disable native touch callout and text selection on elements with custom long-press context menus */
+a[data-release-list-status],
+a[href*="/anime/"],
+a[href*="/anime/"] img,
+[role="tab"] {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 
 [data-theme="light"] {
   --background-color: #ffffff;

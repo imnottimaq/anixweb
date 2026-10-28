@@ -19,6 +19,7 @@ import TabContextMenu, { type TabContextMenuItem } from '../components/TabContex
 import { FAVORITES_TAB_ORDER } from '../shared/types/settings';
 import { normalizeTabOrder } from '../shared/tabOrder';
 import { useReorderableTabs } from '../shared/useReorderableTabs';
+import { useLongPress } from '../shared/useLongPress';
 import TabDragHandle from '../components/TabDragHandle';
 
 type ProfilePage = 'collections' | 'favorites' | 'history' | 'watching' | 'planned' | 'completed' | 'onHold' | 'dropped';
@@ -129,6 +130,30 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
     const orderedItems = isProfileFavorites ? EXTERNAL_PROFILE_PAGE_ITEMS : normalizeTabOrder(settings.content.favoritesTabOrder, FAVORITES_TAB_ORDER).map(key => PAGE_ITEMS.find(item => item.page === FAVORITES_TAB_BY_SETTING[key])!);
     const reorder = useReorderableTabs(orderedItems.map(item => item.page), order => setSettings(previous => ({ ...previous, content: { ...previous.content, favoritesTabOrder: order.map(page => SETTING_BY_FAVORITES_TAB[page]) } })), page => t(PAGE_ITEMS.find(item => item.page === page)!.buttonText));
     const hasValidProfileId = Number.isInteger(selectedProfileId) && selectedProfileId > 0;
+
+    const filterTabTarget = useCallback((target: EventTarget | null) => {
+        if (!target || !(target instanceof Element)) return null;
+        if (target.closest('[data-tab-grip]')) return null;
+        return target.closest<HTMLButtonElement>('button[role="tab"]');
+    }, []);
+
+    const tabLongPress = useLongPress<HTMLDivElement, HTMLButtonElement>({
+        disabled: isProfileFavorites,
+        filterTarget: filterTabTarget,
+        onLongPress: (button, coords) => {
+            const page = button.dataset.tabPage as ProfilePage | undefined;
+            if (page) {
+                setTabContextMenu({
+                    page,
+                    x: coords.x,
+                    y: coords.y,
+                    trigger: button,
+                });
+                return true;
+            }
+            return false;
+        },
+    });
 
     const isCollectionsPage = activePage === 'collections';
     const activeTab = isCollectionsPage ? tabs.collections : tabs[activePage];
@@ -285,11 +310,12 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
 
     return (
         <div className={styles.body}>
-            <div className={styles['side-panel']} role="tablist" aria-label={t('favorites.sectionsAria')}>
+            <div className={styles['side-panel']} role="tablist" aria-label={t('favorites.sectionsAria')} {...tabLongPress.handlers}>
                 {orderedItems.map(({ page, buttonText }) => (
                     <button
                         {...(!isProfileFavorites ? reorder.props(page) : {})}
                         key={page}
+                        data-tab-page={page}
                         role="tab"
                         aria-selected={activePage === page}
                         aria-haspopup={!isProfileFavorites ? 'menu' : undefined}
@@ -297,6 +323,7 @@ function FavoritesScreenContent({ profileId }: { profileId?: string }) {
                         onClick={() => setActivePage(page)}
                         onContextMenu={!isProfileFavorites ? (e) => {
                             e.preventDefault();
+                            tabLongPress.cancel();
                             setTabContextMenu({
                                 page,
                                 x: e.clientX,
