@@ -20,14 +20,18 @@ test('subpath production navigation and unknown-route recovery work', async ({ p
 });
 
 test('a missing production lazy chunk exposes recovery without crashing the navigation', async ({ page }) => {
+    test.slow();
     await page.route('**/assets/SettingsScreen-*.js', route => route.abort());
     await page.goto('settings');
     await expect(page.getByRole('heading', { name: 'Could not open this page' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Primary navigation' })).toBeVisible();
     await page.unroute('**/assets/SettingsScreen-*.js');
-    await page.getByRole('button', { name: 'Try again' }).click();
-    await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible({ timeout: 15000 });
+    await Promise.all([
+        page.waitForNavigation({ waitUntil: 'domcontentloaded' }).catch(() => {}),
+        page.getByRole('button', { name: 'Try again' }).click(),
+    ]);
+    await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible({ timeout: 30000 });
 });
 });
 

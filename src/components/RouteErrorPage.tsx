@@ -8,12 +8,16 @@ export default function RouteErrorPage({ notFound = false }: { notFound?: boolea
     const { t } = useTranslation();
     const missing = notFound || (isRouteErrorResponse(error) && error.status === 404);
 
+    const handleRetry = () => {
+        window.location.reload();
+    };
+
     return <PageLayout>
         <PageHeader title={t(missing ? 'page.notFoundTitle' : 'page.routeErrorTitle')} />
         <PageState
             status={missing ? 'empty' : 'error'}
             message={t(missing ? 'page.notFound' : 'page.routeError')}
-            onRetry={missing ? undefined : () => window.location.reload()}
+            onRetry={missing ? undefined : handleRetry}
         />
         <Link to="/">{t('nav.home')}</Link>
     </PageLayout>;
