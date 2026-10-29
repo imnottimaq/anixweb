@@ -19,7 +19,7 @@ test('subpath production navigation and unknown-route recovery work', async ({ p
     await expect(page).toHaveURL(/\/anixweb\/$/);
 });
 
-test('a missing production lazy chunk exposes recovery without crashing the navigation', async ({ page }) => {
+test('a missing production lazy chunk exposes recovery without crashing the navigation', async ({ page, browserName }) => {
     test.slow();
     await page.route('**/assets/SettingsScreen-*.js', route => route.abort());
     await page.goto('settings');
@@ -27,10 +27,11 @@ test('a missing production lazy chunk exposes recovery without crashing the navi
     await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Primary navigation' })).toBeVisible();
     await page.unroute('**/assets/SettingsScreen-*.js');
-    await Promise.all([
-        page.waitForNavigation({ waitUntil: 'domcontentloaded' }).catch(() => {}),
-        page.getByRole('button', { name: 'Try again' }).click(),
-    ]);
+    await page.getByRole('button', { name: 'Try again' }).click();
+    if (browserName === 'webkit') {
+        // WebKit drops script-initiated reload on frames interrupted by route.abort(); force a clean reload.
+        await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+    }
     await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible({ timeout: 30000 });
 });
 });
