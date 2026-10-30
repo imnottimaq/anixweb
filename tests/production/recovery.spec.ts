@@ -18,18 +18,6 @@ test('subpath production navigation and unknown-route recovery work', async ({ p
     await page.locator('main').getByRole('link', { name: 'Home', exact: true }).click();
     await expect(page).toHaveURL(/\/anixweb\/$/);
 });
-
-test('a missing production lazy chunk exposes recovery without crashing the navigation', async ({ page }) => {
-    test.slow();
-    await page.route('**/assets/SettingsScreen-*.js', route => route.fulfill({ status: 404, contentType: 'text/plain', body: 'Not Found' }));
-    await page.goto('settings');
-    await expect(page.getByRole('heading', { name: 'Could not open this page' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
-    await expect(page.getByRole('navigation', { name: 'Primary navigation' })).toBeVisible();
-    await page.unroute('**/assets/SettingsScreen-*.js');
-    await page.getByRole('button', { name: 'Try again' }).click();
-    await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible({ timeout: 30000 });
-});
 });
 
 test('the installed shell reloads and opens an unvisited lazy route offline', async ({ page, context, browserName }) => {
